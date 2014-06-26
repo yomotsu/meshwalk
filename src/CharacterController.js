@@ -1,8 +1,6 @@
 // @author yomotsu
 // MIT License
 
-THREEFIELD.WALL_GRADIENT = Math.atan( 90 * Math.PI / 180 );
-
 THREEFIELD.CharacterController = function ( object3d, radius, world ) {
 
   this.object = object3d;
@@ -60,24 +58,26 @@ THREEFIELD.CharacterController.prototype._updateVelocity = function () {
   this.velocity.y = FALL_VELOCITY;
   this.velocity.z = frontDierction * this.movementSpeed * this.isWalking;
 
-  if ( this.collidedTriangles.length === 0 ) {
+  if ( this.collidedTriangles.length === 0 && !this.isJumping ) {
 
-    // 何とも衝突していない
+    // 自由落下中 (ジャンプ中とは別)
     return;
 
   }
 
-  if ( this.isGrounded ) {
+  if ( this.isGrounded && !this.isOnSlope && !this.isJumping ) {
 
     this.velocity.y = 0;
 
-  }
-
-  if ( this.isOnSlope ) {
+  } else if ( this.isGrounded && this.isOnSlope && !this.isJumping ) {
 
     this.velocity.x = this.groundNormal.x * this.movementSpeed;
     this.velocity.y = 1 - this.groundNormal.y;
     this.velocity.z = this.groundNormal.z * this.movementSpeed;
+
+  } else if ( !this.isGrounded && !this.isOnSlope && this.isJumping ) {
+
+    this.velocity.y = this.currentJumpPower * -FALL_VELOCITY;
 
   }
 
@@ -133,7 +133,8 @@ THREEFIELD.CharacterController.prototype._updateVelocity = function () {
 
 THREEFIELD.CharacterController.prototype._updateGrounding = function () {
 
-  var origin,
+  var groundPadding,
+      origin,
       raycaster,
       objects,
       intersects,
@@ -142,18 +143,28 @@ THREEFIELD.CharacterController.prototype._updateGrounding = function () {
   this.isGrounded = false;
   this.isOnSlope = false;
 
+  if ( 0 <= this.velocity.y && this.isJumping ) {
+
+    groundPadding = -this.radius;
+
+  } else {
+
+    groundPadding = this.groundPadding;
+
+  }
+
+
   origin = new THREE.Vector3(
     this.object.position.x,
     this.object.position.y + this.radius,
     this.object.position.z
   );
   raycaster = new THREE.Raycaster(
-    origin,                              // origin
-    new THREE.Vector3( 0, -1, 0 ),       // direction
-    0,                                   // near
-    this.radius * 2 + this.groundPadding // far
+    origin,                         // origin
+    new THREE.Vector3( 0, -1, 0 ),  // direction
+    0,                              // near
+    this.radius * 2 + groundPadding // far
   );
-
   objects = [];
 
   for ( i = 0, l = this.world.colliders.length; i < l; i ++ ) {
@@ -172,6 +183,7 @@ THREEFIELD.CharacterController.prototype._updateGrounding = function () {
   }
 
   this.isGrounded = true;
+  this.isJumping = false;
   this.groundHeight = intersects[ 0 ].point.y;
   this.groundNormal.copy( intersects[ 0 ].face.normal );
 
@@ -196,5 +208,32 @@ THREEFIELD.CharacterController.prototype._updatePosition = function ( dt ) {
   }
 
   this.object.position.set( x, y, z );
+
+};
+
+THREEFIELD.CharacterController.prototype.jump = function () {
+
+  if ( this.isJumping ) { return; }
+
+  this.isJumping = true;
+  this.isGrounded = false;
+
+  var that = this;
+  var jumpStartTime = Date.now();
+  var jumpMaxDuration = 1000;
+
+  ( function jump () {
+
+    var elapsedTime = Date.now() - jumpStartTime;
+    var progress = elapsedTime / jumpMaxDuration;
+
+    if( elapsedTime < jumpMaxDuration ){
+
+      that.currentJumpPower = Math.cos( Math.min( progress, 1 ) * Math.PI );
+      requestAnimationFrame( jump );
+
+    }
+
+  } )();
 
 };

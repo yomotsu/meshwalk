@@ -4,7 +4,6 @@
 THREEFIELD.Collider = function ( threeMesh ) {
 
   var geometry,
-      matrix = threeMesh.matrixWorld.clone(),
       i, l;
 
   this.mesh = threeMesh;
