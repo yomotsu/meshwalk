@@ -45,7 +45,7 @@ wall = new THREE.Mesh(
   new THREE.MeshNormalMaterial( { color: 0xffffff,  wireframe: true } )
 );
 wall.position.set( 0, 3, 0 );
-wall.rotation.set( 0, 0, THREE.Math.degToRad( 20 ) );
+// wall.rotation.set( 0, 0, THREE.Math.degToRad( 20 ) );
 scene.add( wall );
 world.add( new THREEFIELD.Collider( wall ) );
 
@@ -71,7 +71,7 @@ keyInputControl.addEventListener( 'jumpKeydown', function () { playerController.
 count=0;
 ;( function update () {
   count++
-  if(count>1500){return}
+  if(count>500){return}
   requestAnimationFrame( update );
   var delta = clock.getDelta();
   var characterFrontAngle = keyInputControl.getFrontAngle();

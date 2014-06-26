@@ -3,6 +3,12 @@
 
 var THREEFIELD = {};
 
+THREEFIELD.normalizeAngle = function ( angleInDeg ) {
+
+  return ( angleInDeg >= 0 ) ? ( angleInDeg % 360 ) : ( angleInDeg  % 360 + 360 );
+
+};
+
 THREEFIELD.sphereInAABB = function ( position, radius, aabb ) {
   // http://d.hatena.ne.jp/taiyakisun/20120205/1328410006
   // http://marupeke296.com/COL_3D_No11_AABBvsPoint.html
@@ -256,7 +262,7 @@ THREEFIELD.CharacterController = function ( object3d, radius, world ) {
   this.object = object3d;
   this.radius = radius;
   this.world = world;
-  this.maxSlopeGradient = Math.atan( 60 * Math.PI / 180 );
+  this.maxSlopeGradient = Math.cos( THREE.Math.degToRad( 50 ) );
   this.isGrounded = false;
   this.isOnSlope = false;
   this.isWalking = false;
@@ -299,6 +305,11 @@ THREEFIELD.CharacterController.prototype._updateVelocity = function () {
       normal,
       wallNomal2D,
       frontVelocity2D,
+      frontVelocity2DNorm,
+      wallAngle,
+      frontAngle,
+      frontAngleInverted,
+      vsWallAngle,
       i, l;
       
   this.velocity.x = rightDierction * this.movementSpeed * this.isWalking;
@@ -326,7 +337,14 @@ THREEFIELD.CharacterController.prototype._updateVelocity = function () {
 
   }
 
-  // ここから vs壁と、壁ずりの処理
+// ここから vs壁と、壁ずりの処理
+  frontVelocity2D = new THREE.Vector2(  this.velocity.x, this.velocity.z );
+  frontAngle = Math.atan2( frontVelocity2D.y, frontVelocity2D.x ) * 180 / Math.PI;
+  frontAngle = THREEFIELD.normalizeAngle( frontAngle );
+
+  frontAngleInverted = Math.atan2( -frontVelocity2D.y, -frontVelocity2D.x ) * 180 / Math.PI;
+  frontAngleInverted = THREEFIELD.normalizeAngle( frontAngleInverted );
+
   for ( i = 0, l = this.collidedTriangles.length; i < l; i ++ ) {
 
     normal = this.collidedTriangles[ i ].normal;
@@ -339,31 +357,35 @@ THREEFIELD.CharacterController.prototype._updateVelocity = function () {
     // 2つ壁がある場合は、鋭角なら止まる。鈍角なら進む
     // 滑り落ちる処理は _updateGrounding にある
     // TODO 壁からpull backする処理も必要
+    // TODO エッジ * 2の時の処理
 
-      // console.log( '壁だよ' );
-    // console.log( intersects[ 0 ].distance );
+    wallNomal2D = new THREE.Vector2( normal.x, normal.z );
+    wallAngle  = Math.atan2( wallNomal2D.y, wallNomal2D.x ) * 180 / Math.PI;
+    wallAngle = THREEFIELD.normalizeAngle( wallAngle );
 
-    // var wallNomal2D = new THREE.Vector2( normal.x, normal.z );
-    // var frontVelocity2D = new THREE.Vector2(  this.velocity.x, this.velocity.z );
 
-    // console.log( wallNomal2D , frontVelocity2D );
+    if (
+      Math.abs( frontAngleInverted - wallAngle ) >= 90 &&
+      Math.abs( frontAngleInverted - wallAngle ) <= 270
+    ) {
 
-    // wallNomal2D.set(
-    //   frontVelocity2D.dot( wallNomal2D ) * wallNomal2D.x,
-    //   frontVelocity2D.dot( wallNomal2D ) * wallNomal2D.y
-    // );
-    // frontVelocity2D.subVectors( frontVelocity2D, wallNomal2D );
-    // this.velocity.x = frontVelocity2D.x;
-    // this.velocity.z = frontVelocity2D.y;
+      continue;
 
-    // this.velocity.x = this.groundNormal.x * this.movementSpeed;
-    // this.velocity.y = 1 - this.groundNormal.y;
-    // this.velocity.z = this.groundNormal.z * this.movementSpeed;
+    }
+
+    wallNomal2D.set(
+      frontVelocity2D.dot( wallNomal2D ) * wallNomal2D.x,
+      frontVelocity2D.dot( wallNomal2D ) * wallNomal2D.y
+    );
+    frontVelocity2D.subVectors( frontVelocity2D, wallNomal2D );
+
+    this.velocity.x = frontVelocity2D.x;
+    this.velocity.z = frontVelocity2D.y;
 
     }
 
   }
-
+  console.log( '---' );
   this.collidedTriangles.length = 0;
 
 };
