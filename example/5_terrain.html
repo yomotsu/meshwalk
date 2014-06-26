@@ -11,15 +11,13 @@ canvas{display: block;}
 <body>
 
 <script src="../lib/three.min.js"></script>
-<script src="../threefield.js"></script>
-<script src="../KeyInputControl.js"></script>
-<script src="../GyroscopeCameraControl.js"></script>
+<script src="../build/threefield.js"></script>
 
 <script>
 
 
 var width, height, clock, scene, camera, renderer;
-var light, terrain, sphere;
+var light, terrain, box, sphere;
 var world, groundBody, playerRadius = 1, playerObjectHolder, playerController;
 
 world = new THREEFIELD.World();
@@ -33,10 +31,6 @@ camera.position.set( 0, 5, 30 );
 renderer = new THREE.WebGLRenderer();
 renderer.setSize( width, height );
 document.body.appendChild( renderer.domElement );
-
-// light = new THREE.DirectionalLight( 0xffffff, 1.5 );
-// light.position.set(1, 1, 1 );
-// scene.add( light );
 
 playerObjectHolder = new THREE.Object3D();
 playerObjectHolder.position.set( 0, 10, 0 );
@@ -69,6 +63,15 @@ var gyroscopeCameraControl = new THREEFIELD.GyroscopeCameraControl(
   }
 );
 
+
+box = new THREE.Mesh(
+  new THREE.BoxGeometry( 14, 1, 5 ),
+  new THREE.MeshNormalMaterial()
+);
+box.position.set( -3, 7.5, -12 );
+scene.add( box );
+world.add( new THREEFIELD.Collider( box ) );
+
 var loader = new THREE.JSONLoader();
 
 loader.load( 'terrain.js', function( geo, mat ) {
@@ -84,10 +87,10 @@ loader.load( 'terrain.js', function( geo, mat ) {
   gyroscopeCameraControl.rigidObjects.push( terrain );
 
   
-  count=0;
+  // count=0;
   ;( function update () {
-    count++
-    if(count>1500){return}
+    // count++
+    // if(count>1500){return}
     requestAnimationFrame( update );
   
     var delta = clock.getDelta();

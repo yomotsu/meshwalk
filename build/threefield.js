@@ -1,7 +1,12 @@
-// @author yomotsu
-// MIT License
+/*!
+ * @author yomotsu http://yomotsu.net/
+ * MIT License
+ */
 
 var THREEFIELD = {};
+
+// @author yomotsu
+// MIT License
 
 THREEFIELD.normalizeAngle = function ( angleInDeg ) {
 
@@ -133,10 +138,12 @@ THREEFIELD.sphereVsTriangle = function ( face, position, radius ) {
 
   }
 
-  // console.log( 'hit' );
   return true;
 
 };
+
+// @author yomotsu
+// MIT License
 
 THREEFIELD.World = function () {
 
@@ -170,6 +177,7 @@ THREEFIELD.World.prototype.step = function ( dt ) {
   for ( i = 0, l = this.characters.length; i < l; i ++ ) {
 
     character = this.characters[ i ];
+    character.collidedTriangles.length = 0;
 
     for ( ii = 0, ll = this.colliders.length; ii < ll; ii ++ ) {
 
@@ -205,6 +213,9 @@ THREEFIELD.World.prototype.step = function ( dt ) {
   }
 
 };
+
+// @author yomotsu
+// MIT License
 
 THREEFIELD.Collider = function ( threeMesh ) {
 
@@ -247,13 +258,13 @@ THREEFIELD.Collider = function ( threeMesh ) {
 
     this.faces.push( { a: a, b: b, c: c } );
     this.normals.push( geometry.faces[ i ].normal );
-    this.aabb.addPoint( a );
-    this.aabb.addPoint( b );
-    this.aabb.addPoint( c );
 
   }
 
 };
+
+// @author yomotsu
+// MIT License
 
 THREEFIELD.WALL_GRADIENT = Math.atan( 90 * Math.PI / 180 );
 
@@ -293,19 +304,17 @@ THREEFIELD.CharacterController.prototype.update = function ( dt ) {
   this._updateGrounding();
   this._updateVelocity();
   this._updatePosition( dt );
-  // console.log( this.groundNormal );
 
 };
 
 THREEFIELD.CharacterController.prototype._updateVelocity = function () {
 
-  var GRAVITY = -20,
+  var FALL_VELOCITY = -20,
       frontDierction = -Math.cos( THREE.Math.degToRad( this.frontAngle ) ),
       rightDierction = -Math.sin( THREE.Math.degToRad( this.frontAngle ) ),
       normal,
       wallNomal2D,
       frontVelocity2D,
-      frontVelocity2DNorm,
       wallAngle,
       frontAngle,
       frontAngleInverted,
@@ -313,7 +322,7 @@ THREEFIELD.CharacterController.prototype._updateVelocity = function () {
       i, l;
       
   this.velocity.x = rightDierction * this.movementSpeed * this.isWalking;
-  this.velocity.y = GRAVITY;
+  this.velocity.y = FALL_VELOCITY;
   this.velocity.z = frontDierction * this.movementSpeed * this.isWalking;
 
   if ( this.collidedTriangles.length === 0 ) {
@@ -353,11 +362,9 @@ THREEFIELD.CharacterController.prototype._updateVelocity = function () {
 
     // y が this.maxSlopeGradient 以下なら急な坂または壁
     // 壁との衝突による壁ずりの処理
-    // 進行方向に壁がある場合
-    // 2つ壁がある場合は、鋭角なら止まる。鈍角なら進む
-    // 滑り落ちる処理は _updateGrounding にある
-    // TODO 壁からpull backする処理も必要
-    // TODO エッジ * 2の時の処理
+    // TODO めり込んだ場合、めり込み量を元に壁の法線方向にpull backする処理
+    // TODO 衝突対象 (壁) が エッジ * 2 の時の処理 - > ノーマルの角度がプレイヤーに一番向いているエッジを使う。エッジの組み合わせが壁と床である可能性もあるから、その時は壁となるエッジは無視する
+    // TODO 衝突対象 (壁) が フェイス * 2 の時の処理 -> フェイス同士のノーマルが鋭角なら止まる。鈍角なら壁ずりで進める
 
     wallNomal2D = new THREE.Vector2( normal.x, normal.z );
     wallAngle  = Math.atan2( wallNomal2D.y, wallNomal2D.x ) * 180 / Math.PI;
@@ -385,8 +392,6 @@ THREEFIELD.CharacterController.prototype._updateVelocity = function () {
     }
 
   }
-  console.log( '---' );
-  this.collidedTriangles.length = 0;
 
 };
 
@@ -458,3 +463,340 @@ THREEFIELD.CharacterController.prototype._updatePosition = function ( dt ) {
   this.object.position.set( x, y, z );
 
 };
+
+// @author yomotsu
+// MIT License
+
+;( function ( ns ) {
+
+  ns.KeyInputControl = function () {
+    
+    THREE.EventDispatcher.prototype.apply( this );
+    this.mouseAccelarationX = 100;
+    this.mouseAccelarationY = 20;
+    this.isDisabled = false;
+
+    this.isUp = false;
+    this.isDown = false;
+    this.isLeft = false;
+    this.isRight = false;
+    this.frontAngle = 0;
+
+    this._mousedownListener = onkeydown.bind( this );
+    this._mouseupListener   = onkeyup.bind( this );
+
+    window.addEventListener( 'keydown', this._mousedownListener, false );
+    window.addEventListener( 'keyup',   this._mouseupListener,   false );
+
+  }
+
+  ns.KeyInputControl.prototype.jump = function () {
+
+    this.dispatchEvent( { type: 'jumpKeydown' } );
+
+  };
+
+  ns.KeyInputControl.prototype.updateAngle = function () {
+
+    var up    = this.isUp;
+    var down  = this.isDown;
+    var left  = this.isLeft;
+    var right = this.isRight;
+
+    if (  up && !left && !down && !right ) { this.frontAngle =   0; }
+    else if (  up &&  left && !down && !right ) { this.frontAngle =  45; }
+    else if ( !up &&  left && !down && !right ) { this.frontAngle =  90; }
+    else if ( !up &&  left &&  down && !right ) { this.frontAngle = 135; }
+    else if ( !up && !left &&  down && !right ) { this.frontAngle = 180; }
+    else if ( !up && !left &&  down &&  right ) { this.frontAngle = 225; }
+    else if ( !up && !left && !down &&  right ) { this.frontAngle = 270; }
+    else if (  up && !left && !down &&  right ) { this.frontAngle = 315; }
+
+  };
+
+  
+  ns.KeyInputControl.prototype.getFrontAngle = function () {
+
+    return this.frontAngle;
+
+  };
+
+
+
+  function onkeydown ( e ) {
+
+    if ( this.isDisabled ) { return; }
+
+    switch ( e.keyCode ) {
+
+      case 87: // 'w'
+      case 38: // up
+        this.isUp = true;
+        break;
+
+      case 83: // 's'
+      case 40: // down
+        this.isDown = true;
+        break;
+
+      case 65: // 'a'
+      case 37: // left
+        this.isLeft = true;
+        break;
+
+      case 68: // 'd'
+      case 39: // right
+        this.isRight = true;
+        break;
+
+      case 32: // spacebar
+        this.jump();
+        break;
+
+    }
+
+    this.updateAngle();
+
+    if ( this.isUp || this.isDown || this.isLeft || this.isRight ) {
+
+      this.isMoveKeyHolded = true;
+      this.dispatchEvent( { type: 'startMoving' } );
+
+    }
+
+  }
+
+  function onkeyup ( e ) {
+
+    if ( this.isDisabled ) { return; }
+
+    switch ( e.keyCode ) {
+
+      case 87: // 'w'
+      case 38: // up
+        this.isUp = false;
+        break;
+
+      case 83: // 's'
+      case 40: // down
+        this.isDown = false;
+        break;
+        
+      case 65: // 'a'
+      case 37: // left
+        this.isLeft = false;
+        break;
+
+      case 68: // 'd'
+      case 39: // right
+        this.isRight = false;
+        break;
+
+      case 32: // spacebar
+        break;
+
+    }
+
+    this.updateAngle();
+
+    if ( !this.isUp && !this.isDown && !this.isLeft && !this.isRight ) {
+
+      this.dispatchEvent( { type: 'stopMoving' } );
+
+    }
+
+  }
+
+} )( THREEFIELD );
+
+// @author yomotsu
+// MIT License
+
+;( function ( ns ) {
+
+  var vec3 = new THREE.Vector3();
+
+  // camera              isntance of THREE.Camera
+  // trackObject         isntance of THREE.Object3D
+  // params.el           DOM element
+  // params.radius       number
+  // params.minRadius    number
+  // params.maxRadius    number
+  // params.rigidObjects array of inctances of THREE.Mesh
+  ns.GyroscopeCameraControl = function ( camera, trackObject, params ) {
+
+    THREE.EventDispatcher.prototype.apply( this );
+    this.camera = camera;
+    this.trackObject  = trackObject;
+    this.el           = params && params.el || window;
+    this.offset       = params && params.offset || new THREE.Vector3( 0, 0, 0 ),
+    this.radius       = params && params.radius    || 10;
+    this.minRadius    = params && params.minRadius || 1;
+    this.maxRadius    = params && params.maxRadius || 30;
+    this.rigidObjects = params && params.rigidObjects || [];
+    this.lat = 0;
+    this.lon = 0;
+    this._phi;   // angle of zenith
+    this._theta; // angle of azimuth
+    this.mouseAccelerationX = params && params.mouseAccelerationX !== undefined ? params.mouseAccelerationX : 100;
+    this.mouseAccelerationY = params && params.mouseAccelerationY !== undefined ? params.mouseAccelerationY : 30;
+    this._pointerStart = { x: 0, y: 0 };
+    this._pointerLast  = { x: 0, y: 0 };
+
+    this.camera.position.set(
+      this.trackObject.position.x + this.offset.x,
+      this.trackObject.position.y + this.offset.y,
+      this.trackObject.position.z + this.offset.z + 1
+    );
+    this.update();
+
+    this._mousedownListener = onmousedown.bind( this );
+    this._mouseupListener   = onmouseup.bind( this );
+    this._mousedragListener = onmousedrag.bind( this )
+    this._scrollListener    = onscroll.bind( this );
+
+    this.el.addEventListener( 'mousedown', this._mousedownListener, false );
+    this.el.addEventListener( 'mouseup',   this._mouseupListener,   false );
+    this.el.addEventListener( 'mousewheel',     this._scrollListener, false );
+    this.el.addEventListener( 'DOMMouseScroll', this._scrollListener, false );
+    
+  }
+
+  ns.GyroscopeCameraControl.prototype.update = function () {
+
+    this.lat = this.lat >  90 ?  90 :
+               this.lat < -90 ? -90 :
+               this.lat;
+    this.lon = this.lon < 0 ? 360 + this.lon % 360 : this.lon % 360;
+    this._phi   =  THREE.Math.degToRad( this.lat );
+    this._theta = -THREE.Math.degToRad( this.lon - 90 );
+
+    this._center = new THREE.Vector3(
+      this.trackObject.matrixWorld.elements[ 12 ] + this.offset.x,
+      this.trackObject.matrixWorld.elements[ 13 ] + this.offset.y,
+      this.trackObject.matrixWorld.elements[ 14 ] + this.offset.z
+    );
+    var distance = collisionTest( this );
+    var position = new THREE.Vector3( 
+      Math.cos( this._phi ) * Math.cos( this._theta ), 
+      Math.sin( this._phi ), 
+      Math.cos( this._phi ) * Math.sin( this._theta )
+    ).multiplyScalar( distance );
+    position = vec3.addVectors( position, this._center );
+    this.camera.position.copy( position );
+
+    if ( this.lat === 90 ) {
+
+      this.camera.up.set(
+        Math.cos( this._theta + THREE.Math.degToRad( 180 ) ),
+        0,
+        Math.sin( this._theta + THREE.Math.degToRad( 180 ) )
+      );
+
+    } else if ( this.lat === -90 ) {
+
+      this.camera.up.set(
+        Math.cos( this._theta ),
+        0,
+        Math.sin( this._theta )
+      );
+
+    } else {
+
+      this.camera.up.set( 0, 1, 0 );
+
+    }
+    this.camera.lookAt( this._center );
+    this.dispatchEvent( { type: 'updated' } );
+
+  }
+
+  ns.GyroscopeCameraControl.prototype.getFrontAngle = function () {
+
+    return 360 - this.lon;
+
+  }
+
+  function collisionTest ( instance ) {
+
+    if ( instance.rigidObjects.length === 0 ) {
+
+      return instance.radius;
+
+    }
+
+    var direction = new THREE.Vector3(
+      instance.camera.position.x - instance._center.x,
+      instance.camera.position.y - instance._center.y,
+      instance.camera.position.z - instance._center.z
+    ).normalize();
+    var raycaster = new THREE.Raycaster(
+      instance._center,    // origin
+      direction,          // direction
+      instance.minRadius, // near
+      instance.radius     // far
+    );
+    var intersects = raycaster.intersectObjects( instance.rigidObjects );
+
+    if ( intersects.length >= 1 ){
+
+      return intersects[ 0 ].distance;
+
+    } else {
+
+      return instance.radius
+    }
+
+  };
+
+  function onmousedown ( event ) {
+
+    this.dispatchEvent( { type: 'mousedown' } );
+    this._pointerStart.x = event.clientX;
+    this._pointerStart.y = event.clientY;
+    this._pointerLast.x = this.lon;
+    this._pointerLast.y = this.lat;
+    this.el.removeEventListener( 'mousemove', this._mousedragListener, false );
+    this.el.addEventListener( 'mousemove', this._mousedragListener, false );
+
+  }
+
+  function onmouseup () {
+
+    this.dispatchEvent( { type: 'mouseup' } );
+    this.el.removeEventListener( 'mousemove', this._mousedragListener, false );
+
+  }
+
+  function onmousedrag ( event ) {
+
+    var w = this.el.offsetWidth;
+    var h = this.el.offsetHeight;
+    var x = ( this._pointerStart.x - event.clientX ) / w * 2;
+    var y = ( this._pointerStart.y - event.clientY ) / h * 2;
+    this.lon = this._pointerLast.x + x * this.mouseAccelerationX;
+    this.lat = this._pointerLast.y + y * this.mouseAccelerationY;
+    // this.update();
+
+  }
+
+  function onscroll ( event ) {
+
+    event.preventDefault();
+    // WebKit
+    if ( event.wheelDeltaY ) {
+      this.radius -= event.wheelDeltaY * 0.05 / 5;
+    // IE
+    } else if ( event.wheelDelta ) {
+      this.radius -= event.wheelDelta * 0.05 / 5;
+    // Firefox
+    } else if ( event.detail ) {
+      this.radius += event.detail / 5;
+    }
+    this.radius = Math.max( this.radius, this.minRadius );
+    this.radius = Math.min( this.radius, this.maxRadius );
+    this.update();
+
+  }
+
+} )( THREEFIELD );
