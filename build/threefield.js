@@ -361,7 +361,9 @@ THREEFIELD.CharacterController.prototype._updateVelocity = function () {
 
     // y が this.maxSlopeGradient 以下なら急な坂または壁
     // 壁との衝突による壁ずりの処理
-    // TODO めり込んだ場合、めり込み量を元に壁の法線方向にpull backする処理
+    // TODO めり込んだ場合、めり込み量を元に壁の法線方向にpull outする処理
+    //      めりこみ量は、中心とフェイスの距離から求めることができる
+    //      複数にめり込んでいたら、全フェイスを平均してそれを使う。
     // TODO 衝突対象 (壁) が エッジ * 2 の時の処理 - > ノーマルの角度がプレイヤーに一番向いているエッジを使う。エッジの組み合わせが壁と床である可能性もあるから、その時は壁となるエッジは無視する
     // TODO 衝突対象 (壁) が フェイス * 2 の時の処理 -> フェイス同士のノーマルが鋭角なら止まる。鈍角なら壁ずりで進める
 
@@ -499,6 +501,52 @@ THREEFIELD.CharacterController.prototype.jump = function () {
     }
 
   } )();
+
+};
+
+// @author yomotsu
+// MIT License
+
+
+THREEFIELD.AnimationController = function ( mesh, actions ) {
+
+  this.mesh = mesh;
+  this.action = {};
+  var i, l, anim;
+
+  for ( i = 0, l = this.mesh.geometry.animations.length; i < l; i ++ ) {
+
+    anim = this.mesh.geometry.animations[ i ];
+
+    THREE.AnimationHandler.add( anim );
+
+    this.action[ anim.name ] = {
+
+      anim: new THREE.Animation(
+        mesh,
+        anim.name,
+        THREE.AnimationHandler.CATMULLROM
+      ),
+
+      duration: anim.length * 1000
+
+    };
+
+  }
+
+};
+
+THREEFIELD.AnimationController.prototype.play = function ( name ) {
+
+  var i;
+
+  for ( i in this.action ) {
+
+    this.action[ i ].anim.stop();
+
+  }
+
+  this.action[ name ].anim.play();
 
 };
 

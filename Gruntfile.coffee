@@ -17,6 +17,7 @@ module.exports = (grunt) ->
           'src/World.js'
           'src/Collider.js'
           'src/CharacterController.js'
+          'src/AnimationController.js'
           'src/KeyInputControl.js'
           'src/GyroscopeCameraControl.js'
         ]
