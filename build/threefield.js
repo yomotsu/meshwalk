@@ -267,10 +267,12 @@ THREEFIELD.Collider = function ( threeMesh ) {
 
 THREEFIELD.CharacterController = function ( object3d, radius, world ) {
 
+  THREE.EventDispatcher.prototype.apply( this );
   this.object = object3d;
   this.radius = radius;
   this.world = world;
   this.maxSlopeGradient = Math.cos( THREE.Math.degToRad( 50 ) );
+  this.isIdling   = false;
   this.isGrounded = false;
   this.isOnSlope = false;
   this.isWalking = false;
@@ -283,6 +285,12 @@ THREEFIELD.CharacterController = function ( object3d, radius, world ) {
   this.groundHeight = 0;
   this.groundNormal = new THREE.Vector3();
   this.collidedTriangles = [];
+  this._previouseMosion = {
+    isGounded: null,
+    isSlope  : null,
+    isWalking: null,
+    isJumping: null
+  };
   world.addCharacter( this );
 
 };
@@ -301,6 +309,45 @@ THREEFIELD.CharacterController.prototype.update = function ( dt ) {
   this._updateGrounding();
   this._updateVelocity();
   this._updatePosition( dt );
+  this._eventEmitter();
+  this._previouseMosion = {
+    isGrounded: this.isGrounded,
+    isSlope  : this.isOnSlope,
+    isWalking: this.isWalking,
+    isJumping: this.isJumping,
+  };
+
+};
+
+THREEFIELD.CharacterController.prototype._eventEmitter = function () {
+
+
+  if ( !this._previouseMosion.isWalking && !this.isWalking && this.isGrounded && !this.isIdling ) {
+
+    this.isIdling = true;
+    this.dispatchEvent( { type: 'startIdling' } );
+
+  } else if (
+    ( !this._previouseMosion.isWalking && this.isWalking && !this.isJumping ) ||
+    ( !this._previouseMosion.isGrounded && this.isGrounded && this.isWalking ) ||
+    ( this._previouseMosion.isSlope && !this.isOnSlope && this.isWalking )
+  ) {
+
+    this.isIdling = false;
+    this.dispatchEvent( { type: 'startWalking' } );
+
+  } else if ( !this._previouseMosion.isJumping && this.isJumping ) {
+
+    this.isIdling = false;
+    this.dispatchEvent( { type: 'startJumping' } );
+
+  }
+
+  if ( !this._previouseMosion.isGrounded && this.isGrounded ) {
+
+    this.dispatchEvent( { type: 'endJumping' } );
+
+  }
 
 };
 
@@ -406,10 +453,9 @@ THREEFIELD.CharacterController.prototype._updateGrounding = function () {
       intersects,
       i, l;
 
-  this.isGrounded = false;
   this.isOnSlope = false;
 
-  if ( 0 <= this.velocity.y && this.isJumping ) {
+  if ( ( 0 < this.currentJumpPower ) && this.isJumping ) {
 
     groundPadding = -this.radius;
 
@@ -443,6 +489,7 @@ THREEFIELD.CharacterController.prototype._updateGrounding = function () {
 
   if ( intersects.length === 0 ) {
 
+    this.isGrounded = false;
     this.groundNormal.set( 0, 0, 0 );
     return;
 
@@ -479,10 +526,13 @@ THREEFIELD.CharacterController.prototype._updatePosition = function ( dt ) {
 
 THREEFIELD.CharacterController.prototype.jump = function () {
 
-  if ( this.isJumping ) { return; }
+  if ( this.isJumping || this.isOnSlope ) {
+
+    return;
+
+  }
 
   this.isJumping = true;
-  this.isGrounded = false;
 
   var that = this;
   var jumpStartTime = Date.now();
@@ -493,7 +543,7 @@ THREEFIELD.CharacterController.prototype.jump = function () {
     var elapsedTime = Date.now() - jumpStartTime;
     var progress = elapsedTime / jumpMaxDuration;
 
-    if( elapsedTime < jumpMaxDuration ){
+    if ( elapsedTime < jumpMaxDuration ){
 
       that.currentJumpPower = Math.cos( Math.min( progress, 1 ) * Math.PI );
       requestAnimationFrame( jump );
@@ -555,6 +605,17 @@ THREEFIELD.AnimationController.prototype.play = function ( name ) {
 
 ;( function ( ns ) {
 
+var KEY_W     = 87,
+    KEY_UP    = 38,
+    KEY_S     = 83,
+    KEY_DOWN  = 40,
+    KEY_A     = 65,
+    KEY_LEFT  = 37,
+    KEY_D     = 68,
+    KEY_RIGHT = 39,
+    KEY_SPACE = 32;
+
+
   ns.KeyInputControl = function () {
     
     THREE.EventDispatcher.prototype.apply( this );
@@ -578,7 +639,7 @@ THREEFIELD.AnimationController.prototype.play = function ( name ) {
 
   ns.KeyInputControl.prototype.jump = function () {
 
-    this.dispatchEvent( { type: 'jumpKeydown' } );
+    this.dispatchEvent( { type: 'jumpkeypress' } );
 
   };
 
@@ -615,27 +676,27 @@ THREEFIELD.AnimationController.prototype.play = function ( name ) {
 
     switch ( e.keyCode ) {
 
-      case 87: // 'w'
-      case 38: // up
+      case KEY_W :
+      case KEY_UP :
         this.isUp = true;
         break;
 
-      case 83: // 's'
-      case 40: // down
+      case KEY_S :
+      case KEY_DOWN :
         this.isDown = true;
         break;
 
-      case 65: // 'a'
-      case 37: // left
+      case KEY_A :
+      case KEY_LEFT :
         this.isLeft = true;
         break;
 
-      case 68: // 'd'
-      case 39: // right
+      case KEY_D :
+      case KEY_RIGHT :
         this.isRight = true;
         break;
 
-      case 32: // spacebar
+      case KEY_SPACE :
         this.jump();
         break;
 
@@ -646,7 +707,7 @@ THREEFIELD.AnimationController.prototype.play = function ( name ) {
     if ( this.isUp || this.isDown || this.isLeft || this.isRight ) {
 
       this.isMoveKeyHolded = true;
-      this.dispatchEvent( { type: 'startMoving' } );
+      this.dispatchEvent( { type: 'movekeyhold' } );
 
     }
 
@@ -658,36 +719,47 @@ THREEFIELD.AnimationController.prototype.play = function ( name ) {
 
     switch ( e.keyCode ) {
 
-      case 87: // 'w'
-      case 38: // up
+      case KEY_W :
+      case KEY_UP :
         this.isUp = false;
         break;
 
-      case 83: // 's'
-      case 40: // down
+      case KEY_S :
+      case KEY_DOWN :
         this.isDown = false;
         break;
         
-      case 65: // 'a'
-      case 37: // left
+      case KEY_A :
+      case KEY_LEFT :
         this.isLeft = false;
         break;
 
-      case 68: // 'd'
-      case 39: // right
+      case KEY_D :
+      case KEY_RIGHT :
         this.isRight = false;
         break;
 
-      case 32: // spacebar
+      case KEY_SPACE :
         break;
 
     }
 
     this.updateAngle();
 
-    if ( !this.isUp && !this.isDown && !this.isLeft && !this.isRight ) {
+    if ( !this.isUp && !this.isDown && !this.isLeft && !this.isRight &&
+      (
+           e.keyCode === KEY_W
+        || e.keyCode === KEY_UP
+        || e.keyCode === KEY_S
+        || e.keyCode === KEY_DOWN
+        || e.keyCode === KEY_A
+        || e.keyCode === KEY_LEFT
+        || e.keyCode === KEY_D
+        || e.keyCode === KEY_RIGHT
+      )
+    ) {
 
-      this.dispatchEvent( { type: 'stopMoving' } );
+      this.dispatchEvent( { type: 'movekeyrelease' } );
 
     }
 

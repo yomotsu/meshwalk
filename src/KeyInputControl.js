@@ -3,6 +3,17 @@
 
 ;( function ( ns ) {
 
+var KEY_W     = 87,
+    KEY_UP    = 38,
+    KEY_S     = 83,
+    KEY_DOWN  = 40,
+    KEY_A     = 65,
+    KEY_LEFT  = 37,
+    KEY_D     = 68,
+    KEY_RIGHT = 39,
+    KEY_SPACE = 32;
+
+
   ns.KeyInputControl = function () {
     
     THREE.EventDispatcher.prototype.apply( this );
@@ -26,7 +37,7 @@
 
   ns.KeyInputControl.prototype.jump = function () {
 
-    this.dispatchEvent( { type: 'jumpKeydown' } );
+    this.dispatchEvent( { type: 'jumpkeypress' } );
 
   };
 
@@ -63,27 +74,27 @@
 
     switch ( e.keyCode ) {
 
-      case 87: // 'w'
-      case 38: // up
+      case KEY_W :
+      case KEY_UP :
         this.isUp = true;
         break;
 
-      case 83: // 's'
-      case 40: // down
+      case KEY_S :
+      case KEY_DOWN :
         this.isDown = true;
         break;
 
-      case 65: // 'a'
-      case 37: // left
+      case KEY_A :
+      case KEY_LEFT :
         this.isLeft = true;
         break;
 
-      case 68: // 'd'
-      case 39: // right
+      case KEY_D :
+      case KEY_RIGHT :
         this.isRight = true;
         break;
 
-      case 32: // spacebar
+      case KEY_SPACE :
         this.jump();
         break;
 
@@ -94,7 +105,7 @@
     if ( this.isUp || this.isDown || this.isLeft || this.isRight ) {
 
       this.isMoveKeyHolded = true;
-      this.dispatchEvent( { type: 'startMoving' } );
+      this.dispatchEvent( { type: 'movekeyhold' } );
 
     }
 
@@ -106,36 +117,47 @@
 
     switch ( e.keyCode ) {
 
-      case 87: // 'w'
-      case 38: // up
+      case KEY_W :
+      case KEY_UP :
         this.isUp = false;
         break;
 
-      case 83: // 's'
-      case 40: // down
+      case KEY_S :
+      case KEY_DOWN :
         this.isDown = false;
         break;
         
-      case 65: // 'a'
-      case 37: // left
+      case KEY_A :
+      case KEY_LEFT :
         this.isLeft = false;
         break;
 
-      case 68: // 'd'
-      case 39: // right
+      case KEY_D :
+      case KEY_RIGHT :
         this.isRight = false;
         break;
 
-      case 32: // spacebar
+      case KEY_SPACE :
         break;
 
     }
 
     this.updateAngle();
 
-    if ( !this.isUp && !this.isDown && !this.isLeft && !this.isRight ) {
+    if ( !this.isUp && !this.isDown && !this.isLeft && !this.isRight &&
+      (
+           e.keyCode === KEY_W
+        || e.keyCode === KEY_UP
+        || e.keyCode === KEY_S
+        || e.keyCode === KEY_DOWN
+        || e.keyCode === KEY_A
+        || e.keyCode === KEY_LEFT
+        || e.keyCode === KEY_D
+        || e.keyCode === KEY_RIGHT
+      )
+    ) {
 
-      this.dispatchEvent( { type: 'stopMoving' } );
+      this.dispatchEvent( { type: 'movekeyrelease' } );
 
     }
 

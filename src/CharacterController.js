@@ -3,10 +3,12 @@
 
 THREEFIELD.CharacterController = function ( object3d, radius, world ) {
 
+  THREE.EventDispatcher.prototype.apply( this );
   this.object = object3d;
   this.radius = radius;
   this.world = world;
   this.maxSlopeGradient = Math.cos( THREE.Math.degToRad( 50 ) );
+  this.isIdling   = false;
   this.isGrounded = false;
   this.isOnSlope = false;
   this.isWalking = false;
@@ -19,6 +21,12 @@ THREEFIELD.CharacterController = function ( object3d, radius, world ) {
   this.groundHeight = 0;
   this.groundNormal = new THREE.Vector3();
   this.collidedTriangles = [];
+  this._previouseMosion = {
+    isGounded: null,
+    isSlope  : null,
+    isWalking: null,
+    isJumping: null
+  };
   world.addCharacter( this );
 
 };
@@ -37,6 +45,45 @@ THREEFIELD.CharacterController.prototype.update = function ( dt ) {
   this._updateGrounding();
   this._updateVelocity();
   this._updatePosition( dt );
+  this._eventEmitter();
+  this._previouseMosion = {
+    isGrounded: this.isGrounded,
+    isSlope  : this.isOnSlope,
+    isWalking: this.isWalking,
+    isJumping: this.isJumping,
+  };
+
+};
+
+THREEFIELD.CharacterController.prototype._eventEmitter = function () {
+
+
+  if ( !this._previouseMosion.isWalking && !this.isWalking && this.isGrounded && !this.isIdling ) {
+
+    this.isIdling = true;
+    this.dispatchEvent( { type: 'startIdling' } );
+
+  } else if (
+    ( !this._previouseMosion.isWalking && this.isWalking && !this.isJumping ) ||
+    ( !this._previouseMosion.isGrounded && this.isGrounded && this.isWalking ) ||
+    ( this._previouseMosion.isSlope && !this.isOnSlope && this.isWalking )
+  ) {
+
+    this.isIdling = false;
+    this.dispatchEvent( { type: 'startWalking' } );
+
+  } else if ( !this._previouseMosion.isJumping && this.isJumping ) {
+
+    this.isIdling = false;
+    this.dispatchEvent( { type: 'startJumping' } );
+
+  }
+
+  if ( !this._previouseMosion.isGrounded && this.isGrounded ) {
+
+    this.dispatchEvent( { type: 'endJumping' } );
+
+  }
 
 };
 
@@ -142,10 +189,9 @@ THREEFIELD.CharacterController.prototype._updateGrounding = function () {
       intersects,
       i, l;
 
-  this.isGrounded = false;
   this.isOnSlope = false;
 
-  if ( 0 <= this.velocity.y && this.isJumping ) {
+  if ( ( 0 < this.currentJumpPower ) && this.isJumping ) {
 
     groundPadding = -this.radius;
 
@@ -179,6 +225,7 @@ THREEFIELD.CharacterController.prototype._updateGrounding = function () {
 
   if ( intersects.length === 0 ) {
 
+    this.isGrounded = false;
     this.groundNormal.set( 0, 0, 0 );
     return;
 
@@ -215,10 +262,13 @@ THREEFIELD.CharacterController.prototype._updatePosition = function ( dt ) {
 
 THREEFIELD.CharacterController.prototype.jump = function () {
 
-  if ( this.isJumping ) { return; }
+  if ( this.isJumping || this.isOnSlope ) {
+
+    return;
+
+  }
 
   this.isJumping = true;
-  this.isGrounded = false;
 
   var that = this;
   var jumpStartTime = Date.now();
@@ -229,7 +279,7 @@ THREEFIELD.CharacterController.prototype.jump = function () {
     var elapsedTime = Date.now() - jumpStartTime;
     var progress = elapsedTime / jumpMaxDuration;
 
-    if( elapsedTime < jumpMaxDuration ){
+    if ( elapsedTime < jumpMaxDuration ){
 
       that.currentJumpPower = Math.cos( Math.min( progress, 1 ) * Math.PI );
       requestAnimationFrame( jump );

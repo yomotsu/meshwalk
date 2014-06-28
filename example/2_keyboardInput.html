@@ -63,14 +63,14 @@ playerController = new THREEFIELD.CharacterController( playerObjectHolder, playe
 
 var keyInputControl = new THREEFIELD.KeyInputControl();
 
-keyInputControl.addEventListener( 'startMoving', function () { playerController.isWalking = true; } );
-keyInputControl.addEventListener( 'stopMoving',  function () { playerController.isWalking = false; } );
-keyInputControl.addEventListener( 'jumpKeydown', function () { playerController.jump(); } );
+keyInputControl.addEventListener( 'movekeyhold',    function () { playerController.isWalking = true; } );
+keyInputControl.addEventListener( 'movekeyrelease', function () { playerController.isWalking = false; } );
+keyInputControl.addEventListener( 'jumpkeypress',   function () { playerController.jump(); } );
 
-count=0;
+// count=0;
 ;( function update () {
-  count++
-  if(count>500){return}
+  // count++
+  // if(count>500){return}
   requestAnimationFrame( update );
   var delta = clock.getDelta();
   var characterFrontAngle = keyInputControl.getFrontAngle();

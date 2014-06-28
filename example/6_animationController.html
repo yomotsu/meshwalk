@@ -72,9 +72,9 @@ loader.load( './mobuko/mobuko.js', function( geometry, materials ) {
 
   scene.add( mesh );
   animationController = new THREEFIELD.AnimationController( mesh );
-  animationController.action.jump.loop = false;
-  animationController.action.land.loop = false;
-  animationController.action.slide.loop = false;
+  animationController.action.jump.anim.loop = false;
+  animationController.action.land.anim.loop = false;
+  animationController.action.slide.anim.loop = false;
 
   var duration = animationController.action.land.duration;
   animationController.play( 'idle' );
