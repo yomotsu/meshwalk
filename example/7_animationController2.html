@@ -126,8 +126,6 @@ $.when(
     new THREE.MeshFaceMaterial( mobukoData.materials )
   );
   mobukoMesh.scale.set( .5, .5, .5 );
-  mobukoMesh.rotation.y = Math.PI;
-  mobukoMesh.position.y = -playerRadius;
 
   playerObjectHolder.add( mobukoMesh );
   animationController = new THREEFIELD.AnimationController( mobukoMesh );
@@ -149,7 +147,13 @@ $.when(
     var cameraFrontAngle = gyroscopeCameraControl.getFrontAngle();
     var characterFrontAngle = keyInputControl.getFrontAngle();
     playerController.frontAngle = ( 360 - cameraFrontAngle ) + characterFrontAngle % 360;
-    playerObjectHolder.rotation.y = THREE.Math.degToRad( ( 360 - cameraFrontAngle ) + characterFrontAngle % 360 );
+    // since nested objects are cause IE11 slow, just copy position
+    animationController.position.set(
+      playerObjectHolder.position.x,
+      playerObjectHolder.position.y - playerRadius,
+      playerObjectHolder.position.z
+    );
+    animationController.rotation.y = THREE.Math.degToRad( ( 360 - cameraFrontAngle ) + characterFrontAngle % 360 ) + Math.PI;
     gyroscopeCameraControl.update();
 
     world.step( delta );
