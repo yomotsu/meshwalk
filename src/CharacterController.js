@@ -20,7 +20,7 @@ THREEFIELD.CharacterController = function ( object3d, radius, world ) {
   this.groundPadding = 1;
   this.groundHeight = 0;
   this.groundNormal = new THREE.Vector3();
-  this.collidedTriangles = [];
+  this.contactInfo = [];
   this._previouseMosion = {
     isGounded: null,
     isSlope  : null,
@@ -93,6 +93,7 @@ THREEFIELD.CharacterController.prototype._updateVelocity = function () {
       frontDierction = -Math.cos( THREE.Math.degToRad( this.frontAngle ) ),
       rightDierction = -Math.sin( THREE.Math.degToRad( this.frontAngle ) ),
       normal,
+      newPosition = new THREE.Vector3(),
       wallNomal2D,
       frontVelocity2D,
       wallAngle,
@@ -105,7 +106,7 @@ THREEFIELD.CharacterController.prototype._updateVelocity = function () {
   this.velocity.y = FALL_VELOCITY;
   this.velocity.z = frontDierction * this.movementSpeed * this.isWalking;
 
-  if ( this.collidedTriangles.length === 0 && !this.isJumping ) {
+  if ( this.contactInfo.length === 0 && !this.isJumping ) {
 
     // 自由落下中 (ジャンプ中とは別)
     return;
@@ -128,21 +129,34 @@ THREEFIELD.CharacterController.prototype._updateVelocity = function () {
 
   }
 
-// ここから vs壁と、壁ずりの処理
+  // vs walls and sliding on the wall
   frontVelocity2D = new THREE.Vector2(  this.velocity.x, this.velocity.z );
   frontAngle = Math.atan2( frontVelocity2D.y, frontVelocity2D.x ) * 180 / Math.PI;
   frontAngle = THREEFIELD.normalizeAngle( frontAngle );
-
   frontAngleInverted = Math.atan2( -frontVelocity2D.y, -frontVelocity2D.x ) * 180 / Math.PI;
   frontAngleInverted = THREEFIELD.normalizeAngle( frontAngleInverted );
 
-  for ( i = 0, l = this.collidedTriangles.length; i < l; i ++ ) {
+  for ( i = 0, l = this.contactInfo.length; i < l; i ++ ) {
 
-    normal = this.collidedTriangles[ i ].normal;
+    normal = this.contactInfo[ i ].normal;
 
-    if ( normal.y <= this.maxSlopeGradient ) {
+    if ( normal.y <= -1 || this.maxSlopeGradient < normal.y ) {
 
-    // y が this.maxSlopeGradient 以下なら急な坂または壁
+      // this triangle is a ground or ceil, not a wall
+      continue;
+
+    }
+
+    // if ( this.contactInfo[ i ].distance < -0.01 ) {
+
+    //   // pulling back to out of collider
+    //   newPosition.set( this.velocity.x, this.velocity.y, this.velocity.z ).normalize();
+    //   newPosition.multiplyScalar( this.contactInfo[ i ].distance );
+    //   newPosition.add( this.object.position );
+    //   this.object.position.copy( newPosition );
+
+    // }
+
     // 壁との衝突による壁ずりの処理
     // TODO めり込んだ場合、めり込み量を元に壁の法線方向にpull outする処理
     //      めりこみ量は、中心とフェイスの距離から求めることができる
@@ -150,10 +164,9 @@ THREEFIELD.CharacterController.prototype._updateVelocity = function () {
     // TODO 衝突対象 (壁) が エッジ * 2 の時の処理 - > ノーマルの角度がプレイヤーに一番向いているエッジを使う。エッジの組み合わせが壁と床である可能性もあるから、その時は壁となるエッジは無視する
     // TODO 衝突対象 (壁) が フェイス * 2 の時の処理 -> フェイス同士のノーマルが鋭角なら止まる。鈍角なら壁ずりで進める
 
-    wallNomal2D = new THREE.Vector2( normal.x, normal.z );
+    wallNomal2D = new THREE.Vector2( normal.x, normal.z ).normalize();
     wallAngle  = Math.atan2( wallNomal2D.y, wallNomal2D.x ) * 180 / Math.PI;
     wallAngle = THREEFIELD.normalizeAngle( wallAngle );
-
 
     if (
       Math.abs( frontAngleInverted - wallAngle ) >= 90 &&
@@ -172,8 +185,6 @@ THREEFIELD.CharacterController.prototype._updateVelocity = function () {
 
     this.velocity.x = frontVelocity2D.x;
     this.velocity.z = frontVelocity2D.y;
-
-    }
 
   }
 
@@ -201,12 +212,12 @@ THREEFIELD.CharacterController.prototype._updateGrounding = function () {
 
   }
 
-
   origin = new THREE.Vector3(
     this.object.position.x,
     this.object.position.y + this.radius,
     this.object.position.z
   );
+
   raycaster = new THREE.Raycaster(
     origin,                         // origin
     new THREE.Vector3( 0, -1, 0 ),  // direction
@@ -289,3 +300,51 @@ THREEFIELD.CharacterController.prototype.jump = function () {
   } )();
 
 };
+
+// THREEFIELD.CharacterController.prototype.sortTriagnlesByFrontAngle = function ( frontAngle ) {
+
+//   var wallTriangles = [],
+//       angleList = [ 0 ],
+//       normal,
+//       wallAngle2DInversed,
+//       angleFrontAndWall,
+//       i, ii, l, ll;
+
+//   for ( i = 0, l = this.contactInfo.length; i < l; i ++ ) {
+
+//     normal = this.contactInfo[ i ].normal;
+
+//     if ( this.maxSlopeGradient < normal.y ) {
+//       // this triangle is a ground, not a wall
+//       continue;
+
+//     }
+
+//     wallAngle2DInversed = THREEFIELD.normalizeAngle( 180 - Math.atan2( normal.y, normal.x ) * 180 / Math.PI );
+//     angleFrontAndWall = THREEFIELD.howCloseBetweenAngles( frontAngle, wallAngle2DInversed );
+
+//     for ( ii = 0, ll = angleList.length; ii < ll; ii ++ ) {
+
+//       if ( angleList[ ii ] === angleFrontAndWall ) {
+
+//         //既に格納されている角度と同じなら上書きして終了
+//         wallTriangles[ ii ] = this.contactInfo[ i ];
+//         break;
+
+//       } else if ( angleList[ ii ] < angleFrontAndWall ) {
+
+//         //既に格納されている角度より小さければ、[ ii-1 ] に新たに要素を挿入して終了
+//         wallTriangles.splice( [ ii - 1 ], 0, this.contactInfo[ i ] );
+//         angleList.splice( [ ii - 1 ], 0, angleFrontAndWall );
+//         break;
+
+//       }
+//       // 既に格納されている角度より大きければ繰り返す
+
+//     }
+
+//   }
+
+//   return wallTriangles;
+
+// }

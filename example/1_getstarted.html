@@ -12,6 +12,7 @@ canvas{display: block;}
 
 <script src="../lib/three.min.js"></script>
 <script src="../build/threefield.js"></script>
+<script src="../src/World.js"></script>
 <script>
 
 var width, height, clock, scene, camera, renderer;
@@ -53,8 +54,12 @@ playerObjectHolder.add( sphere );
 playerController = new THREEFIELD.CharacterController( playerObjectHolder, playerRadius, world );
 
 
-;( function update () {
+// ;( function update () {
 
+count=0;
+;( function update () {
+  count++
+  if(count>500){return}
   requestAnimationFrame( update );
   var delta = clock.getDelta();
   world.step( delta );

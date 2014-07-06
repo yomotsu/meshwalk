@@ -14,7 +14,112 @@ THREEFIELD.normalizeAngle = function ( angleInDeg ) {
 
 };
 
-THREEFIELD.sphereInAABB = function ( position, radius, aabb ) {
+
+THREEFIELD.howCloseBetweenAngles = function ( angle1, angle2 ) {
+
+  var angle = Math.min(
+    THREEFIELD.normalizeAngle( angle1 - angle2 ),
+    THREEFIELD.normalizeAngle( angle2 - angle1 )
+  );
+  
+  return angle;
+
+};
+
+// @author yomotsu
+// MIT License
+
+THREEFIELD.World = function () {
+
+  console.log( 'THREEFIELD.World' );
+
+  this.colliders  = [];
+  this.characters = [];
+
+};
+
+THREEFIELD.World.prototype.add = function ( collider ) {
+
+  this.colliders.push( collider );
+
+}
+
+THREEFIELD.World.prototype.addCharacter = function ( character ) {
+
+  this.characters.push( character );
+
+}
+
+THREEFIELD.World.prototype.step = function ( dt ) {
+
+  var character,
+      collider,
+      isInAABB,
+      contactInfo,
+      hasAdded,
+      contactPoint = new THREE.Vector3(),
+      i, ii, iii, iiii, l, ll, lll, llll;
+
+  for ( i = 0, l = this.characters.length; i < l; i ++ ) {
+
+    character = this.characters[ i ];
+    character.contactInfo.length = 0;
+
+    for ( ii = 0, ll = this.colliders.length; ii < ll; ii ++ ) {
+
+      collider = this.colliders[ ii ];
+      isInAABB = THREEFIELD.World.sphereInAABB( character.object.position, character.radius, collider.aabb );
+      
+      if ( !isInAABB ) {
+
+        continue;
+
+      }
+
+      for ( iii = 0, lll = collider.faces.length; iii < lll; iii ++ ) {
+
+        contactInfo = THREEFIELD.World.sphereVsTriangle( collider.faces[ iii ], collider.normals[ iii ], character.object.position, character.radius );
+
+        if ( !contactInfo ) {
+
+          continue;
+
+        }
+
+        for ( iiii = 0, llll = character.contactInfo.length; iiii < llll; iiii ++ ) {
+
+          if (
+            character.contactInfo[ iiii ].normal.x === contactInfo.normal.x &&
+            character.contactInfo[ iiii ].normal.y === contactInfo.normal.y &&
+            character.contactInfo[ iiii ].normal.z === contactInfo.normal.z
+          ) {
+
+            hasAdded = true;
+            break;
+
+          }
+
+        }
+
+        if ( hasAdded ) {
+
+          continue;
+
+        }
+
+        character.contactInfo.push( contactInfo );
+
+      }
+
+    }
+
+    character.update( dt );
+
+  }
+
+};
+
+THREEFIELD.World.sphereInAABB = function ( position, radius, aabb ) {
   // http://d.hatena.ne.jp/taiyakisun/20120205/1328410006
   // http://marupeke296.com/COL_3D_No11_AABBvsPoint.html
   // http://stackoverflow.com/questions/4578967/cube-sphere-intersection-test#answer-4579192
@@ -44,10 +149,11 @@ THREEFIELD.sphereInAABB = function ( position, radius, aabb ) {
 
 };
 
-THREEFIELD.sphereVsTriangle = function ( face, position, radius ) {
+THREEFIELD.World.sphereVsTriangle = function ( face, normal, position, radius ) {
   // http://realtimecollisiondetection.net/blog/?p=103
 
-  // vs face
+  // var distance = THREEFIELD.World.getDistanceTriangleVsSphere( face, normal, position, radius );
+  // vs plain of traiangle face
   var A = new THREE.Vector3(),
       B = new THREE.Vector3(),
       C = new THREE.Vector3(),
@@ -70,7 +176,7 @@ THREEFIELD.sphereVsTriangle = function ( face, position, radius ) {
 
   }
 
-  // vs vertex
+  // vs triangle vertex
   var aa,
       ab,
       ac,
@@ -138,81 +244,28 @@ THREEFIELD.sphereVsTriangle = function ( face, position, radius ) {
 
   }
 
-  return true;
+  var distance = Math.sqrt( d * d / e ) - radius,
+      contactPoint = THREEFIELD.World.getContactPoint( normal, position, distance );
+
+  return {
+    plainD      : d,
+    face        : face,
+    normal      : normal,
+    distance    : distance,
+    contactPoint: contactPoint
+  };
 
 };
 
-// @author yomotsu
-// MIT License
+THREEFIELD.World.getContactPoint = function ( normal, position, distance ) {
 
-THREEFIELD.World = function () {
+  var contactPoint = new THREE.Vector3(),
+      inversedNormal = new THREE.Vector3( -normal.x, -normal.y, -normal.z );
 
-  console.log( 'THREEFIELD.World' );
-
-  this.colliders  = [];
-  this.characters = [];
-
-};
-
-THREEFIELD.World.prototype.add = function ( collider ) {
-
-  this.colliders.push( collider );
+  contactPoint.copy( position ).add( inversedNormal.multiplyScalar( distance ) );
+  return contactPoint;
 
 }
-
-THREEFIELD.World.prototype.addCharacter = function ( character ) {
-
-  this.characters.push( character );
-
-}
-
-THREEFIELD.World.prototype.step = function ( dt ) {
-
-  var character,
-      collider,
-      isInAABB,
-      isCollided,
-      i, ii, iii, l, ll, lll;
-
-  for ( i = 0, l = this.characters.length; i < l; i ++ ) {
-
-    character = this.characters[ i ];
-    character.collidedTriangles.length = 0;
-
-    for ( ii = 0, ll = this.colliders.length; ii < ll; ii ++ ) {
-
-      collider = this.colliders[ ii ];
-      isInAABB = THREEFIELD.sphereInAABB( character.object.position, character.radius, collider.aabb );
-      
-      if ( !isInAABB ) {
-
-        continue;
-
-      }
-
-      for ( iii = 0, lll = collider.faces.length; iii < lll; iii ++ ) {
-
-        isCollided = THREEFIELD.sphereVsTriangle( collider.faces[ iii ], character.object.position, character.radius );
-
-        if ( !isCollided ) {
-
-          continue;
-
-        }
-
-        character.collidedTriangles.push( {
-          face: collider.faces[ iii ],
-          normal: collider.normals[ iii ]
-        } );
-      }
-
-    }
-
-    character.update( dt );
-
-  }
-
-};
 
 // @author yomotsu
 // MIT License
@@ -284,7 +337,7 @@ THREEFIELD.CharacterController = function ( object3d, radius, world ) {
   this.groundPadding = 1;
   this.groundHeight = 0;
   this.groundNormal = new THREE.Vector3();
-  this.collidedTriangles = [];
+  this.contactInfo = [];
   this._previouseMosion = {
     isGounded: null,
     isSlope  : null,
@@ -357,6 +410,7 @@ THREEFIELD.CharacterController.prototype._updateVelocity = function () {
       frontDierction = -Math.cos( THREE.Math.degToRad( this.frontAngle ) ),
       rightDierction = -Math.sin( THREE.Math.degToRad( this.frontAngle ) ),
       normal,
+      newPosition = new THREE.Vector3(),
       wallNomal2D,
       frontVelocity2D,
       wallAngle,
@@ -369,7 +423,7 @@ THREEFIELD.CharacterController.prototype._updateVelocity = function () {
   this.velocity.y = FALL_VELOCITY;
   this.velocity.z = frontDierction * this.movementSpeed * this.isWalking;
 
-  if ( this.collidedTriangles.length === 0 && !this.isJumping ) {
+  if ( this.contactInfo.length === 0 && !this.isJumping ) {
 
     // 自由落下中 (ジャンプ中とは別)
     return;
@@ -392,21 +446,34 @@ THREEFIELD.CharacterController.prototype._updateVelocity = function () {
 
   }
 
-// ここから vs壁と、壁ずりの処理
+  // vs walls and sliding on the wall
   frontVelocity2D = new THREE.Vector2(  this.velocity.x, this.velocity.z );
   frontAngle = Math.atan2( frontVelocity2D.y, frontVelocity2D.x ) * 180 / Math.PI;
   frontAngle = THREEFIELD.normalizeAngle( frontAngle );
-
   frontAngleInverted = Math.atan2( -frontVelocity2D.y, -frontVelocity2D.x ) * 180 / Math.PI;
   frontAngleInverted = THREEFIELD.normalizeAngle( frontAngleInverted );
 
-  for ( i = 0, l = this.collidedTriangles.length; i < l; i ++ ) {
+  for ( i = 0, l = this.contactInfo.length; i < l; i ++ ) {
 
-    normal = this.collidedTriangles[ i ].normal;
+    normal = this.contactInfo[ i ].normal;
 
-    if ( normal.y <= this.maxSlopeGradient ) {
+    if ( normal.y <= -1 || this.maxSlopeGradient < normal.y ) {
 
-    // y が this.maxSlopeGradient 以下なら急な坂または壁
+      // this triangle is a ground or ceil, not a wall
+      continue;
+
+    }
+
+    // if ( this.contactInfo[ i ].distance < -0.01 ) {
+
+    //   // pulling back to out of collider
+    //   newPosition.set( this.velocity.x, this.velocity.y, this.velocity.z ).normalize();
+    //   newPosition.multiplyScalar( this.contactInfo[ i ].distance );
+    //   newPosition.add( this.object.position );
+    //   this.object.position.copy( newPosition );
+
+    // }
+
     // 壁との衝突による壁ずりの処理
     // TODO めり込んだ場合、めり込み量を元に壁の法線方向にpull outする処理
     //      めりこみ量は、中心とフェイスの距離から求めることができる
@@ -414,10 +481,9 @@ THREEFIELD.CharacterController.prototype._updateVelocity = function () {
     // TODO 衝突対象 (壁) が エッジ * 2 の時の処理 - > ノーマルの角度がプレイヤーに一番向いているエッジを使う。エッジの組み合わせが壁と床である可能性もあるから、その時は壁となるエッジは無視する
     // TODO 衝突対象 (壁) が フェイス * 2 の時の処理 -> フェイス同士のノーマルが鋭角なら止まる。鈍角なら壁ずりで進める
 
-    wallNomal2D = new THREE.Vector2( normal.x, normal.z );
+    wallNomal2D = new THREE.Vector2( normal.x, normal.z ).normalize();
     wallAngle  = Math.atan2( wallNomal2D.y, wallNomal2D.x ) * 180 / Math.PI;
     wallAngle = THREEFIELD.normalizeAngle( wallAngle );
-
 
     if (
       Math.abs( frontAngleInverted - wallAngle ) >= 90 &&
@@ -436,8 +502,6 @@ THREEFIELD.CharacterController.prototype._updateVelocity = function () {
 
     this.velocity.x = frontVelocity2D.x;
     this.velocity.z = frontVelocity2D.y;
-
-    }
 
   }
 
@@ -465,12 +529,12 @@ THREEFIELD.CharacterController.prototype._updateGrounding = function () {
 
   }
 
-
   origin = new THREE.Vector3(
     this.object.position.x,
     this.object.position.y + this.radius,
     this.object.position.z
   );
+
   raycaster = new THREE.Raycaster(
     origin,                         // origin
     new THREE.Vector3( 0, -1, 0 ),  // direction
@@ -553,6 +617,54 @@ THREEFIELD.CharacterController.prototype.jump = function () {
   } )();
 
 };
+
+// THREEFIELD.CharacterController.prototype.sortTriagnlesByFrontAngle = function ( frontAngle ) {
+
+//   var wallTriangles = [],
+//       angleList = [ 0 ],
+//       normal,
+//       wallAngle2DInversed,
+//       angleFrontAndWall,
+//       i, ii, l, ll;
+
+//   for ( i = 0, l = this.contactInfo.length; i < l; i ++ ) {
+
+//     normal = this.contactInfo[ i ].normal;
+
+//     if ( this.maxSlopeGradient < normal.y ) {
+//       // this triangle is a ground, not a wall
+//       continue;
+
+//     }
+
+//     wallAngle2DInversed = THREEFIELD.normalizeAngle( 180 - Math.atan2( normal.y, normal.x ) * 180 / Math.PI );
+//     angleFrontAndWall = THREEFIELD.howCloseBetweenAngles( frontAngle, wallAngle2DInversed );
+
+//     for ( ii = 0, ll = angleList.length; ii < ll; ii ++ ) {
+
+//       if ( angleList[ ii ] === angleFrontAndWall ) {
+
+//         //既に格納されている角度と同じなら上書きして終了
+//         wallTriangles[ ii ] = this.contactInfo[ i ];
+//         break;
+
+//       } else if ( angleList[ ii ] < angleFrontAndWall ) {
+
+//         //既に格納されている角度より小さければ、[ ii-1 ] に新たに要素を挿入して終了
+//         wallTriangles.splice( [ ii - 1 ], 0, this.contactInfo[ i ] );
+//         angleList.splice( [ ii - 1 ], 0, angleFrontAndWall );
+//         break;
+
+//       }
+//       // 既に格納されている角度より大きければ繰り返す
+
+//     }
+
+//   }
+
+//   return wallTriangles;
+
+// }
 
 // @author yomotsu
 // MIT License
