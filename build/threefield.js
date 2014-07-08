@@ -86,13 +86,11 @@ THREEFIELD.World.prototype.step = function ( dt ) {
 
         }
 
+        hasAdded = false;
+        
         for ( iiii = 0, llll = character.contactInfo.length; iiii < llll; iiii ++ ) {
 
-          if (
-            character.contactInfo[ iiii ].normal.x === contactInfo.normal.x &&
-            character.contactInfo[ iiii ].normal.y === contactInfo.normal.y &&
-            character.contactInfo[ iiii ].normal.z === contactInfo.normal.z
-          ) {
+          if ( character.contactInfo[ iiii ].plainD === contactInfo.plainD ) {
 
             hasAdded = true;
             break;
@@ -327,9 +325,9 @@ THREEFIELD.CharacterController = function ( object3d, radius, world ) {
   this.maxSlopeGradient = Math.cos( THREE.Math.degToRad( 50 ) );
   this.isIdling   = false;
   this.isGrounded = false;
-  this.isOnSlope = false;
-  this.isWalking = false;
-  this.isJumping = false;
+  this.isOnSlope  = false;
+  this.isWalking  = false;
+  this.isJumping  = false;
   this.frontAngle = 0; // 0 to 360 deg
   this.movementSpeed = 15;
   this.velocity = new THREE.Vector3( 0, -10, 0 );
@@ -359,8 +357,8 @@ THREEFIELD.CharacterController = function ( object3d, radius, world ) {
 
 THREEFIELD.CharacterController.prototype.update = function ( dt ) {
 
-  this._updateGrounding();
   this._updateVelocity();
+  this._updateGrounding();
   this._updatePosition( dt );
   this._eventEmitter();
   this._previouseMosion = {
@@ -416,7 +414,6 @@ THREEFIELD.CharacterController.prototype._updateVelocity = function () {
       wallAngle,
       frontAngle,
       frontAngleInverted,
-      vsWallAngle,
       i, l;
       
   this.velocity.x = rightDierction * this.movementSpeed * this.isWalking;
@@ -447,11 +444,9 @@ THREEFIELD.CharacterController.prototype._updateVelocity = function () {
   }
 
   // vs walls and sliding on the wall
-  frontVelocity2D = new THREE.Vector2(  this.velocity.x, this.velocity.z );
-  frontAngle = Math.atan2( frontVelocity2D.y, frontVelocity2D.x ) * 180 / Math.PI;
-  frontAngle = THREEFIELD.normalizeAngle( frontAngle );
-  frontAngleInverted = Math.atan2( -frontVelocity2D.y, -frontVelocity2D.x ) * 180 / Math.PI;
-  frontAngleInverted = THREEFIELD.normalizeAngle( frontAngleInverted );
+  frontVelocity2D = new THREE.Vector2( this.velocity.x, this.velocity.z );
+  frontAngle = Math.atan2( frontVelocity2D.y, frontVelocity2D.x );
+  frontAngleInverted = Math.atan2( -frontVelocity2D.y, -frontVelocity2D.x );
 
   for ( i = 0, l = this.contactInfo.length; i < l; i ++ ) {
 
@@ -482,12 +477,11 @@ THREEFIELD.CharacterController.prototype._updateVelocity = function () {
     // TODO 衝突対象 (壁) が フェイス * 2 の時の処理 -> フェイス同士のノーマルが鋭角なら止まる。鈍角なら壁ずりで進める
 
     wallNomal2D = new THREE.Vector2( normal.x, normal.z ).normalize();
-    wallAngle  = Math.atan2( wallNomal2D.y, wallNomal2D.x ) * 180 / Math.PI;
-    wallAngle = THREEFIELD.normalizeAngle( wallAngle );
+    wallAngle = Math.atan2( wallNomal2D.y, wallNomal2D.x );
 
     if (
-      Math.abs( frontAngleInverted - wallAngle ) >= 90 &&
-      Math.abs( frontAngleInverted - wallAngle ) <= 270
+      Math.abs( frontAngleInverted - wallAngle ) >= Math.PI * 0.5 && //  90deg
+      Math.abs( frontAngleInverted - wallAngle ) <= Math.PI * 1.5    // 270deg
     ) {
 
       continue;

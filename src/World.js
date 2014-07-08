@@ -58,13 +58,11 @@ THREEFIELD.World.prototype.step = function ( dt ) {
 
         }
 
+        hasAdded = false;
+        
         for ( iiii = 0, llll = character.contactInfo.length; iiii < llll; iiii ++ ) {
 
-          if (
-            character.contactInfo[ iiii ].normal.x === contactInfo.normal.x &&
-            character.contactInfo[ iiii ].normal.y === contactInfo.normal.y &&
-            character.contactInfo[ iiii ].normal.z === contactInfo.normal.z
-          ) {
+          if ( character.contactInfo[ iiii ].plainD === contactInfo.plainD ) {
 
             hasAdded = true;
             break;

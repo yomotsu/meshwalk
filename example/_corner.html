@@ -99,8 +99,8 @@ wall = new THREE.Mesh(
   new THREE.BoxGeometry( 1, 6, 14 ),
   new THREE.MeshNormalMaterial( { color: 0xffffff,  wireframe: true } )
 );
-wall.position.set( 20, 3, 0 );
-wall.rotation.set( THREE.Math.degToRad( 10 ), THREE.Math.degToRad( 90 ), 0 );
+wall.position.set( 20, 4, 0 );
+wall.rotation.set( THREE.Math.degToRad( 90 ), THREE.Math.degToRad( 90 ), 0 );
 scene.add( wall );
 world.add( new THREEFIELD.Collider( wall ) );
 
