@@ -10,23 +10,30 @@ module.exports = (grunt) ->
     clean: ['build/']
 
     concat:
-      jsSrc:
+      jsCore:
         src: [
-          'src/threefield.js'
-          'src/utils.js'
-          'src/World.js'
-          'src/Collider.js'
-          'src/CharacterController.js'
-          'src/AnimationController.js'
-          'src/KeyInputControl.js'
-          'src/GyroscopeCameraControl.js'
+          'src/core/threefield.js'
+          'src/core/utils.js'
+          'src/core/World.js'
+          'src/core/Collider.js'
         ]
         dest: 'build/threefield.js'
+      jsTPS:
+        src: [
+          'src/TPS/CharacterController.js'
+          'src/TPS/AnimationController.js'
+          'src/TPS/KeyInputControl.js'
+          'src/TPS/GyroscopeCameraControl.js'
+        ]
+        dest: 'build/addon/threefield.TPS.js'
 
     uglify:
-      jsSrc:
-        src: '<%= concat.jsSrc.dest %>'
+      jsCore:
+        src: '<%= concat.jsCore.dest %>'
         dest: 'build/threefield.min.js'
+      jsTPS:
+        src: '<%= concat.jsTPS.dest %>'
+        dest: 'build/addon/threefield.TPS.min.js'
       options:
         preserveComments: 'some'
 

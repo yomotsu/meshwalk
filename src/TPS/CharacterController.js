@@ -5,6 +5,7 @@ THREEFIELD.CharacterController = function ( object3d, radius, world ) {
 
   THREE.EventDispatcher.prototype.apply( this );
   this.object = object3d;
+  this.position = new THREE.Vector3().copy( this.object.position );
   this.radius = radius;
   this.world = world;
   this.maxSlopeGradient = Math.cos( THREE.Math.degToRad( 50 ) );
@@ -86,7 +87,7 @@ THREEFIELD.CharacterController.prototype._updateVelocity = function () {
       normal,
       distance,
       wallNomal2D,
-      frontVelocity2D,
+      direction2D,
       wallAngle,
       frontAngle,
       frontAngleInverted,
@@ -121,18 +122,19 @@ THREEFIELD.CharacterController.prototype._updateVelocity = function () {
   }
 
   // vs walls and sliding on the wall
-  frontVelocity2D = new THREE.Vector2( this.velocity.x, this.velocity.z );
-  frontAngle = Math.atan2( frontVelocity2D.y, frontVelocity2D.x );
-  frontAngleInverted = Math.atan2( -frontVelocity2D.y, -frontVelocity2D.x );
+  direction2D = new THREE.Vector2( rightDierction, frontDierction );
+  frontAngle = Math.atan2( direction2D.y, direction2D.x );
+  frontAngleInverted = Math.atan2( -direction2D.y, -direction2D.x );
 
   for ( i = 0, l = this.contactInfo.length; i < l; i ++ ) {
 
     normal = this.contactInfo[ i ].normal;
     distance = this.contactInfo[ i ].distance;
 
-    if ( normal.y <= -1 || this.maxSlopeGradient < normal.y ) {
+    // if ( normal.y <= -1 || this.maxSlopeGradient < normal.y ) {
+    if ( this.maxSlopeGradient < normal.y || this.isOnSlope) {
 
-      // this triangle is a ground or ceil, not a wall
+      // this triangle is a ground or slope, not a wall or ceil
       continue;
 
     }
@@ -150,20 +152,28 @@ THREEFIELD.CharacterController.prototype._updateVelocity = function () {
     }
 
     wallNomal2D.set(
-      frontVelocity2D.dot( wallNomal2D ) * wallNomal2D.x,
-      frontVelocity2D.dot( wallNomal2D ) * wallNomal2D.y
+      direction2D.dot( wallNomal2D ) * wallNomal2D.x,
+      direction2D.dot( wallNomal2D ) * wallNomal2D.y
     );
-    frontVelocity2D.subVectors( frontVelocity2D, wallNomal2D );
+    direction2D.subVectors( direction2D, wallNomal2D );
 
-    this.velocity.x = frontVelocity2D.x;
-    this.velocity.z = frontVelocity2D.y;
+    this.velocity.x = direction2D.x * this.movementSpeed * this.isWalking;
+    this.velocity.z = direction2D.y * this.movementSpeed * this.isWalking;
 
-    if ( distance <= - this.radius / 2 ) {
+    // TODO: updatePositionと被っているから結果がおかしくなるかも
+    if ( distance < -this.radius / 2 && this.isGrounded ) {
 
-      // pulling back to out of collider
-      baseY = this.contactInfo[ i ].normal.y * distance / Math.tan( ( 1 - this.contactInfo[ i ].normal.y ) * Math.PI / 2 );
-      this.object.position.x -= this.contactInfo[ i ].normal.x * distance - this.contactInfo[ i ].normal.x * baseY;
-      this.object.position.z -= this.contactInfo[ i ].normal.z * distance - this.contactInfo[ i ].normal.z * baseY;
+      // pulling back from inside of the wall
+      baseY = normal.y * distance / Math.tan( ( 1 - normal.y ) * Math.PI / 2 );
+      this.position.x -= normal.x * distance - normal.x * baseY;
+      this.position.z -= normal.z * distance - normal.z * baseY;
+
+    } else if ( distance < 0 && !this.isGrounded ) {
+
+      // pulling back from inside of the ceil
+      this.position.x -= normal.x * distance;
+      this.position.y -= normal.y * distance;
+      this.position.z -= normal.z * distance;
 
     }
 
@@ -194,9 +204,9 @@ THREEFIELD.CharacterController.prototype._updateGrounding = function () {
   }
 
   origin = new THREE.Vector3(
-    this.object.position.x,
-    this.object.position.y + this.radius,
-    this.object.position.z
+    this.position.x,
+    this.position.y + this.radius,
+    this.position.z
   );
 
   raycaster = new THREE.Raycaster(
@@ -238,9 +248,9 @@ THREEFIELD.CharacterController.prototype._updateGrounding = function () {
 
 THREEFIELD.CharacterController.prototype._updatePosition = function ( dt ) {
 
-  var x = this.object.position.x + this.velocity.x * dt,
-      y = this.object.position.y + this.velocity.y * dt,
-      z = this.object.position.z + this.velocity.z * dt;
+  var x = this.position.x + this.velocity.x * dt,
+      y = this.position.y + this.velocity.y * dt,
+      z = this.position.z + this.velocity.z * dt;
 
   if ( this.isGrounded ) {
 
@@ -248,7 +258,8 @@ THREEFIELD.CharacterController.prototype._updatePosition = function ( dt ) {
 
   }
 
-  this.object.position.set( x, y, z );
+  this.position.set( x, y, z );
+  this.object.position.copy( this.position );
 
 };
 

@@ -12,6 +12,7 @@ canvas{display: block;}
 
 <script src="../lib/three.min.js"></script>
 <script src="../build/threefield.js"></script>
+<script src="../build/addon/threefield.TPS.min.js"></script>
 <script>
 
 var width, height, clock, scene, camera, renderer;
@@ -52,7 +53,7 @@ scene.add( object1 );
 world.add( new THREEFIELD.Collider( object1 ) );
 
 object2 = new THREE.Mesh(
-  new THREE.BoxGeometry( 5, 2, 10 ),
+  new THREE.BoxGeometry( 5, 2, 14 ),
   new THREE.MeshPhongMaterial( { color: 0xffffff } )
 );
 object2.position.set( -15, 0, 0 );
@@ -61,7 +62,7 @@ scene.add( object2 );
 world.add( new THREEFIELD.Collider( object2 ) );
 
 object3 = new THREE.Mesh(
-  new THREE.BoxGeometry( 5, 2, 8 ),
+  new THREE.BoxGeometry( 5, 2, 10 ),
   new THREE.MeshPhongMaterial( { color: 0xffffff } )
 );
 object3.position.set( -15, 4.5, -8 );
@@ -70,7 +71,7 @@ scene.add( object3 );
 world.add( new THREEFIELD.Collider( object3 ) );
 
 object4 = new THREE.Mesh(
-  new THREE.BoxGeometry( 5, 2, 8 ),
+  new THREE.BoxGeometry( 5, 2, 10 ),
   new THREE.MeshPhongMaterial( { color: 0xffffff } )
 );
 object4.position.set( -15, 10.5, -13 );

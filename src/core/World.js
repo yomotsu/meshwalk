@@ -32,9 +32,11 @@ THREEFIELD.World.prototype.step = function ( dt ) {
       contactPoint = new THREE.Vector3(),
       i, ii, iii, iiii, l, ll, lll, llll;
 
+
   for ( i = 0, l = this.characters.length; i < l; i ++ ) {
 
     character = this.characters[ i ];
+    character.update( dt );
     character.contactInfo.length = 0;
 
     for ( ii = 0, ll = this.colliders.length; ii < ll; ii ++ ) {
@@ -82,8 +84,6 @@ THREEFIELD.World.prototype.step = function ( dt ) {
       }
 
     }
-
-    character.update( dt );
 
   }
 

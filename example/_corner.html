@@ -12,7 +12,8 @@ canvas{display: block;}
 
 <script src="../lib/three.min.js"></script>
 <script src="../build/threefield.js"></script>
-<script src="../src/CharacterController.js"></script>
+<script src="../build/addon/threefield.TPS.min.js"></script>
+<script src="../src/TPS/_CharacterController.js"></script>
 <script>
 
 var width, height, clock, scene, camera, renderer;
@@ -100,7 +101,7 @@ wall = new THREE.Mesh(
   new THREE.MeshNormalMaterial( { color: 0xffffff,  wireframe: true } )
 );
 wall.position.set( 20, 4, 0 );
-wall.rotation.set( THREE.Math.degToRad( 90 ), THREE.Math.degToRad( 90 ), 0 );
+wall.rotation.set( THREE.Math.degToRad( 30 ), THREE.Math.degToRad( 90 ), 0 );
 scene.add( wall );
 world.add( new THREEFIELD.Collider( wall ) );
 
