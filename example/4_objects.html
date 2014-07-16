@@ -119,7 +119,7 @@ var gyroscopeCameraControl = new THREEFIELD.GyroscopeCameraControl(
 count=0;
 ;( function update () {
   count++
-  if(count>1500){return}
+  if(count>1300){return}
   requestAnimationFrame( update );
   var delta = clock.getDelta();
   var cameraFrontAngle = gyroscopeCameraControl.getFrontAngle();

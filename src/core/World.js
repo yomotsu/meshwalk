@@ -42,7 +42,7 @@ THREEFIELD.World.prototype.step = function ( dt ) {
     for ( ii = 0, ll = this.colliders.length; ii < ll; ii ++ ) {
 
       collider = this.colliders[ ii ];
-      isInAABB = THREEFIELD.World.sphereInAABB( character.object.position, character.radius, collider.aabb );
+      isInAABB = THREEFIELD.World.sphereInAABB( character.position, character.radius, collider.aabb );
       
       if ( !isInAABB ) {
 
@@ -52,7 +52,7 @@ THREEFIELD.World.prototype.step = function ( dt ) {
 
       for ( iii = 0, lll = collider.faces.length; iii < lll; iii ++ ) {
 
-        contactInfo = THREEFIELD.World.sphereVsTriangle( collider.faces[ iii ], collider.normals[ iii ], character.object.position, character.radius );
+        contactInfo = THREEFIELD.World.sphereVsTriangle( collider.faces[ iii ], collider.normals[ iii ], character.position, character.radius );
 
         if ( !contactInfo ) {
 
@@ -64,7 +64,11 @@ THREEFIELD.World.prototype.step = function ( dt ) {
         
         for ( iiii = 0, llll = character.contactInfo.length; iiii < llll; iiii ++ ) {
 
-          if ( character.contactInfo[ iiii ].plainD === contactInfo.plainD ) {
+          if (
+            character.contactInfo[ iiii ].normal.x === contactInfo.normal.x &&
+            character.contactInfo[ iiii ].normal.y === contactInfo.normal.y &&
+            character.contactInfo[ iiii ].normal.z === contactInfo.normal.z
+          ) {
 
             hasAdded = true;
             break;
@@ -84,6 +88,8 @@ THREEFIELD.World.prototype.step = function ( dt ) {
       }
 
     }
+
+    character.fixPosition();
 
   }
 
@@ -218,7 +224,6 @@ THREEFIELD.World.sphereVsTriangle = function ( face, normal, position, radius ) 
       contactPoint = THREEFIELD.World.getContactPoint( normal, position, distance );
 
   return {
-    plainD      : d,
     face        : face,
     normal      : normal,
     distance    : distance,

@@ -85,13 +85,11 @@ THREEFIELD.CharacterController.prototype._updateVelocity = function () {
       frontDierction = -Math.cos( THREE.Math.degToRad( this.frontAngle ) ),
       rightDierction = -Math.sin( THREE.Math.degToRad( this.frontAngle ) ),
       normal,
-      distance,
       wallNomal2D,
       direction2D,
       wallAngle,
       frontAngle,
       frontAngleInverted,
-      baseY,
       i, l;
       
   this.velocity.x = rightDierction * this.movementSpeed * this.isWalking;
@@ -129,10 +127,8 @@ THREEFIELD.CharacterController.prototype._updateVelocity = function () {
   for ( i = 0, l = this.contactInfo.length; i < l; i ++ ) {
 
     normal = this.contactInfo[ i ].normal;
-    distance = this.contactInfo[ i ].distance;
 
-    // if ( normal.y <= -1 || this.maxSlopeGradient < normal.y ) {
-    if ( this.maxSlopeGradient < normal.y || this.isOnSlope) {
+    if ( this.maxSlopeGradient < normal.y || this.isOnSlope ) {
 
       // this triangle is a ground or slope, not a wall or ceil
       continue;
@@ -159,23 +155,6 @@ THREEFIELD.CharacterController.prototype._updateVelocity = function () {
 
     this.velocity.x = direction2D.x * this.movementSpeed * this.isWalking;
     this.velocity.z = direction2D.y * this.movementSpeed * this.isWalking;
-
-    // TODO: updatePositionと被っているから結果がおかしくなるかも
-    if ( distance < -this.radius / 2 && this.isGrounded ) {
-
-      // pulling back from inside of the wall
-      baseY = normal.y * distance / Math.tan( ( 1 - normal.y ) * Math.PI / 2 );
-      this.position.x -= normal.x * distance - normal.x * baseY;
-      this.position.z -= normal.z * distance - normal.z * baseY;
-
-    } else if ( distance < 0 && !this.isGrounded ) {
-
-      // pulling back from inside of the ceil
-      this.position.x -= normal.x * distance;
-      this.position.y -= normal.y * distance;
-      this.position.z -= normal.z * distance;
-
-    }
 
   }
 
@@ -259,9 +238,92 @@ THREEFIELD.CharacterController.prototype._updatePosition = function ( dt ) {
   }
 
   this.position.set( x, y, z );
+
+};
+
+THREEFIELD.CharacterController.prototype.fixPosition = function () {
+
+
+  var face,
+      normal,
+      distance,
+      point1 = new THREE.Vector3(),
+      point2 = new THREE.Vector3(),
+      direction = new THREE.Vector3(),
+      plainD,
+      t,
+      translateScoped = new THREE.Vector3(),
+      translate = new THREE.Vector3(),
+      i, l;
+      
+  if ( this.contactInfo.length === 0 && !this.isJumping ) {
+
+    // free falling, aside of jumping
+    this.object.position.copy( this.position );
+    return;
+
+  }
+
+  // vs walls and sliding on the wall
+
+  for ( i = 0, l = this.contactInfo.length; i < l; i ++ ) {
+
+    face = this.contactInfo[ i ].face;
+    normal = this.contactInfo[ i ].normal;
+    distance = this.contactInfo[ i ].distance;
+
+    if ( this.maxSlopeGradient < normal.y || this.isOnSlope ) {
+
+      // this triangle is a ground or slope, not a wall or ceil
+      continue;
+
+    }
+
+    if ( distance < 0 && this.isGrounded ) {
+
+      // resolve player vs wall collistion while on the ground
+      point1.copy( normal ).multiplyScalar( -this.radius ).add( this.position );
+      direction.set( normal.x, 0, normal.z ).normalize();
+      plainD = face.a.dot( normal );
+      t = ( plainD - ( normal.x * point1.x + normal.y * point1.y + normal.z * point1.z ) ) / ( normal.x * direction.x + normal.y * direction.y + normal.z * direction.z );
+
+      if ( Math.abs( t ) === Infinity ) {
+
+        continue;
+
+      }
+
+      point2.copy( direction ).multiplyScalar( t ).add( point1 );
+      translateScoped.subVectors( point2, point1 );
+
+      if ( Math.abs( translate.x ) > Math.abs( translateScoped.x ) ) {
+
+        translate.x += translateScoped.x;
+
+      }
+
+      if ( Math.abs( translate.z ) > Math.abs( translateScoped.z ) ) {
+
+        translate.z += translateScoped.z;
+
+      }
+
+    } else if ( distance < -this.radius / 2 && !this.isGrounded ) {
+
+      // resolve player vs wall collistion while jumping
+      translate.x += -normal.x * distance;
+      translate.y += -normal.y * distance;
+      translate.z += -normal.z * distance;
+
+    }
+
+  }
+
+  this.position.add( translate );
   this.object.position.copy( this.position );
 
 };
+
 
 THREEFIELD.CharacterController.prototype.jump = function () {
 

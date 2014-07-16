@@ -48,8 +48,8 @@ wall = new THREE.Mesh(
   new THREE.BoxGeometry( 1, 6, 10 ),
   new THREE.MeshNormalMaterial( { color: 0xffffff,  wireframe: true } )
 );
-wall.position.set( 0, 3, 0 );
-wall.rotation.set( 0, THREE.Math.degToRad( 90 ), 0 );
+wall.position.set( 0, 2, 0 );
+wall.rotation.set( 0, THREE.Math.degToRad( 90 ), THREE.Math.degToRad( 30 ) );
 // wall.rotation.set( 0, 0, THREE.Math.degToRad( 20 ) );
 scene.add( wall );
 world.add( new THREEFIELD.Collider( wall ) );
@@ -61,8 +61,8 @@ wall = new THREE.Mesh(
   new THREE.BoxGeometry( 1, 6, 10 ),
   new THREE.MeshNormalMaterial( { color: 0xffffff,  wireframe: true } )
 );
-wall.position.set( 0, 3, 0 );
-// wall.rotation.set( 0, THREE.Math.degToRad( 30 ), 0 );
+wall.position.set( 0, 2, 0 );
+wall.rotation.set( 0, 0,  THREE.Math.degToRad( 30 ) );
 // wall.rotation.set( 0, 0, THREE.Math.degToRad( 20 ) );
 scene.add( wall );
 world.add( new THREEFIELD.Collider( wall ) );
