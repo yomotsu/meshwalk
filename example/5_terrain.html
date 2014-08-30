@@ -26,7 +26,7 @@ width = window.innerWidth;
 height = window.innerHeight;
 clock = new THREE.Clock();
 scene = new THREE.Scene();
-camera = new THREE.PerspectiveCamera( 40, width / height, 1, 1000 );
+camera = new THREE.PerspectiveCamera( 40, width / height, .01, 100 );
 camera.position.set( 0, 5, 30 );
 renderer = new THREE.WebGLRenderer();
 renderer.setSize( width, height );
@@ -50,7 +50,7 @@ keyInputControl.addEventListener( 'movekeyhold', function () { playerController.
 keyInputControl.addEventListener( 'movekeyrelease',  function () { playerController.isWalking = false; } );
 keyInputControl.addEventListener( 'jumpkeypress', function () { playerController.jump(); } );
 
-var gyroscopeCameraControl = new THREEFIELD.GyroscopeCameraControl(
+var tpsCameraControl = new THREEFIELD.TPSCameraControl(
   camera,
   playerObjectHolder,
   {
@@ -84,7 +84,7 @@ loader.load( 'terrain.js', function( geo, mat ) {
   terrain.scale.set( 2, 2, 2 );
   scene.add( terrain );
   world.add( new THREEFIELD.Collider( terrain ) );
-  gyroscopeCameraControl.rigidObjects.push( terrain );
+  tpsCameraControl.rigidObjects.push( terrain );
 
   
   // count=0;
@@ -94,10 +94,10 @@ loader.load( 'terrain.js', function( geo, mat ) {
     requestAnimationFrame( update );
   
     var delta = clock.getDelta();
-    var cameraFrontAngle = gyroscopeCameraControl.getFrontAngle();
+    var cameraFrontAngle = tpsCameraControl.getFrontAngle();
     var characterFrontAngle = keyInputControl.getFrontAngle();
     playerController.frontAngle = ( 360 - cameraFrontAngle ) + characterFrontAngle % 360;
-    gyroscopeCameraControl.update();
+    tpsCameraControl.update();
 
     world.step( delta );
     renderer.render( scene, camera );

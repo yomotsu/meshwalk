@@ -286,13 +286,6 @@ THREEFIELD.CharacterController.prototype.fixPosition = function () {
       direction.set( normal.x, 0, normal.z ).normalize();
       plainD = face.a.dot( normal );
       t = ( plainD - ( normal.x * point1.x + normal.y * point1.y + normal.z * point1.z ) ) / ( normal.x * direction.x + normal.y * direction.y + normal.z * direction.z );
-
-      if ( Math.abs( t ) === Infinity ) {
-
-        continue;
-
-      }
-
       point2.copy( direction ).multiplyScalar( t ).add( point1 );
       translateScoped.subVectors( point2, point1 );
 
@@ -308,7 +301,7 @@ THREEFIELD.CharacterController.prototype.fixPosition = function () {
 
       }
 
-    } else if ( distance < -this.radius / 2 && !this.isGrounded ) {
+    } else if ( distance < 0 && !this.isGrounded ) {
 
       // resolve player vs wall collistion while jumping
       translate.x += -normal.x * distance;

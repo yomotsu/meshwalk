@@ -106,8 +106,9 @@ keyInputControl.addEventListener( 'movekeyhold', function () { playerController.
 keyInputControl.addEventListener( 'movekeyrelease',  function () { playerController.isWalking = false; } );
 keyInputControl.addEventListener( 'jumpkeypress', function () { playerController.jump(); } );
 
-var gyroscopeCameraControl = new THREEFIELD.GyroscopeCameraControl(
+var tpsCameraControl = new THREEFIELD.TPSCameraControl(
   camera,
+  renderer,
   playerObjectHolder,
   {
     el: renderer.domElement,
@@ -122,10 +123,10 @@ count=0;
   if(count>1300){return}
   requestAnimationFrame( update );
   var delta = clock.getDelta();
-  var cameraFrontAngle = gyroscopeCameraControl.getFrontAngle();
+  var cameraFrontAngle = tpsCameraControl.getFrontAngle();
   var characterFrontAngle = keyInputControl.getFrontAngle();
   playerController.frontAngle = ( 360 - cameraFrontAngle ) + characterFrontAngle % 360;
-  gyroscopeCameraControl.update();
+  tpsCameraControl.update();
 
   world.step( delta );
   renderer.render( scene, camera );

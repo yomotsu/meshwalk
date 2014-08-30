@@ -23,7 +23,7 @@ module.exports = (grunt) ->
           'src/TPS/CharacterController.js'
           'src/TPS/AnimationController.js'
           'src/TPS/KeyInputControl.js'
-          'src/TPS/GyroscopeCameraControl.js'
+          'src/TPS/TPSCameraControl.js'
         ]
         dest: 'build/addon/threefield.TPS.js'
 
