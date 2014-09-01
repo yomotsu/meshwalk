@@ -26,10 +26,10 @@ THREEFIELD.World.prototype.step = function ( dt ) {
 
   var character,
       collider,
+      isInSphere,
       isInAABB,
       contactInfo,
       hasAdded,
-      contactPoint = new THREE.Vector3(),
       i, ii, iii, iiii, l, ll, lll, llll;
 
 
@@ -42,7 +42,16 @@ THREEFIELD.World.prototype.step = function ( dt ) {
     for ( ii = 0, ll = this.colliders.length; ii < ll; ii ++ ) {
 
       collider = this.colliders[ ii ];
-      isInAABB = THREEFIELD.World.sphereInAABB( character.position, character.radius, collider.aabb );
+
+      isInSphere = THREEFIELD.World.sphereInSphere( character, collider.sphere );
+      
+      if ( !isInSphere ) {
+
+        continue;
+
+      }
+
+      isInAABB = THREEFIELD.World.sphereInAABB( character.center, character.radius, collider.aabb );
       
       if ( !isInAABB ) {
 
@@ -52,7 +61,15 @@ THREEFIELD.World.prototype.step = function ( dt ) {
 
       for ( iii = 0, lll = collider.faces.length; iii < lll; iii ++ ) {
 
-        contactInfo = THREEFIELD.World.sphereVsTriangle( collider.faces[ iii ], collider.normals[ iii ], character.position, character.radius );
+        isInAABB = THREEFIELD.World.sphereInAABB( character.center, character.radius, collider.boxes[ iii ] );
+
+        if ( !isInAABB ) {
+
+          continue;
+
+        }
+
+        contactInfo = THREEFIELD.World.sphereVsTriangle( collider.faces[ iii ], collider.normals[ iii ], character.center, character.radius );
 
         if ( !contactInfo ) {
 
@@ -122,6 +139,14 @@ THREEFIELD.World.sphereInAABB = function ( position, radius, aabb ) {
   }
 
   return dmin <= rr;
+
+};
+
+THREEFIELD.World.sphereInSphere = function ( sphere1, sphere2 ) {
+
+    var radiusSum = sphere1.radius + sphere2.radius;
+
+    return sphere1.center.distanceToSquared( sphere2.center ) <= ( radiusSum * radiusSum );
 
 };
 

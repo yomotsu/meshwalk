@@ -5,7 +5,7 @@ THREEFIELD.CharacterController = function ( object3d, radius, world ) {
 
   THREE.EventDispatcher.prototype.apply( this );
   this.object = object3d;
-  this.position = new THREE.Vector3().copy( this.object.position );
+  this.center = new THREE.Vector3().copy( this.object.position );
   this.radius = radius;
   this.world = world;
   this.maxSlopeGradient = Math.cos( THREE.Math.degToRad( 50 ) );
@@ -183,9 +183,9 @@ THREEFIELD.CharacterController.prototype._updateGrounding = function () {
   }
 
   origin = new THREE.Vector3(
-    this.position.x,
-    this.position.y + this.radius,
-    this.position.z
+    this.center.x,
+    this.center.y + this.radius,
+    this.center.z
   );
 
   raycaster = new THREE.Raycaster(
@@ -227,9 +227,9 @@ THREEFIELD.CharacterController.prototype._updateGrounding = function () {
 
 THREEFIELD.CharacterController.prototype._updatePosition = function ( dt ) {
 
-  var x = this.position.x + this.velocity.x * dt,
-      y = this.position.y + this.velocity.y * dt,
-      z = this.position.z + this.velocity.z * dt;
+  var x = this.center.x + this.velocity.x * dt,
+      y = this.center.y + this.velocity.y * dt,
+      z = this.center.z + this.velocity.z * dt;
 
   if ( this.isGrounded ) {
 
@@ -237,7 +237,7 @@ THREEFIELD.CharacterController.prototype._updatePosition = function ( dt ) {
 
   }
 
-  this.position.set( x, y, z );
+  this.center.set( x, y, z );
 
 };
 
@@ -259,7 +259,7 @@ THREEFIELD.CharacterController.prototype.fixPosition = function () {
   if ( this.contactInfo.length === 0 && !this.isJumping ) {
 
     // free falling, aside of jumping
-    this.object.position.copy( this.position );
+    this.object.position.copy( this.center );
     return;
 
   }
@@ -282,7 +282,7 @@ THREEFIELD.CharacterController.prototype.fixPosition = function () {
     if ( distance < 0 && this.isGrounded ) {
 
       // resolve player vs wall collistion while on the ground
-      point1.copy( normal ).multiplyScalar( -this.radius ).add( this.position );
+      point1.copy( normal ).multiplyScalar( -this.radius ).add( this.center );
       direction.set( normal.x, 0, normal.z ).normalize();
       plainD = face.a.dot( normal );
       t = ( plainD - ( normal.x * point1.x + normal.y * point1.y + normal.z * point1.z ) ) / ( normal.x * direction.x + normal.y * direction.y + normal.z * direction.z );
@@ -312,8 +312,8 @@ THREEFIELD.CharacterController.prototype.fixPosition = function () {
 
   }
 
-  this.position.add( translate );
-  this.object.position.copy( this.position );
+  this.center.add( translate );
+  this.object.position.copy( this.center );
 
 };
 

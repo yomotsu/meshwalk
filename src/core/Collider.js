@@ -1,47 +1,67 @@
 // @author yomotsu
 // MIT License
 
-THREEFIELD.Collider = function ( threeMesh ) {
+;( function ( THREE, ns ) {
 
-  var geometry,
-      i, l;
+  'use strict';
 
-  this.mesh = threeMesh;
-  this.faces   = [];
-  this.normals = [];
-  this.aabb    = null;
+  THREEFIELD.Collider = function ( threeMesh ) {
 
-  // http://stackoverflow.com/questions/23990354/how-to-update-vertices-geometry-after-rotate-or-move-object#answer-24001626
-  threeMesh.updateMatrix(); 
-  threeMesh.geometry.applyMatrix( threeMesh.matrix );
-  threeMesh.matrix.identity();
-  threeMesh.position.set( 0, 0, 0 );
-  threeMesh.rotation.set( 0, 0, 0 );
-  threeMesh.scale.set( 1, 1, 1 );
-  threeMesh.geometry.verticesNeedUpdate = true;
-  threeMesh.updateMatrixWorld();
-  threeMesh.geometry.computeFaceNormals();
-  threeMesh.geometry.computeVertexNormals();
-  threeMesh.geometry.computeBoundingBox();
+    var geometry,
+        face,
+        normal,
+        i, l;
 
-  this.aabb = threeMesh.geometry.boundingBox;
-  geometry = this.mesh.geometry;
+    this.mesh = threeMesh;
+    this.faces   = [];
+    this.normals = [];
+    this.boxes   = [];
+    this.sphere  = null;
+    this.aabb    = null;
 
-  for ( i = 0, l = geometry.faces.length; i < l; i ++ ) {
+    // http://stackoverflow.com/questions/23990354/how-to-update-vertices-geometry-after-rotate-or-move-object#answer-24001626
+    threeMesh.updateMatrix(); 
+    threeMesh.geometry.applyMatrix( threeMesh.matrix );
+    threeMesh.matrix.identity();
+    threeMesh.position.set( 0, 0, 0 );
+    threeMesh.rotation.set( 0, 0, 0 );
+    threeMesh.scale.set( 1, 1, 1 );
+    threeMesh.geometry.verticesNeedUpdate = true;
+    threeMesh.updateMatrixWorld();
+    threeMesh.geometry.computeFaceNormals();
+    threeMesh.geometry.computeVertexNormals();
 
-    if ( geometry.faces[ i ].d ) {
+    if ( threeMesh.geometry.boundingSphere === null ) {
 
-      console.log( 'still not supported' );
+      threeMesh.geometry.computeBoundingSphere();
 
     }
 
-    var a = geometry.vertices[ geometry.faces[ i ].a ];
-    var b = geometry.vertices[ geometry.faces[ i ].b ];
-    var c = geometry.vertices[ geometry.faces[ i ].c ];
+    if ( threeMesh.geometry.boundingBox === null ) {
 
-    this.faces.push( { a: a, b: b, c: c } );
-    this.normals.push( geometry.faces[ i ].normal );
+      threeMesh.geometry.computeBoundingBox();
 
-  }
+    }
 
-};
+    this.sphere = threeMesh.geometry.boundingSphere;
+    this.aabb   = threeMesh.geometry.boundingBox;
+    geometry = this.mesh.geometry;
+
+    for ( i = 0, l = geometry.faces.length; i < l; i ++ ) {
+
+      face = new THREE.Triangle(
+        geometry.vertices[ geometry.faces[ i ].a ],
+        geometry.vertices[ geometry.faces[ i ].b ],
+        geometry.vertices[ geometry.faces[ i ].c ]
+      );
+      normal = geometry.faces[ i ].normal;
+
+      this.faces.push( face );
+      this.normals.push( normal );
+      this.boxes.push( THREEFIELD.triangle.makeBoundingBox( face ) );
+
+    }
+
+  };
+
+} )( THREE, THREEFIELD );
