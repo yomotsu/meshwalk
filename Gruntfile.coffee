@@ -14,7 +14,9 @@ module.exports = (grunt) ->
         src: [
           'src/core/threefield.js'
           'src/core/utils.js'
+          'src/core/collision.js'
           'src/core/World.js'
+          'src/core/Octree.js'
           'src/core/Collider.js'
         ]
         dest: 'build/threefield.js'

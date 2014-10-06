@@ -11,8 +11,19 @@ canvas{display: block;}
 <body>
 
 <script src="../lib/three.min.js"></script>
-<script src="../build/threefield.js"></script>
-<script src="../build/addon/threefield.TPS.min.js"></script>
+
+<script src="/src/core/threefield.js"></script>
+<script src="/src/core/utils.js"></script>
+<script src="/src/core/collision.js"></script>
+<script src="/src/core/World.js"></script>
+<script src="/src/core/Octree.js"></script>
+<script src="/src/core/Collider.js"></script>
+
+<script src="/src/TPS/CharacterController.js"></script>
+<script src="/src/TPS/AnimationController.js"></script>
+<script src="/src/TPS/KeyInputControl.js"></script>
+<script src="/src/TPS/TPSCameraControl.js"></script>
+
 <script>
 
 
@@ -21,6 +32,11 @@ var light, terrain, box, sphere;
 var world, groundBody, playerRadius = 1, playerObjectHolder, playerController;
 
 world = new THREEFIELD.World();
+
+var min = new THREE.Vector3( -15, -15, -15 );
+var max = new THREE.Vector3(  15,  15,  15 );
+var octree = new THREEFIELD.Octree( min, max, 5 );
+// world.add( octree );
 
 width = window.innerWidth;
 height = window.innerHeight;
@@ -33,7 +49,7 @@ renderer.setSize( width, height );
 document.body.appendChild( renderer.domElement );
 
 playerObjectHolder = new THREE.Object3D();
-playerObjectHolder.position.set( 0, 10, 0 );
+playerObjectHolder.position.set( 1, 10, -12 );
 scene.add( playerObjectHolder );
 
 sphere = new THREE.Mesh(
@@ -70,7 +86,7 @@ box = new THREE.Mesh(
 );
 box.position.set( -3, 7.5, -12 );
 scene.add( box );
-world.add( new THREEFIELD.Collider( box ) );
+octree.importThreeMesh( box );
 
 var loader = new THREE.JSONLoader();
 
@@ -83,14 +99,14 @@ loader.load( 'terrain.js', function( geo, mat ) {
   );
   terrain.scale.set( 2, 2, 2 );
   scene.add( terrain );
-  world.add( new THREEFIELD.Collider( terrain ) );
+  octree.importThreeMesh( terrain );
   tpsCameraControl.rigidObjects.push( terrain );
 
   
-  // count=0;
+  count=0;
   ;( function update () {
-    // count++
-    // if(count>1500){return}
+    count++
+    if(count>350){return}
     requestAnimationFrame( update );
   
     var delta = clock.getDelta();
