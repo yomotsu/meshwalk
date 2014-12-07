@@ -5,7 +5,7 @@
 
   'use strict';
 
-  THREEFIELD.Collider = function ( threeMesh ) {
+  THREEFIELD.Collider = function ( threeMesh, name ) {
 
     var geometry,
         face,
@@ -13,12 +13,15 @@
         i, l;
 
     this.mesh = threeMesh;
+    this.name = name;
+    this.uuid = THREE.Math.generateUUID();
     this.faces   = [];
     this.normals = [];
     this.boxes   = [];
-    this.sphere  = null;
-    this.aabb    = null;
+    this.boundingSphere = null;
+    this.boundingBox    = null;
 
+    // bake the matrix for performance
     // http://stackoverflow.com/questions/23990354/how-to-update-vertices-geometry-after-rotate-or-move-object#answer-24001626
     threeMesh.updateMatrix(); 
     threeMesh.geometry.applyMatrix( threeMesh.matrix );
@@ -31,21 +34,22 @@
     threeMesh.geometry.computeFaceNormals();
     threeMesh.geometry.computeVertexNormals();
 
-    if ( threeMesh.geometry.boundingSphere === null ) {
-
-      threeMesh.geometry.computeBoundingSphere();
-
-    }
-
-    if ( threeMesh.geometry.boundingBox === null ) {
-
-      threeMesh.geometry.computeBoundingBox();
-
-    }
-
-    this.sphere = threeMesh.geometry.boundingSphere;
-    this.aabb   = threeMesh.geometry.boundingBox;
     geometry = this.mesh.geometry;
+
+    if ( geometry.boundingSphere === null ) {
+
+      geometry.computeBoundingSphere();
+
+    }
+
+    if ( geometry.boundingBox === null ) {
+
+      geometry.computeBoundingBox();
+
+    }
+
+    this.boundingSphere = geometry.boundingSphere;
+    this.boundingBox    = geometry.boundingBox;
 
     for ( i = 0, l = geometry.faces.length; i < l; i ++ ) {
 

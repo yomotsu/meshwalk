@@ -130,7 +130,7 @@
         for ( ii = 0, ll = targetNodes.length; ii < ll; ii ++ ) {
 
           node = targetNodes[ ii ];
-          isIntersected = ns.collision.testTriangleAABB( face.a, face.b, face.c, node );
+          isIntersected = ns.collision.isIntersectionTriangleAABB( face.a, face.b, face.c, node );
 
           if ( isIntersected ) {
 
@@ -166,7 +166,7 @@
       var i, ii, l, ll, node, targetNodes = [], tmp = [],
           isIntersected, intersectedNodes = [], isAtMaxDepth;
 
-      isIntersected = ns.collision.testSphereAABB( sphere, this );
+      isIntersected = ns.collision.isIntersectionSphereAABB( sphere, this );
 
       if ( !isIntersected ) {
 
@@ -182,7 +182,7 @@
         for ( ii = 0, ll = targetNodes.length; ii < ll; ii ++ ) {
 
           node = targetNodes[ ii ];
-          isIntersected = ns.collision.testSphereAABB( sphere, node );
+          isIntersected = ns.collision.isIntersectionSphereAABB( sphere, node );
 
           if ( isIntersected ) {
 

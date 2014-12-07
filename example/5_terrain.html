@@ -11,22 +11,11 @@ canvas{display: block;}
 <body>
 
 <script src="../lib/three.min.js"></script>
-
-<script src="/src/core/threefield.js"></script>
-<script src="/src/core/utils.js"></script>
-<script src="/src/core/collision.js"></script>
-<script src="/src/core/World.js"></script>
-<script src="/src/core/Octree.js"></script>
-<script src="/src/core/Collider.js"></script>
-
-<script src="/src/TPS/CharacterController.js"></script>
-<script src="/src/TPS/AnimationController.js"></script>
-<script src="/src/TPS/KeyInputControl.js"></script>
-<script src="/src/TPS/TPSCameraControl.js"></script>
-
+<script src="../build/threefield.js"></script>
+<script src="../build/addon/threefield.TPS.js"></script>
 <script>
 
-
+var _TEMP_GROUNDMESHES = [];
 var width, height, clock, scene, camera, renderer;
 var light, terrain, box, sphere;
 var world, groundBody, playerRadius = 1, playerObjectHolder, playerController;
@@ -36,7 +25,7 @@ world = new THREEFIELD.World();
 var min = new THREE.Vector3( -15, -15, -15 );
 var max = new THREE.Vector3(  15,  15,  15 );
 var octree = new THREEFIELD.Octree( min, max, 5 );
-// world.add( octree );
+world.add( octree );
 
 width = window.innerWidth;
 height = window.innerHeight;
@@ -49,7 +38,8 @@ renderer.setSize( width, height );
 document.body.appendChild( renderer.domElement );
 
 playerObjectHolder = new THREE.Object3D();
-playerObjectHolder.position.set( 1, 10, -12 );
+playerObjectHolder.position.set( 0, 20, 0 );
+// playerObjectHolder.position.set( 0, 10, 0 );
 scene.add( playerObjectHolder );
 
 sphere = new THREE.Mesh(
@@ -58,7 +48,8 @@ sphere = new THREE.Mesh(
 );
 playerObjectHolder.add( sphere );
 
-playerController = new THREEFIELD.CharacterController( playerObjectHolder, playerRadius, world );
+playerController = new THREEFIELD.CharacterController( playerObjectHolder, playerRadius );
+world.addCharacter( playerController );
 
 var keyInputControl = new THREEFIELD.KeyInputControl();
 
@@ -87,6 +78,7 @@ box = new THREE.Mesh(
 box.position.set( -3, 7.5, -12 );
 scene.add( box );
 octree.importThreeMesh( box );
+// _TEMP_GROUNDMESHES.push( box );
 
 var loader = new THREE.JSONLoader();
 
@@ -100,13 +92,14 @@ loader.load( 'terrain.js', function( geo, mat ) {
   terrain.scale.set( 2, 2, 2 );
   scene.add( terrain );
   octree.importThreeMesh( terrain );
+  _TEMP_GROUNDMESHES.push( terrain );
   tpsCameraControl.rigidObjects.push( terrain );
 
   
-  count=0;
+  // count=0;
   ;( function update () {
-    count++
-    if(count>350){return}
+    // count++
+    // if(count>350){return}
     requestAnimationFrame( update );
   
     var delta = clock.getDelta();

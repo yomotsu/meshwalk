@@ -6,21 +6,10 @@
   'use strict';
 
   ns.collision = {};
- 
-  ns.collision.helper = {
-   
-    scalarTriple: function ( a, b, c ) {
-   
-      var m = b.clone().cross( c );
-      return a.dot( m );
-   
-    }
-   
-  };
 
   // aabb: <THREE.Box3>
   // Plane: <THREE.Plane>
-  ns.collision.testAABBPlane = function ( aabb, Plane ) {
+  ns.collision.isIntersectionAABBPlane = function ( aabb, Plane ) {
 
     var center = new THREE.Vector3().addVectors( aabb.max, aabb.min ).multiplyScalar( 0.5 ),
         extents = new THREE.Vector3().subVectors( aabb.max, center );
@@ -38,7 +27,7 @@
   // b: <THREE.Vector3>, // vertex of a triangle
   // c: <THREE.Vector3>, // vertex of a triangle
   // aabb: <THREE.Box3>
-  ns.collision.testTriangleAABB = function ( a, b, c, aabb ) {
+  ns.collision.isIntersectionTriangleAABB = function ( a, b, c, aabb ) {
 
     var p0, p1, p2, r;
     
@@ -201,14 +190,14 @@
     plane.normal = new THREE.Vector3().copy( f1 ).cross( f0 ).normalize();
     plane.constant = plane.normal.dot( a );
     
-    return ns.collision.testAABBPlane( aabb, plane );
+    return ns.collision.isIntersectionAABBPlane( aabb, plane );
 
   }
 
 
   // sphere1: <THREE.Sphere>
   // sphere2: <THREE.Sphere>
-  ns.collision.testSphereSphere = function ( sphere1, sphere2 ) {
+  ns.collision.isIntersectionSphereSphere = function ( sphere1, sphere2 ) {
 
     var radiusSum = sphere1.radius + sphere2.radius;
 
@@ -220,7 +209,7 @@
   // sphere: <THREE.Sphere>
   // aabb: <THREE.Box3>
 
-  ns.collision.testSphereAABB = function ( sphere, aabb ) {
+  ns.collision.isIntersectionSphereAABB = function ( sphere, aabb ) {
 
     var sqDist = 0;
 
@@ -245,7 +234,7 @@
   // b: <THREE.Vector3>, // vertex of a triangle
   // c: <THREE.Vector3>, // vertex of a triangle
   // normal: <THREE.Vector3>, // normal of a triangle
-  ns.collision.testSphereTriangle = function ( sphere, a, b, c, normal ) {
+  ns.collision.isIntersectionSphereTriangle = function ( sphere, a, b, c, normal ) {
     // http://realtimecollisiondetection.net/blog/?p=103
 
     // vs plain of traiangle face
@@ -374,7 +363,7 @@
 
   // }
 
-  // ns.collision.testLineTriangle = function ( p, q, a, b, c, precision ) {
+  // ns.collision.isIntersectionLineTriangle = function ( p, q, a, b, c, precision ) {
 
   //   var pq = q.clone().sub( p ),
   //       pa = a.clone().sub( p ),
@@ -410,53 +399,48 @@
 
   // }
 
-  // based on Real-Time Collision Detection Section 5.3.4
-  // p: <THREE.Vector3>, // line3.start
-  // q: <THREE.Vector3>, // line3.end
-  // a: <THREE.Vector3>, // triangle.a
-  // b: <THREE.Vector3>, // triangle.b
-  // c: <THREE.Vector3>, // triangle.c
   ns.collision.testSegmentTriangle = function ( p, q, a, b, c ) {
-   
+
     var ab = b.clone().sub( a );
     var ac = c.clone().sub( a );
     var qp = p.clone().sub( q );
-   
+
     var n = ab.clone().cross( ac );
-   
+
     var d = qp.dot( n );
     if ( d <= 0 ) { return false; }
-   
+
     var ap = p.clone().sub( a );
     var t = ap.dot( n );
-   
-    if ( t < 0 ) { return false; }
-    if ( t > d ) { return false; }
-   
+
+    if ( t < 0 ) { return 0; }
+    if ( t > d ) { return 0; }
+
     var e = qp.clone().cross( ap );
     var v = ac.dot( e );
-   
-    if ( v < 0 || v > d ) { return false; }
-   
+
+    if ( v < 0 || v > d ) { return 0; }
+
     var w = ab.clone().dot( e ) * -1;
-   
-    if ( w < 0 || v + w > d ) { return false; }
-   
+
+    if ( w < 0 || v + w > d ) { return 0; }
+
     var ood = 1 / d;
     t *= ood;
     v *= ood;
     w *= ood;
     var u = 1 - v - w;
-   
+
     var au = a.clone().multiplyScalar( u ),
         bv = b.clone().multiplyScalar( v ),
         cw = c.clone().multiplyScalar( w ),
         contactPoint = au.clone().add( bv ).add( cw );
-   
+
     return {
       contactPoint: contactPoint
     }
-  }
+
+}
 
 } )( THREE, THREEFIELD );
 
