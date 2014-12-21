@@ -5,7 +5,11 @@
 
   'use strict';
 
+  var PI2     = Math.PI * 2;
   var PI_HALF = Math.PI / 2;
+  var modulo = function ( n, d ) {
+    return ( ( n % d ) + d ) % d;
+  }
   
   // camera              isntance of THREE.Camera
   // trackObject         isntance of THREE.Object3D
@@ -25,9 +29,9 @@
     this.minRadius    = params && params.minRadius || 1;
     this.maxRadius    = params && params.maxRadius || 30;
     this.rigidObjects = params && params.rigidObjects || [];
-    this.lat = 0;
-    this.lon = 0;
-    this.phi = 0;   // angle of zenith
+    this.lat   = 0;
+    this.lon   = 0;
+    this.phi   = 0; // angle of zenith
     this.theta = 0; // angle of azimuth
     this.mouseAccelerationX = params && params.mouseAccelerationX !== undefined ? params.mouseAccelerationX : 100;
     this.mouseAccelerationY = params && params.mouseAccelerationY !== undefined ? params.mouseAccelerationY : 30;
@@ -102,7 +106,7 @@
 
     getFrontAngle: function () {
 
-      return 360 - this.lon;
+      return PI2 + this.theta;
 
     },
 

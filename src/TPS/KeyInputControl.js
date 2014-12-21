@@ -1,18 +1,29 @@
 // @author yomotsu
 // MIT License
 
-;( function ( ns ) {
+;( function ( THREE, ns ) {
 
-var KEY_W     = 87,
-    KEY_UP    = 38,
-    KEY_S     = 83,
-    KEY_DOWN  = 40,
-    KEY_A     = 65,
-    KEY_LEFT  = 37,
-    KEY_D     = 68,
-    KEY_RIGHT = 39,
-    KEY_SPACE = 32;
+  'use strict';
 
+  var KEY_W     = 87,
+      KEY_UP    = 38,
+      KEY_S     = 83,
+      KEY_DOWN  = 40,
+      KEY_A     = 65,
+      KEY_LEFT  = 37,
+      KEY_D     = 68,
+      KEY_RIGHT = 39,
+      KEY_SPACE = 32;
+
+  var DEG_0   = THREE.Math.degToRad(   0 ),
+      DEG_45  = THREE.Math.degToRad(  45 ),
+      DEG_90  = THREE.Math.degToRad(  90 ),
+      DEG_135 = THREE.Math.degToRad( 135 ),
+      DEG_180 = THREE.Math.degToRad( 180 ),
+      DEG_225 = THREE.Math.degToRad( 225 ),
+      DEG_270 = THREE.Math.degToRad( 270 ),
+      DEG_315 = THREE.Math.degToRad( 315 ),
+      DEG_360 = THREE.Math.degToRad( 360 );
 
   ns.KeyInputControl = function () {
     
@@ -21,9 +32,9 @@ var KEY_W     = 87,
     this.mouseAccelarationY = 20;
     this.isDisabled = false;
 
-    this.isUp = false;
-    this.isDown = false;
-    this.isLeft = false;
+    this.isUp    = false;
+    this.isDown  = false;
+    this.isLeft  = false;
     this.isRight = false;
     this.frontAngle = 0;
 
@@ -48,14 +59,16 @@ var KEY_W     = 87,
     var left  = this.isLeft;
     var right = this.isRight;
 
-    if (  up && !left && !down && !right ) { this.frontAngle =   0; }
-    else if (  up &&  left && !down && !right ) { this.frontAngle =  45; }
-    else if ( !up &&  left && !down && !right ) { this.frontAngle =  90; }
-    else if ( !up &&  left &&  down && !right ) { this.frontAngle = 135; }
-    else if ( !up && !left &&  down && !right ) { this.frontAngle = 180; }
-    else if ( !up && !left &&  down &&  right ) { this.frontAngle = 225; }
-    else if ( !up && !left && !down &&  right ) { this.frontAngle = 270; }
-    else if (  up && !left && !down &&  right ) { this.frontAngle = 315; }
+    if (  up && !left && !down && !right )      { this.frontAngle = DEG_0  ; }
+    else if (  up &&  left && !down && !right ) { this.frontAngle = DEG_45 ; }
+    else if ( !up &&  left && !down && !right ) { this.frontAngle = DEG_90 ; }
+    else if ( !up &&  left &&  down && !right ) { this.frontAngle = DEG_135; }
+    else if ( !up && !left &&  down && !right ) { this.frontAngle = DEG_180; }
+    else if ( !up && !left &&  down &&  right ) { this.frontAngle = DEG_225; }
+    else if ( !up && !left && !down &&  right ) { this.frontAngle = DEG_270; }
+    else if (  up && !left && !down &&  right ) { this.frontAngle = DEG_315; }
+
+    this.frontAngle = this.frontAngle % DEG_360;
 
   };
 
@@ -163,4 +176,4 @@ var KEY_W     = 87,
 
   }
 
-} )( THREEFIELD );
+} )( THREE, THREEFIELD );

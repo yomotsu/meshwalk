@@ -15,9 +15,9 @@
     this.isGrounded = false;
     this.isOnSlope  = false;
     this.isIdling   = false;
-    this.isWalking  = false;
+    this.IsRunning  = false;
     this.isJumping  = false;
-    this.frontAngle = 0; // 0 to 360 deg
+    this.direction  = 0; // 0 to 2PI(=360deg) in rad
     this.movementSpeed = 15;
     this.velocity = new THREE.Vector3( 0, -10, 0 );
     this.currentJumpPower = 0;
@@ -46,7 +46,6 @@
       this.updatePosition( dt );
       this.collisionDetection();
       this.solvePosition();
-      // this.emitEvent();
       this.updateVelocity();
 
     },
@@ -54,9 +53,10 @@
     updateVelocity: function () {
 
       var FALL_VELOCITY = -20,
-          frontDierction = -Math.cos( THREE.Math.degToRad( this.frontAngle ) ),
-          rightDierction = -Math.sin( THREE.Math.degToRad( this.frontAngle ) ),
+          frontDierction = -Math.cos( this.direction ),
+          rightDierction = -Math.sin( this.direction ),
           normal,
+          isHittingCeiling = false,
           wallNomal2D,
           direction2D,
           wallAngle,
@@ -65,9 +65,9 @@
           i, l;
       
       this.velocity.set(
-        rightDierction * this.movementSpeed * this.isWalking, 
+        rightDierction * this.movementSpeed * this.IsRunning, 
         FALL_VELOCITY,
-        frontDierction * this.movementSpeed * this.isWalking
+        frontDierction * this.movementSpeed * this.IsRunning
       );
 
       // 急勾配や自由落下など、自動で付与される速度の処理
@@ -91,7 +91,7 @@
         this.velocity.y = FALL_VELOCITY;
         this.velocity.z = this.groundNormal.z * holizontalSpead;
 
-      // TODO ジャンプの処理
+      // ジャンプの処理
       } else if ( !this.isGrounded && !this.isOnSlope && this.isJumping ) {
 
         this.velocity.y = this.currentJumpPower * -FALL_VELOCITY;
@@ -110,12 +110,17 @@
         normal = this.contactInfo[ i ].face.normal;
         // var distance = this.contactInfo[ i ].distance;
 
-
         if ( this.maxSlopeGradient < normal.y || this.isOnSlope ) {
 
           // フェイスは地面なので、壁としての衝突の可能性はない。
           // 速度の減衰はしないでいい
           continue;
+
+        }
+
+        if ( !isHittingCeiling && normal.y < 0 ) {
+
+          isHittingCeiling = true;
 
         }
 
@@ -141,10 +146,19 @@
         );
         direction2D.subVectors( direction2D, wallNomal2D );
 
-        this.velocity.x = direction2D.x * this.movementSpeed * this.isWalking;
-        this.velocity.z = direction2D.y * this.movementSpeed * this.isWalking;
+        this.velocity.x = direction2D.x * this.movementSpeed * this.IsRunning;
+        this.velocity.z = direction2D.y * this.movementSpeed * this.IsRunning;
 
       }
+
+      // ジャンプ中に天井にぶつかったら、ジャンプを中断する
+      if ( isHittingCeiling ) {
+
+        this.velocity.y = Math.min( 0, this.velocity.y );
+        this.isJumping = false;
+
+      }
+
     },
 
     updateGrounding: function () {
@@ -216,7 +230,7 @@
       var top    = head.y;
       var bottom = this.center.y - this.radius - this.groundPadding;
 
-      // ジャンプ中、かつ上方向に移動中だったら、接地しない
+      // ジャンプ中、かつ上方向に移動中だったら、強制接地しない
       if ( this.isJumping && 0 < this.currentJumpPower ) {
 
         this.isOnSlope  = false;
@@ -254,16 +268,6 @@
       }
 
       this.center.set( x, y, z );
-
-    },
-
-    emitEvent: function () {
-
-      var wasWalking;
-
-      return function () {
-
-      }
 
     },
 
@@ -390,25 +394,6 @@
 
         }
 
-        // 接地していない、かつ、急勾配野坂
-
-
-        // ジャンプ上昇中に屋根か壁と衝突した場合は
-        // 法線と逆方向に押し出す
-        // if (
-        //   this.isJumping && 0 < this.currentJumpPower &&
-        //   -1 <= normal.y && normal.y <= 0
-        // ) {
-
-        //   // 壁と屋根は、衝突フェイスの法線の角度で判定する
-        //   // 
-        //   translate.x += -normal.x * distance;
-        //   translate.y += -normal.y * distance;
-        //   translate.z += -normal.z * distance;
-        //   continue;
-
-        // }
-
       }
 
       this.center.add( translate );
@@ -416,9 +401,11 @@
 
     },
 
-    run: function () {},
+    setDirection : function () {
 
-    idle: function () {},
+
+
+    },
 
     jump: function () {
 
@@ -427,8 +414,6 @@
         return;
 
       }
-
-      console.log( 'jump' );
 
       this.jumpStartTime = performance.now();
       this.currentJumpPower = 1;
@@ -453,7 +438,5 @@
     }
 
   }
-
-
 
 } )( THREE, THREEFIELD );
