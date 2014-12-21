@@ -20,6 +20,8 @@
     this.frontAngle = 0; // 0 to 360 deg
     this.movementSpeed = 15;
     this.velocity = new THREE.Vector3( 0, -10, 0 );
+    this.currentJumpPower = 0;
+    this.jumpStartTime = 0;
     this.groundHeight = 0;
     this.groundNormal = new THREE.Vector3();
     this.collisionCandidate;
@@ -32,15 +34,15 @@
     constructor: ns.CharacterController,
 
     update: function ( dt ) {
-// console.log( this.isGrounded, this.isOnSlope )
 
-      // 状態をリセットしておく      
+      // 状態をリセットしておく
       this.isGrounded = false;
       this.isOnSlope  = false;
       this.groundHeight = -Infinity;
       this.groundNormal.set( 0, 1, 0 );
 
       this.updateGrounding();
+      this.updateJumping();
       this.updatePosition( dt );
       this.collisionDetection();
       this.solvePosition();
@@ -81,14 +83,18 @@
 
       } else if ( this.isOnSlope ) {
 
-        this.velocity.x = this.groundNormal.x * this.movementSpeed;
-        this.velocity.y = 1 - this.groundNormal.y * this.movementSpeed;
-        this.velocity.z = this.groundNormal.z * this.movementSpeed;
+        // TODO 0.2 はマジックナンバーなので、幾何学的な求め方を考える
+        var slidingDownVelocity = FALL_VELOCITY;
+        var holizontalSpead = - slidingDownVelocity / ( 1 - this.groundNormal.y ) * 0.2;
+
+        this.velocity.x = this.groundNormal.x * holizontalSpead;
+        this.velocity.y = FALL_VELOCITY;
+        this.velocity.z = this.groundNormal.z * holizontalSpead;
 
       // TODO ジャンプの処理
-      //} else if ( !this.isGrounded && !this.isOnSlope && this.isJumping ) {
+      } else if ( !this.isGrounded && !this.isOnSlope && this.isJumping ) {
 
-      //   this.velocity.y = this.currentJumpPower * -FALL_VELOCITY;
+        this.velocity.y = this.currentJumpPower * -FALL_VELOCITY;
 
       }
 
@@ -109,7 +115,6 @@
 
           // フェイスは地面なので、壁としての衝突の可能性はない。
           // 速度の減衰はしないでいい
-          // this triangle is a ground or slope, not a wall or ceil
           continue;
 
         }
@@ -174,7 +179,7 @@
 
       var to = new THREE.Vector3(
         this.center.x,
-        -1e10,
+        this.center.y - 1e10,
         this.center.z
       );
 
@@ -211,9 +216,24 @@
       var top    = head.y;
       var bottom = this.center.y - this.radius - this.groundPadding;
 
-      this.isOnSlope  = ( this.groundNormal.y <= this.maxSlopeGradient );
+      // ジャンプ中、かつ上方向に移動中だったら、接地しない
+      if ( this.isJumping && 0 < this.currentJumpPower ) {
+
+        this.isOnSlope  = false;
+        this.isGrounded = false;
+        return;
+
+      }
+
       this.isGrounded = ( bottom <= this.groundHeight && this.groundHeight <= top );
-// console.log( this.isGrounded, this.isOnSlope )
+      this.isOnSlope  = ( this.groundNormal.y <= this.maxSlopeGradient );
+
+      if ( this.isGrounded ) {
+
+        this.isJumping = false;
+
+      }
+
     },
 
     updatePosition: function ( dt ) {
@@ -226,7 +246,6 @@
       var x = this.center.x + this.velocity.x * dt,
           y = this.center.y + this.velocity.y * dt,
           z = this.center.z + this.velocity.z * dt;
-
 
       if ( this.isGrounded ) {
 
@@ -272,23 +291,6 @@
 
         contactInfo.face = faces[ i ];
         this.contactInfo.push( contactInfo );
-
-        // もし、updateGrounding() 内で
-        // 急勾配の坂の上にいるかの判定ができていなくて、
-        // !grounded かつ この時点で急勾配と交差している場合は
-        // 坂の上にいる (isOnSlope) ことにする
-        var isSlopeFace = ( this.maxSlopeGradient <= faces[ i ].normal.y && faces[ i ].normal.y  < 1 );
-
-        if(
-          !this.isGrounded &&
-          !this.isOnSlope  &&
-          isSlopeFace
-        ) {
-
-          this.isOnSlope = true;
-          this.groundNormal = faces[ i ].normal;
-
-        }
 
       }
 
@@ -347,12 +349,22 @@
 
         }
 
+        // フェイスは急勾配な坂か否か
+        var isSlopeFace = ( this.maxSlopeGradient <= face.normal.y && face.normal.y < 1 );
+
+        // ジャンプ降下中に、急勾配な坂に衝突したらジャンプ終わり
+        if ( this.isJumping && 0 >= this.currentJumpPower && isSlopeFace ) {
+
+          this.isJumping = false;
+          this.isGrounded = true;
+          // console.log( 'jump end' );
+
+        }
+
         if ( this.isGrounded || this.isOnSlope ) {
 
           // 地面の上にいる場合はy(縦)方向は同一のまま
           // x, z (横) 方向だけを変更して押し出す
-
-          // solve player vs wall collistion while on the ground
           // http://gamedev.stackexchange.com/questions/80293/how-do-i-resolve-a-sphere-triangle-collision-in-a-given-direction
           point1.copy( normal ).multiplyScalar( -this.radius ).add( this.center );
           direction.set( normal.x, 0, normal.z ).normalize();
@@ -373,17 +385,29 @@
 
           }
 
-          break;
+          // break;
           continue;
 
         }
-// console.log( 111, this.contactInfo[0].distance );
+
         // 接地していない、かつ、急勾配野坂
-        // 降下中やジャンプ中に壁まはた屋根と衝突した場合は
+
+
+        // ジャンプ上昇中に屋根か壁と衝突した場合は
         // 法線と逆方向に押し出す
-        // translate.x += -normal.x * distance;
-        // translate.y += -normal.y * distance;
-        // translate.z += -normal.z * distance;
+        // if (
+        //   this.isJumping && 0 < this.currentJumpPower &&
+        //   -1 <= normal.y && normal.y <= 0
+        // ) {
+
+        //   // 壁と屋根は、衝突フェイスの法線の角度で判定する
+        //   // 
+        //   translate.x += -normal.x * distance;
+        //   translate.y += -normal.y * distance;
+        //   translate.z += -normal.z * distance;
+        //   continue;
+
+        // }
 
       }
 
@@ -392,9 +416,40 @@
 
     },
 
+    run: function () {},
+
+    idle: function () {},
+
     jump: function () {
 
+      if ( this.isJumping || !this.isGrounded || this.isOnSlope ) {
+
+        return;
+
+      }
+
       console.log( 'jump' );
+
+      this.jumpStartTime = performance.now();
+      this.currentJumpPower = 1;
+      this.isJumping = true;
+
+    },
+
+    updateJumping: function () {
+
+      var JUMP_DURATION = 1000;
+
+      if ( !this.isJumping ) {
+
+        return;
+
+      }
+
+      var elapsed = performance.now() - this.jumpStartTime;
+      var progress = elapsed / JUMP_DURATION;
+      this.currentJumpPower = Math.cos( Math.min( progress, 1 ) * Math.PI );
+
     }
 
   }

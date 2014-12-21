@@ -4,3 +4,4 @@
  */
 
 var THREEFIELD = {};
+var jiban = {};
