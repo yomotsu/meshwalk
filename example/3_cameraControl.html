@@ -16,7 +16,7 @@ canvas{display: block;}
 </head>
 <body>
 <div class="info">
-  The red sphere as a player character will just fall down to the ground mesh. <button onclick="playerController.center.set( 0, 10, 0 );">retry</button>
+  WASD to move, Space to jump. Plus, mousedrag to rotate, scroll to zoom
 </div>
 
 <script src="../lib/three.min.js"></script>
@@ -24,39 +24,21 @@ canvas{display: block;}
 <script src="../build/addon/threefield.TPS.min.js"></script>
 <script>
 
+// See demo/2_keyboardInput.html first
+
 'use strict';
 
 var width, height, clock, scene, camera, renderer;
-var ground, sphere;
+var ground, wall, sphere;
 var world, min, max, partition, octree,
     playerRadius = 1, playerObjectHolder, playerController;
+var keyInputControl;
+var tpsCameraControl;
 
-// make the world,
 world = new THREEFIELD.World();
-
-// then make a octree object,
-// which will be the container of rigid objects such as terrain
 min = new THREE.Vector3( -15, -15, -15 );
 max = new THREE.Vector3(  15,  15,  15 );
 partition = 5;
-// min and max is for the size of the octree box
-// see http://en.wikipedia.org/wiki/Octree
-// 
-//                 +------+------+
-//                 |\      \      \
-//                 | +------+------+
-//                 + |\      \      \
-//                 |\| +------+------+ <-coords of max
-//                 | + |      |      |
-// coords of min-> + |\|      |      |
-//                  \| +------+------+
-//                   + |      |      |
-//          y         \|      |      |
-//          |          +------+------+
-//          +--x
-//           \  
-//            z 
-// 
 octree = new THREEFIELD.Octree( min, max, partition );
 world.add( octree );
 
@@ -72,7 +54,6 @@ renderer.setSize( width, height );
 document.body.appendChild( renderer.domElement );
 
 
-// make a terrain in three.js and import it to the octree
 ground = new THREE.Mesh(
   new THREE.PlaneGeometry( 30, 30, 10, 10 ),
   new THREE.MeshBasicMaterial( { color: 0xffffff,  wireframe: true } )
@@ -82,20 +63,67 @@ scene.add( ground );
 octree.importThreeMesh( ground );
 
 
+wall = new THREE.Mesh(
+  new THREE.BoxGeometry( 5, 6, 10 ),
+  new THREE.MeshNormalMaterial( { color: 0xffffff,  wireframe: true } )
+);
+wall.position.set( 0, 3, 0 );
+// wall.rotation.set( 0, 0, THREE.Math.degToRad( 20 ) );
+scene.add( wall );
+octree.importThreeMesh( wall );
+
+
 playerObjectHolder = new THREE.Object3D();
 playerObjectHolder.position.set( 0, 10, 0 );
 scene.add( playerObjectHolder );
 
-// make your player character
 sphere = new THREE.Mesh(
   new THREE.SphereGeometry( playerRadius, 16, 16 ),
   new THREE.MeshBasicMaterial( { color: 0xff0000,  wireframe: true} )
 );
 playerObjectHolder.add( sphere );
 
-// to apply fake gravity and to be controllable object
 playerController = new THREEFIELD.CharacterController( playerObjectHolder, playerRadius );
 world.add( playerController );
+
+keyInputControl = new THREEFIELD.KeyInputControl();
+
+tpsCameraControl = new THREEFIELD.TPSCameraControl(
+  camera, // three.js camera
+  playerObjectHolder, // tracking object
+  {
+    el: renderer.domElement,
+    offset: new THREE.Vector3( 0, 1.8, 0 ), // eye height
+    // radius: 1, // default distance of the character to the camera
+    // minRadius: 1,
+    // maxRadius: 80,
+    rigidObjects: [ ground, wall ]
+  }
+);
+
+
+// bind events
+keyInputControl.addEventListener( 'movekeyhold',    function () { playerController.isRunning = true; } );
+keyInputControl.addEventListener( 'movekeyrelease', function () { playerController.isRunning = false; } );
+keyInputControl.addEventListener( 'jumpkeypress',   function () { playerController.jump(); } );
+
+// synk with keybord input and camera control input
+keyInputControl.addEventListener( 'movekeychange',  function () {
+  
+  var cameraFrontAngle = tpsCameraControl.getFrontAngle();
+  var characterFrontAngle = keyInputControl.getFrontAngle();
+  playerController.direction = THREE.Math.degToRad( 360 ) - cameraFrontAngle + characterFrontAngle;
+
+} );
+
+// the 'updated' event is fired by `tpsCameraControl.update()`
+tpsCameraControl.addEventListener( 'updated', function () {
+
+  var cameraFrontAngle = tpsCameraControl.getFrontAngle();
+  var characterFrontAngle = keyInputControl.getFrontAngle();
+  playerController.direction = THREE.Math.degToRad( 360 ) - cameraFrontAngle + characterFrontAngle;
+  
+} );
 
 
 ;( function update () {
@@ -103,6 +131,7 @@ world.add( playerController );
   requestAnimationFrame( update );
   var delta = clock.getDelta();
   world.step( delta );
+  tpsCameraControl.update();
   renderer.render( scene, camera );
 
 } )();

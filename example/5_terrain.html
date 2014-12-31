@@ -6,31 +6,54 @@
 <style>
 body{margin: 0;padding: 0; background: #000;}
 canvas{display: block;}
+.info{
+  color: #fff;
+  position: absolute;
+  top: 0;
+  left: 0;
+}
 </style>
 </head>
 <body>
+<div class="info">
+  u can import terrain models as heightfields.
+</div>
 
 <script src="../lib/three.min.js"></script>
-<script src="../build/threefield.js"></script>
+<script src="../build/threefield.min.js"></script>
 <script src="../build/addon/threefield.TPS.min.js"></script>
 <script>
 
+// See demo/3_cameraControl.html first
+
+'use strict';
 
 var width, height, clock, scene, camera, renderer;
-var light, terrain, box, sphere;
-var world, groundBody, playerRadius = 1, playerObjectHolder, playerController;
+var loader = new THREE.JSONLoader();
+var terrain, box, sphere;
+var world, min, max, partition, octree,
+    playerRadius = 1, playerObjectHolder, playerController;
+var keyInputControl;
+var tpsCameraControl;
 
 world = new THREEFIELD.World();
+min = new THREE.Vector3( -15, -15, -15 );
+max = new THREE.Vector3(  15,  15,  15 );
+partition = 5;
+octree = new THREEFIELD.Octree( min, max, partition );
+world.add( octree );
+
 
 width = window.innerWidth;
 height = window.innerHeight;
 clock = new THREE.Clock();
 scene = new THREE.Scene();
-camera = new THREE.PerspectiveCamera( 40, width / height, .01, 100 );
+camera = new THREE.PerspectiveCamera( 40, width / height, 1, 1000 );
 camera.position.set( 0, 5, 30 );
 renderer = new THREE.WebGLRenderer();
 renderer.setSize( width, height );
 document.body.appendChild( renderer.domElement );
+
 
 playerObjectHolder = new THREE.Object3D();
 playerObjectHolder.position.set( 0, 10, 0 );
@@ -42,21 +65,18 @@ sphere = new THREE.Mesh(
 );
 playerObjectHolder.add( sphere );
 
-playerController = new THREEFIELD.CharacterController( playerObjectHolder, playerRadius, world );
+playerController = new THREEFIELD.CharacterController( playerObjectHolder, playerRadius );
+world.add( playerController );
 
-var keyInputControl = new THREEFIELD.KeyInputControl();
+keyInputControl = new THREEFIELD.KeyInputControl();
 
-keyInputControl.addEventListener( 'movekeyhold', function () { playerController.isWalking = true; } );
-keyInputControl.addEventListener( 'movekeyrelease',  function () { playerController.isWalking = false; } );
-keyInputControl.addEventListener( 'jumpkeypress', function () { playerController.jump(); } );
-
-var tpsCameraControl = new THREEFIELD.TPSCameraControl(
-  camera,
-  playerObjectHolder,
+tpsCameraControl = new THREEFIELD.TPSCameraControl(
+  camera, // three.js camera
+  playerObjectHolder, // tracking object
   {
     el: renderer.domElement,
     offset: new THREE.Vector3( 0, 1.8, 0 ), // eye height
-    // radius: 1,
+    // radius: 1, // default distance of the character to the camera
     // minRadius: 1,
     // maxRadius: 80,
     rigidObjects: []
@@ -64,50 +84,64 @@ var tpsCameraControl = new THREEFIELD.TPSCameraControl(
 );
 
 
-box = new THREE.Mesh(
-  new THREE.BoxGeometry( 14, 1, 5 ),
-  new THREE.MeshNormalMaterial()
-);
-box.position.set( -3, 7.5, -12 );
-scene.add( box );
-world.add( new THREEFIELD.Collider( box ) );
+// bind events
+keyInputControl.addEventListener( 'movekeyhold',    function () { playerController.isRunning = true; } );
+keyInputControl.addEventListener( 'movekeyrelease', function () { playerController.isRunning = false; } );
+keyInputControl.addEventListener( 'jumpkeypress',   function () { playerController.jump(); } );
 
-var loader = new THREE.JSONLoader();
+// synk with keybord input and camera control input
+keyInputControl.addEventListener( 'movekeychange',  function () {
+  
+  var cameraFrontAngle = tpsCameraControl.getFrontAngle();
+  var characterFrontAngle = keyInputControl.getFrontAngle();
+  playerController.direction = THREE.Math.degToRad( 360 ) - cameraFrontAngle + characterFrontAngle;
 
-loader.load( 'terrain.js', function( geo, mat ) {
+} );
 
-  var terrain = new THREE.Mesh(
+// the 'updated' event is fired by `tpsCameraControl.update()`
+tpsCameraControl.addEventListener( 'updated', function () {
+
+  var cameraFrontAngle = tpsCameraControl.getFrontAngle();
+  var characterFrontAngle = keyInputControl.getFrontAngle();
+  playerController.direction = THREE.Math.degToRad( 360 ) - cameraFrontAngle + characterFrontAngle;
+  
+} );
+
+
+
+loader.load( 'terrain.json', function( geo, mat ) {
+
+  box = new THREE.Mesh(
+    new THREE.BoxGeometry( 14, 1, 5 ),
+    new THREE.MeshNormalMaterial()
+  );
+  box.position.set( -3, 7.5, -13 );
+  scene.add( box );
+  octree.importThreeMesh( box );
+
+
+  terrain = new THREE.Mesh(
     geo,
     new THREE.MeshNormalMaterial()
     // new THREE.MeshFaceMaterial( mat )
   );
   terrain.scale.set( 2, 2, 2 );
   scene.add( terrain );
-  world.add( new THREEFIELD.Collider( terrain ) );
+  octree.importThreeMesh( terrain );
   tpsCameraControl.rigidObjects.push( terrain );
 
   
-  // count=0;
   ;( function update () {
-    // count++
-    // if(count>1500){return}
-    requestAnimationFrame( update );
-  
-    var delta = clock.getDelta();
-    var cameraFrontAngle = tpsCameraControl.getFrontAngle();
-    var characterFrontAngle = keyInputControl.getFrontAngle();
-    playerController.frontAngle = ( 360 - cameraFrontAngle ) + characterFrontAngle % 360;
-    tpsCameraControl.update();
 
+    requestAnimationFrame( update );
+    var delta = clock.getDelta();
     world.step( delta );
+    tpsCameraControl.update();
     renderer.render( scene, camera );
 
   } )();
 
 } );
-
-
-
 
 </script>
 

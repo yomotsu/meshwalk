@@ -6,20 +6,41 @@
 <style>
 body{margin: 0;padding: 0; background: #000;}
 canvas{display: block;}
+.info{
+  color: #fff;
+  position: absolute;
+  top: 0;
+  left: 0;
+}
 </style>
 </head>
 <body>
+<div class="info">
+  WASD to move, Space to jump
+</div>
 
 <script src="../lib/three.min.js"></script>
-<script src="../build/threefield.js"></script>
+<script src="../build/threefield.min.js"></script>
 <script src="../build/addon/threefield.TPS.min.js"></script>
 <script>
 
+// See demo/1_getstarted.html first
+
+'use strict';
+
 var width, height, clock, scene, camera, renderer;
-var ground, sphere;
-var world, groundBody, playerRadius = 1, playerObjectHolder, playerController;
+var ground, wall, sphere;
+var world, min, max, partition, octree,
+    playerRadius = 1, playerObjectHolder, playerController;
+var keyInputControl;
 
 world = new THREEFIELD.World();
+min = new THREE.Vector3( -15, -15, -15 );
+max = new THREE.Vector3(  15,  15,  15 );
+partition = 5;
+octree = new THREEFIELD.Octree( min, max, partition );
+world.add( octree );
+
 
 width = window.innerWidth;
 height = window.innerHeight;
@@ -34,11 +55,12 @@ document.body.appendChild( renderer.domElement );
 
 ground = new THREE.Mesh(
   new THREE.PlaneGeometry( 30, 30, 10, 10 ),
-  new THREE.MeshNormalMaterial( { color: 0xffffff,  wireframe: true } )
+  new THREE.MeshBasicMaterial( { color: 0xffffff,  wireframe: true } )
 );
 ground.rotation.x = THREE.Math.degToRad( -90 );
 scene.add( ground );
-world.add( new THREEFIELD.Collider( ground ) );
+octree.importThreeMesh( ground );
+
 
 wall = new THREE.Mesh(
   new THREE.BoxGeometry( 5, 6, 10 ),
@@ -47,7 +69,7 @@ wall = new THREE.Mesh(
 wall.position.set( 0, 3, 0 );
 // wall.rotation.set( 0, 0, THREE.Math.degToRad( 20 ) );
 scene.add( wall );
-world.add( new THREEFIELD.Collider( wall ) );
+octree.importThreeMesh( wall );
 
 
 playerObjectHolder = new THREE.Object3D();
@@ -60,22 +82,23 @@ sphere = new THREE.Mesh(
 );
 playerObjectHolder.add( sphere );
 
-playerController = new THREEFIELD.CharacterController( playerObjectHolder, playerRadius, world );
+playerController = new THREEFIELD.CharacterController( playerObjectHolder, playerRadius );
+world.add( playerController );
 
-var keyInputControl = new THREEFIELD.KeyInputControl();
+// make a keyinput control
+keyInputControl = new THREEFIELD.KeyInputControl();
 
-keyInputControl.addEventListener( 'movekeyhold',    function () { playerController.isWalking = true; } );
-keyInputControl.addEventListener( 'movekeyrelease', function () { playerController.isWalking = false; } );
+// bind events
+keyInputControl.addEventListener( 'movekeyhold',    function () { playerController.isRunning = true; } );
+keyInputControl.addEventListener( 'movekeyrelease', function () { playerController.isRunning = false; } );
+keyInputControl.addEventListener( 'movekeychange',  function () { playerController.direction = keyInputControl.getFrontAngle(); } );
 keyInputControl.addEventListener( 'jumpkeypress',   function () { playerController.jump(); } );
 
-// count=0;
+
 ;( function update () {
-  // count++
-  // if(count>500){return}
+
   requestAnimationFrame( update );
   var delta = clock.getDelta();
-  var characterFrontAngle = keyInputControl.getFrontAngle();
-  playerController.frontAngle = characterFrontAngle;
   world.step( delta );
   renderer.render( scene, camera );
 

@@ -1,268 +1,63 @@
 // @author yomotsu
 // MIT License
 
-THREEFIELD.World = function () {
+;( function ( THREE, ns ) {
 
-  console.log( 'THREEFIELD.World' );
+  'use strict';
 
-  this.colliders  = [];
-  this.characters = [];
+  ns.World = function () {
 
-};
+    // console.log( 'THREEFIELD.World' );
 
-THREEFIELD.World.prototype.add = function ( collider ) {
+    this.colliderPool  = [];
+    this.characterPool = [];
 
-  this.colliders.push( collider );
-
-}
-
-THREEFIELD.World.prototype.addCharacter = function ( character ) {
-
-  this.characters.push( character );
-
-}
-
-THREEFIELD.World.prototype.step = function ( dt ) {
-
-  var character,
-      collider,
-      isInSphere,
-      isInAABB,
-      contactInfo,
-      hasAdded,
-      i, ii, iii, iiii, l, ll, lll, llll;
-
-
-  for ( i = 0, l = this.characters.length; i < l; i ++ ) {
-
-    character = this.characters[ i ];
-    character.update( dt );
-    character.contactInfo.length = 0;
-
-    for ( ii = 0, ll = this.colliders.length; ii < ll; ii ++ ) {
-
-      collider = this.colliders[ ii ];
-
-      isInSphere = THREEFIELD.World.sphereInSphere( character, collider.sphere );
-      
-      if ( !isInSphere ) {
-
-        continue;
-
-      }
-
-      isInAABB = THREEFIELD.World.sphereInAABB( character.center, character.radius, collider.aabb );
-      
-      if ( !isInAABB ) {
-
-        continue;
-
-      }
-
-      for ( iii = 0, lll = collider.faces.length; iii < lll; iii ++ ) {
-
-        isInAABB = THREEFIELD.World.sphereInAABB( character.center, character.radius, collider.boxes[ iii ] );
-
-        if ( !isInAABB ) {
-
-          continue;
-
-        }
-
-        contactInfo = THREEFIELD.World.sphereVsTriangle( collider.faces[ iii ], collider.normals[ iii ], character.center, character.radius );
-
-        if ( !contactInfo ) {
-
-          continue;
-
-        }
-
-        hasAdded = false;
-        
-        for ( iiii = 0, llll = character.contactInfo.length; iiii < llll; iiii ++ ) {
-
-          if (
-            character.contactInfo[ iiii ].normal.x === contactInfo.normal.x &&
-            character.contactInfo[ iiii ].normal.y === contactInfo.normal.y &&
-            character.contactInfo[ iiii ].normal.z === contactInfo.normal.z
-          ) {
-
-            hasAdded = true;
-            break;
-
-          }
-
-        }
-
-        if ( hasAdded ) {
-
-          continue;
-
-        }
-
-        character.contactInfo.push( contactInfo );
-
-      }
-
-    }
-
-    character.fixPosition();
-
-  }
-
-};
-
-THREEFIELD.World.sphereInAABB = function ( position, radius, aabb ) {
-  // http://d.hatena.ne.jp/taiyakisun/20120205/1328410006
-  // http://marupeke296.com/COL_3D_No11_AABBvsPoint.html
-  // http://stackoverflow.com/questions/4578967/cube-sphere-intersection-test#answer-4579192
-  var rr = Math.pow( radius, 2 ),
-      dmin = 0,
-      axis,
-      axisKey = [ 'x', 'y', 'z' ],
-      i;
-
-  for ( i in axisKey ) {
-
-    axis = axisKey[ i ];
-
-    if( position[ axis ] < aabb.min[ axis ] ) {
-
-      dmin += Math.pow( ( position[ axis ] - aabb.min[ axis ] ), 2 );
-
-    } else if( position[ axis ] > aabb.max[ axis ] ) {
-
-      dmin += Math.pow( ( position[ axis ] - aabb.max[ axis ] ), 2 );
-
-    }
-
-  }
-
-  return dmin <= rr;
-
-};
-
-THREEFIELD.World.sphereInSphere = function ( sphere1, sphere2 ) {
-
-    var radiusSum = sphere1.radius + sphere2.radius;
-
-    return sphere1.center.distanceToSquared( sphere2.center ) <= ( radiusSum * radiusSum );
-
-};
-
-THREEFIELD.World.sphereVsTriangle = function ( face, normal, position, radius ) {
-  // http://realtimecollisiondetection.net/blog/?p=103
-
-  // var distance = THREEFIELD.World.getDistanceTriangleVsSphere( face, normal, position, radius );
-  // vs plain of traiangle face
-  var A = new THREE.Vector3(),
-      B = new THREE.Vector3(),
-      C = new THREE.Vector3(),
-      rr,
-      V = new THREE.Vector3(),
-      d,
-      e;
-
-  A.subVectors( face.a, position );
-  B.subVectors( face.b, position );
-  C.subVectors( face.c, position );
-  rr = radius * radius;
-  V.crossVectors( B.clone().sub( A ), C.clone().sub( A ) );
-  d = A.dot( V );
-  e = V.dot( V );
-
-  if ( d * d > rr * e ) {
-
-    return false;
-
-  }
-
-  // vs triangle vertex
-  var aa,
-      ab,
-      ac,
-      bb,
-      bc,
-      cc;
-
-  aa = A.dot( A );
-  ab = A.dot( B );
-  ac = A.dot( C );
-  bb = B.dot( B );
-  bc = B.dot( C );
-  cc = C.dot( C );
-
-  if (
-    ( aa > rr ) & ( ab > aa ) & ( ac > aa ) ||
-    ( bb > rr ) & ( ab > bb ) & ( bc > bb ) ||
-    ( cc > rr ) & ( ac > cc ) & ( bc > cc )
-  ) {
-
-    return false;
-
-  }
-
-  // vs edge
-  var AB = new THREE.Vector3(),
-      BC = new THREE.Vector3(),
-      CA = new THREE.Vector3(),
-      d1,
-      d2,
-      d3,
-      e1,
-      e2,
-      e3,
-      Q1 = new THREE.Vector3(),
-      Q2 = new THREE.Vector3(),
-      Q3 = new THREE.Vector3(),
-      QC = new THREE.Vector3(),
-      QA = new THREE.Vector3(),
-      QB = new THREE.Vector3();
-
-  AB.subVectors( B, A );
-  BC.subVectors( C, B );
-  CA.subVectors( A, C );
-  d1 = ab - aa;
-  d2 = bc - bb;
-  d3 = ac - cc;
-  e1 = AB.dot( AB );
-  e2 = BC.dot( BC );
-  e3 = CA.dot( CA );
-  Q1.subVectors( A.multiplyScalar( e1 ), AB.multiplyScalar( d1 ) );
-  Q2.subVectors( B.multiplyScalar( e2 ), BC.multiplyScalar( d2 ) );
-  Q3.subVectors( C.multiplyScalar( e3 ), CA.multiplyScalar( d3 ) );
-  QC.subVectors( C.multiplyScalar( e1 ), Q1 );
-  QA.subVectors( A.multiplyScalar( e2 ), Q2 );
-  QB.subVectors( B.multiplyScalar( e3 ), Q3 );
-
-  if (
-    ( Q1.dot( Q1 ) > rr * e1 * e1 ) && ( Q1.dot( QC ) >= 0 ) ||
-    ( Q2.dot( Q2 ) > rr * e2 * e2 ) && ( Q2.dot( QA ) >= 0 ) ||
-    ( Q3.dot( Q3 ) > rr * e3 * e3 ) && ( Q3.dot( QB ) >= 0 )
-  ) {
-
-    return false;
-
-  }
-
-  var distance = Math.sqrt( d * d / e ) - radius,
-      contactPoint = THREEFIELD.World.getContactPoint( normal, position, distance );
-
-  return {
-    face        : face,
-    normal      : normal,
-    distance    : distance,
-    contactPoint: contactPoint
   };
 
-};
+  ns.World.prototype.add = function ( object ) {
+    
+    if ( object instanceof ns.Octree ) {
 
-THREEFIELD.World.getContactPoint = function ( normal, position, distance ) {
+      this.colliderPool.push( object );
 
-  var contactPoint = new THREE.Vector3(),
-      inversedNormal = new THREE.Vector3( -normal.x, -normal.y, -normal.z );
+    } else if ( object instanceof ns.CharacterController ) {
 
-  contactPoint.copy( position ).add( inversedNormal.multiplyScalar( distance ) );
-  return contactPoint;
+      this.characterPool.push( object );
 
-}
+    }
+
+  };
+
+  ns.World.prototype.step = function ( dt ) {
+
+    var character,
+        octree,
+        sphere,
+        intersectedNodes,
+        faces,
+        contactInfo,
+        i, ii, iii, l, ll, lll;
+
+    for ( i = 0, l = this.characterPool.length; i < l; i ++ ) {
+
+      character = this.characterPool[ i ];
+
+      // octree で絞られた node に含まれる face だけを
+      // charactore に渡して判定する
+      for ( ii = 0, ll = this.colliderPool.length; ii < ll; ii ++ ) {
+
+        octree = this.colliderPool[ ii ];
+        sphere = new THREE.Sphere( character.center, character.radius + character.groundPadding );
+        intersectedNodes = octree.getIntersectedNodes( sphere, octree.maxDepth );
+        faces = ns.Octree.uniqTriangkesfromNodes( intersectedNodes );
+
+      }
+      
+      character.collisionCandidate = faces;
+      character.update( dt );
+
+    }
+
+  };
+
+} )( THREE, THREEFIELD );

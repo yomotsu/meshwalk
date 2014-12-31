@@ -5,7 +5,14 @@
 
   'use strict';
 
-  var PI_HALF = Math.PI / 2;
+  var PI2     = Math.PI * 2,
+      PI_HALF = Math.PI / 2;
+
+  var modulo = function ( n, d ) {
+
+    return ( ( n % d ) + d ) % d;
+    
+  }
   
   // camera              isntance of THREE.Camera
   // trackObject         isntance of THREE.Object3D
@@ -25,9 +32,9 @@
     this.minRadius    = params && params.minRadius || 1;
     this.maxRadius    = params && params.maxRadius || 30;
     this.rigidObjects = params && params.rigidObjects || [];
-    this.lat = 0;
-    this.lon = 0;
-    this.phi = 0;   // angle of zenith
+    this.lat   = 0;
+    this.lon   = 0;
+    this.phi   = 0; // angle of zenith
     this.theta = 0; // angle of azimuth
     this.mouseAccelerationX = params && params.mouseAccelerationX !== undefined ? params.mouseAccelerationX : 100;
     this.mouseAccelerationY = params && params.mouseAccelerationY !== undefined ? params.mouseAccelerationY : 30;
@@ -64,9 +71,9 @@
         this.trackObject.matrixWorld.elements[ 14 ] + this.offset.z
       );
       position = new THREE.Vector3(
-        Math.cos( this.phi ) * Math.cos( this.theta + Math.PI / 2 ), 
+        Math.cos( this.phi ) * Math.cos( this.theta + PI_HALF ), 
         Math.sin( this.phi ), 
-        Math.cos( this.phi ) * Math.sin( this.theta + Math.PI / 2 )
+        Math.cos( this.phi ) * Math.sin( this.theta + PI_HALF )
       );
       distance = this.collisionTest( position.clone().normalize() );
       position.multiplyScalar( distance );
@@ -102,7 +109,7 @@
 
     getFrontAngle: function () {
 
-      return 360 - this.lon;
+      return PI2 + this.theta;
 
     },
 
@@ -236,7 +243,6 @@
 
     this.radius = Math.max( this.radius, this.minRadius );
     this.radius = Math.min( this.radius, this.maxRadius );
-    this.update();
 
   }
 
