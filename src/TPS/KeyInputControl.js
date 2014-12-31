@@ -114,6 +114,7 @@
     }
 
     this.updateAngle();
+    this.dispatchEvent( { type: 'movekeychange' } );
 
     if ( this.isUp || this.isDown || this.isLeft || this.isRight ) {
 
@@ -156,6 +157,7 @@
     }
 
     this.updateAngle();
+    this.dispatchEvent( { type: 'movekeychange' } );
 
     if ( !this.isUp && !this.isDown && !this.isLeft && !this.isRight &&
       (

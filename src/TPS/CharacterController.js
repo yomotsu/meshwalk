@@ -15,10 +15,10 @@
     this.isGrounded = false;
     this.isOnSlope  = false;
     this.isIdling   = false;
-    this.IsRunning  = false;
+    this.isRunning  = false;
     this.isJumping  = false;
     this.direction  = 0; // 0 to 2PI(=360deg) in rad
-    this.movementSpeed = 15;
+    this.movementSpeed = 10; // Meters Per Second
     this.velocity = new THREE.Vector3( 0, -10, 0 );
     this.currentJumpPower = 0;
     this.jumpStartTime = 0;
@@ -47,6 +47,7 @@
       this.collisionDetection();
       this.solvePosition();
       this.updateVelocity();
+      this.events();
 
     },
 
@@ -65,9 +66,9 @@
           i, l;
       
       this.velocity.set(
-        rightDierction * this.movementSpeed * this.IsRunning, 
+        rightDierction * this.movementSpeed * this.isRunning, 
         FALL_VELOCITY,
-        frontDierction * this.movementSpeed * this.IsRunning
+        frontDierction * this.movementSpeed * this.isRunning
       );
 
       // 急勾配や自由落下など、自動で付与される速度の処理
@@ -146,8 +147,8 @@
         );
         direction2D.subVectors( direction2D, wallNomal2D );
 
-        this.velocity.x = direction2D.x * this.movementSpeed * this.IsRunning;
-        this.velocity.z = direction2D.y * this.movementSpeed * this.IsRunning;
+        this.velocity.x = direction2D.x * this.movementSpeed * this.isRunning;
+        this.velocity.z = direction2D.y * this.movementSpeed * this.isRunning;
 
       }
 
@@ -401,6 +402,77 @@
 
     },
 
+    events: function () {
+      // TODO あとでもうちょっとスマートにする
+
+      var isFirstUpdate = true,
+          wasGrounded,
+          wasOnSlope,
+          wasIdling,
+          wasRunning,
+          wasJumping;
+
+      return function () {
+
+        // 初回のみ、過去状態を作るだけで終わり
+        if ( isFirstUpdate ) {
+
+          isFirstUpdate = false;
+          wasGrounded = this.isGrounded;
+          wasOnSlope  = this.isOnSlope;
+          wasIdling   = this.isIdling;
+          wasRunning  = this.isRunning;
+          wasJumping  = this.isJumping;
+          return;
+
+        }
+
+        if ( !wasRunning && !this.isRunning && this.isGrounded && !this.isIdling ) {
+
+          this.isIdling = true;
+          this.dispatchEvent( { type: 'startIdling' } );
+
+        } else if (
+          ( !wasRunning && this.isRunning && !this.isJumping && this.isGrounded ) ||
+          ( !wasGrounded && this.isGrounded && this.isRunning ) ||
+          ( wasOnSlope && !this.isOnSlope && this.isRunning && this.isGrounded )
+        ) {
+
+          this.isIdling = false;
+          this.dispatchEvent( { type: 'startWalking' } );
+
+        } else if ( !wasJumping && this.isJumping ) {
+
+          this.isIdling = false;
+          this.dispatchEvent( { type: 'startJumping' } );
+
+        } else if ( !wasOnSlope && this.isOnSlope ) {
+
+          this.dispatchEvent( { type: 'startSliding' } );
+
+        } else if ( wasGrounded && !this.isGrounded && !this.isJumping ) {
+
+          this.dispatchEvent( { type: 'startFalling' } );
+
+        }
+
+        if ( !wasGrounded && this.isGrounded ) {
+          // startIdlingが先に発生している問題がある
+          // TODO このイベントのn秒後にstartIdlingを始めるように変更する
+          // this.dispatchEvent( { type: 'endJumping' } );
+
+        }
+
+        wasGrounded = this.isGrounded;
+        wasOnSlope  = this.isOnSlope;
+        wasIdling   = this.isIdling;
+        wasRunning  = this.isRunning;
+        wasJumping  = this.isJumping;
+
+      };
+
+    }(),
+
     setDirection : function () {
 
 
@@ -408,14 +480,16 @@
     },
 
     jump: function () {
-
+      
       if ( this.isJumping || !this.isGrounded || this.isOnSlope ) {
 
         return;
 
       }
 
-      this.jumpStartTime = performance.now();
+      // since ios dose not support porformance.now()
+      // this.jumpStartTime = performance.now();
+      this.jumpStartTime = Date.now();
       this.currentJumpPower = 1;
       this.isJumping = true;
 
@@ -431,7 +505,9 @@
 
       }
 
-      var elapsed = performance.now() - this.jumpStartTime;
+      // since ios dose not support porformance.now()
+      // var elapsed = performance.now() - this.jumpStartTime;
+      var elapsed = Date.now() - this.jumpStartTime;
       var progress = elapsed / JUMP_DURATION;
       this.currentJumpPower = Math.cos( Math.min( progress, 1 ) * Math.PI );
 

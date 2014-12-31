@@ -15,10 +15,10 @@
     this.isGrounded = false;
     this.isOnSlope  = false;
     this.isIdling   = false;
-    this.IsRunning  = false;
+    this.isRunning  = false;
     this.isJumping  = false;
     this.direction  = 0; // 0 to 2PI(=360deg) in rad
-    this.movementSpeed = 15;
+    this.movementSpeed = 10; // Meters Per Second
     this.velocity = new THREE.Vector3( 0, -10, 0 );
     this.currentJumpPower = 0;
     this.jumpStartTime = 0;
@@ -47,6 +47,7 @@
       this.collisionDetection();
       this.solvePosition();
       this.updateVelocity();
+      this.events();
 
     },
 
@@ -65,9 +66,9 @@
           i, l;
       
       this.velocity.set(
-        rightDierction * this.movementSpeed * this.IsRunning, 
+        rightDierction * this.movementSpeed * this.isRunning, 
         FALL_VELOCITY,
-        frontDierction * this.movementSpeed * this.IsRunning
+        frontDierction * this.movementSpeed * this.isRunning
       );
 
       // 急勾配や自由落下など、自動で付与される速度の処理
@@ -146,8 +147,8 @@
         );
         direction2D.subVectors( direction2D, wallNomal2D );
 
-        this.velocity.x = direction2D.x * this.movementSpeed * this.IsRunning;
-        this.velocity.z = direction2D.y * this.movementSpeed * this.IsRunning;
+        this.velocity.x = direction2D.x * this.movementSpeed * this.isRunning;
+        this.velocity.z = direction2D.y * this.movementSpeed * this.isRunning;
 
       }
 
@@ -401,6 +402,77 @@
 
     },
 
+    events: function () {
+      // TODO あとでもうちょっとスマートにする
+
+      var isFirstUpdate = true,
+          wasGrounded,
+          wasOnSlope,
+          wasIdling,
+          wasRunning,
+          wasJumping;
+
+      return function () {
+
+        // 初回のみ、過去状態を作るだけで終わり
+        if ( isFirstUpdate ) {
+
+          isFirstUpdate = false;
+          wasGrounded = this.isGrounded;
+          wasOnSlope  = this.isOnSlope;
+          wasIdling   = this.isIdling;
+          wasRunning  = this.isRunning;
+          wasJumping  = this.isJumping;
+          return;
+
+        }
+
+        if ( !wasRunning && !this.isRunning && this.isGrounded && !this.isIdling ) {
+
+          this.isIdling = true;
+          this.dispatchEvent( { type: 'startIdling' } );
+
+        } else if (
+          ( !wasRunning && this.isRunning && !this.isJumping && this.isGrounded ) ||
+          ( !wasGrounded && this.isGrounded && this.isRunning ) ||
+          ( wasOnSlope && !this.isOnSlope && this.isRunning && this.isGrounded )
+        ) {
+
+          this.isIdling = false;
+          this.dispatchEvent( { type: 'startWalking' } );
+
+        } else if ( !wasJumping && this.isJumping ) {
+
+          this.isIdling = false;
+          this.dispatchEvent( { type: 'startJumping' } );
+
+        } else if ( !wasOnSlope && this.isOnSlope ) {
+
+          this.dispatchEvent( { type: 'startSliding' } );
+
+        } else if ( wasGrounded && !this.isGrounded && !this.isJumping ) {
+
+          this.dispatchEvent( { type: 'startFalling' } );
+
+        }
+
+        if ( !wasGrounded && this.isGrounded ) {
+          // startIdlingが先に発生している問題がある
+          // TODO このイベントのn秒後にstartIdlingを始めるように変更する
+          // this.dispatchEvent( { type: 'endJumping' } );
+
+        }
+
+        wasGrounded = this.isGrounded;
+        wasOnSlope  = this.isOnSlope;
+        wasIdling   = this.isIdling;
+        wasRunning  = this.isRunning;
+        wasJumping  = this.isJumping;
+
+      };
+
+    }(),
+
     setDirection : function () {
 
 
@@ -408,14 +480,16 @@
     },
 
     jump: function () {
-
+      
       if ( this.isJumping || !this.isGrounded || this.isOnSlope ) {
 
         return;
 
       }
 
-      this.jumpStartTime = performance.now();
+      // since ios dose not support porformance.now()
+      // this.jumpStartTime = performance.now();
+      this.jumpStartTime = Date.now();
       this.currentJumpPower = 1;
       this.isJumping = true;
 
@@ -431,7 +505,9 @@
 
       }
 
-      var elapsed = performance.now() - this.jumpStartTime;
+      // since ios dose not support porformance.now()
+      // var elapsed = performance.now() - this.jumpStartTime;
+      var elapsed = Date.now() - this.jumpStartTime;
       var progress = elapsed / JUMP_DURATION;
       this.currentJumpPower = Math.cos( Math.min( progress, 1 ) * Math.PI );
 
@@ -445,23 +521,21 @@
 // MIT License
 
 
-THREEFIELD.AnimationController = function ( mesh, actions ) {
+THREEFIELD.AnimationController = function ( mesh ) {
 
   this.mesh = mesh;
-  this.action = {};
+  this.motion = {};
   var i, l, anim;
 
   for ( i = 0, l = this.mesh.geometry.animations.length; i < l; i ++ ) {
 
     anim = this.mesh.geometry.animations[ i ];
 
-    THREE.AnimationHandler.add( anim );
-
-    this.action[ anim.name ] = {
+    this.motion[ anim.name ] = {
 
       anim: new THREE.Animation(
         mesh,
-        anim.name,
+        anim,
         THREE.AnimationHandler.CATMULLROM
       ),
 
@@ -477,13 +551,13 @@ THREEFIELD.AnimationController.prototype.play = function ( name ) {
 
   var i;
 
-  for ( i in this.action ) {
+  for ( i in this.motion ) {
 
-    this.action[ i ].anim.stop();
+    this.motion[ i ].anim.stop();
 
   }
 
-  this.action[ name ].anim.play();
+  this.motion[ name ].anim.play();
 
 };
 
@@ -603,6 +677,7 @@ THREEFIELD.AnimationController.prototype.play = function ( name ) {
     }
 
     this.updateAngle();
+    this.dispatchEvent( { type: 'movekeychange' } );
 
     if ( this.isUp || this.isDown || this.isLeft || this.isRight ) {
 
@@ -645,6 +720,7 @@ THREEFIELD.AnimationController.prototype.play = function ( name ) {
     }
 
     this.updateAngle();
+    this.dispatchEvent( { type: 'movekeychange' } );
 
     if ( !this.isUp && !this.isDown && !this.isLeft && !this.isRight &&
       (
@@ -674,10 +750,13 @@ THREEFIELD.AnimationController.prototype.play = function ( name ) {
 
   'use strict';
 
-  var PI2     = Math.PI * 2;
-  var PI_HALF = Math.PI / 2;
+  var PI2     = Math.PI * 2,
+      PI_HALF = Math.PI / 2;
+
   var modulo = function ( n, d ) {
+
     return ( ( n % d ) + d ) % d;
+    
   }
   
   // camera              isntance of THREE.Camera
@@ -737,9 +816,9 @@ THREEFIELD.AnimationController.prototype.play = function ( name ) {
         this.trackObject.matrixWorld.elements[ 14 ] + this.offset.z
       );
       position = new THREE.Vector3(
-        Math.cos( this.phi ) * Math.cos( this.theta + Math.PI / 2 ), 
+        Math.cos( this.phi ) * Math.cos( this.theta + PI_HALF ), 
         Math.sin( this.phi ), 
-        Math.cos( this.phi ) * Math.sin( this.theta + Math.PI / 2 )
+        Math.cos( this.phi ) * Math.sin( this.theta + PI_HALF )
       );
       distance = this.collisionTest( position.clone().normalize() );
       position.multiplyScalar( distance );
@@ -909,7 +988,6 @@ THREEFIELD.AnimationController.prototype.play = function ( name ) {
 
     this.radius = Math.max( this.radius, this.minRadius );
     this.radius = Math.min( this.radius, this.maxRadius );
-    this.update();
 
   }
 

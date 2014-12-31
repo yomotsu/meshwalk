@@ -4,28 +4,9 @@
  */
 
 var THREEFIELD = {};
-var jiban = {};
 
 // @author yomotsu
 // MIT License
-
-THREEFIELD.normalizeAngle = function ( angleInDeg ) {
-
-  return ( angleInDeg >= 0 ) ? ( angleInDeg % 360 ) : ( angleInDeg  % 360 + 360 );
-
-};
-
-
-THREEFIELD.howCloseBetweenAngles = function ( angle1, angle2 ) {
-
-  var angle = Math.min(
-    THREEFIELD.normalizeAngle( angle1 - angle2 ),
-    THREEFIELD.normalizeAngle( angle2 - angle1 )
-  );
-  
-  return angle;
-
-};
 
 THREEFIELD.triangle = {}
 
@@ -571,58 +552,66 @@ THREEFIELD.triangle.makeBoundingSphere = function ( triangle, normal ) {
 // @author yomotsu
 // MIT License
 
-THREEFIELD.World = function () {
+;( function ( THREE, ns ) {
 
-  console.log( 'THREEFIELD.World' );
+  'use strict';
 
-  this.colliders  = [];
-  this.characters = [];
+  ns.World = function () {
 
-};
+    // console.log( 'THREEFIELD.World' );
 
-THREEFIELD.World.prototype.add = function ( collider ) {
+    this.colliderPool  = [];
+    this.characterPool = [];
 
-  this.colliders.push( collider );
+  };
 
-};
+  ns.World.prototype.add = function ( object ) {
+    
+    if ( object instanceof ns.Octree ) {
 
-THREEFIELD.World.prototype.addCharacter = function ( character ) {
+      this.colliderPool.push( object );
 
-  this.characters.push( character );
+    } else if ( object instanceof ns.CharacterController ) {
 
-};
-
-THREEFIELD.World.prototype.step = function ( dt ) {
-
-  var character,
-      octree,
-      sphere,
-      intersectedNodes,
-      faces,
-      contactInfo,
-      i, ii, iii, l, ll, lll;
-
-  for ( i = 0, l = this.characters.length; i < l; i ++ ) {
-
-    character = this.characters[ i ];
-
-    // octree で絞られた node に含まれる face だけを
-    // charactore に渡して判定する
-    for ( ii = 0, ll = this.colliders.length; ii < ll; ii ++ ) {
-
-      octree = this.colliders[ ii ];
-      sphere = new THREE.Sphere( character.center, character.radius + character.groundPadding );
-      intersectedNodes = octree.getIntersectedNodes( sphere, octree.maxDepth );
-      faces = THREEFIELD.Octree.uniqTriangkesfromNodes( intersectedNodes );
+      this.characterPool.push( object );
 
     }
-    
-    character.collisionCandidate = faces;
-    character.update( dt );
 
-  }
+  };
 
-};
+  ns.World.prototype.step = function ( dt ) {
+
+    var character,
+        octree,
+        sphere,
+        intersectedNodes,
+        faces,
+        contactInfo,
+        i, ii, iii, l, ll, lll;
+
+    for ( i = 0, l = this.characterPool.length; i < l; i ++ ) {
+
+      character = this.characterPool[ i ];
+
+      // octree で絞られた node に含まれる face だけを
+      // charactore に渡して判定する
+      for ( ii = 0, ll = this.colliderPool.length; ii < ll; ii ++ ) {
+
+        octree = this.colliderPool[ ii ];
+        sphere = new THREE.Sphere( character.center, character.radius + character.groundPadding );
+        intersectedNodes = octree.getIntersectedNodes( sphere, octree.maxDepth );
+        faces = ns.Octree.uniqTriangkesfromNodes( intersectedNodes );
+
+      }
+      
+      character.collisionCandidate = faces;
+      character.update( dt );
+
+    }
+
+  };
+
+} )( THREE, THREEFIELD );
 
 // @author yomotsu
 // MIT License
@@ -989,77 +978,5 @@ THREEFIELD.World.prototype.step = function ( dt ) {
     this.direction = direction;
     this.distance = distance;
   }
-
-} )( THREE, THREEFIELD );
-
-// @author yomotsu
-// MIT License
-
-;( function ( THREE, ns ) {
-
-  'use strict';
-
-  THREEFIELD.Collider = function ( threeMesh, name ) {
-
-    var geometry,
-        face,
-        normal,
-        i, l;
-
-    this.mesh = threeMesh;
-    this.name = name;
-    this.uuid = THREE.Math.generateUUID();
-    this.faces   = [];
-    this.normals = [];
-    this.boxes   = [];
-    this.boundingSphere = null;
-    this.boundingBox    = null;
-
-    // bake the matrix for performance
-    // http://stackoverflow.com/questions/23990354/how-to-update-vertices-geometry-after-rotate-or-move-object#answer-24001626
-    threeMesh.updateMatrix(); 
-    threeMesh.geometry.applyMatrix( threeMesh.matrix );
-    threeMesh.matrix.identity();
-    threeMesh.position.set( 0, 0, 0 );
-    threeMesh.rotation.set( 0, 0, 0 );
-    threeMesh.scale.set( 1, 1, 1 );
-    threeMesh.geometry.verticesNeedUpdate = true;
-    threeMesh.updateMatrixWorld();
-    threeMesh.geometry.computeFaceNormals();
-    threeMesh.geometry.computeVertexNormals();
-
-    geometry = this.mesh.geometry;
-
-    if ( geometry.boundingSphere === null ) {
-
-      geometry.computeBoundingSphere();
-
-    }
-
-    if ( geometry.boundingBox === null ) {
-
-      geometry.computeBoundingBox();
-
-    }
-
-    this.boundingSphere = geometry.boundingSphere;
-    this.boundingBox    = geometry.boundingBox;
-
-    for ( i = 0, l = geometry.faces.length; i < l; i ++ ) {
-
-      face = new THREE.Triangle(
-        geometry.vertices[ geometry.faces[ i ].a ],
-        geometry.vertices[ geometry.faces[ i ].b ],
-        geometry.vertices[ geometry.faces[ i ].c ]
-      );
-      normal = geometry.faces[ i ].normal;
-
-      this.faces.push( face );
-      this.normals.push( normal );
-      this.boxes.push( THREEFIELD.triangle.makeBoundingBox( face ) );
-
-    }
-
-  };
 
 } )( THREE, THREEFIELD );

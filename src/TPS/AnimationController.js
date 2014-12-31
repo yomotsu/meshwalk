@@ -2,23 +2,21 @@
 // MIT License
 
 
-THREEFIELD.AnimationController = function ( mesh, actions ) {
+THREEFIELD.AnimationController = function ( mesh ) {
 
   this.mesh = mesh;
-  this.action = {};
+  this.motion = {};
   var i, l, anim;
 
   for ( i = 0, l = this.mesh.geometry.animations.length; i < l; i ++ ) {
 
     anim = this.mesh.geometry.animations[ i ];
 
-    THREE.AnimationHandler.add( anim );
-
-    this.action[ anim.name ] = {
+    this.motion[ anim.name ] = {
 
       anim: new THREE.Animation(
         mesh,
-        anim.name,
+        anim,
         THREE.AnimationHandler.CATMULLROM
       ),
 
@@ -34,12 +32,12 @@ THREEFIELD.AnimationController.prototype.play = function ( name ) {
 
   var i;
 
-  for ( i in this.action ) {
+  for ( i in this.motion ) {
 
-    this.action[ i ].anim.stop();
+    this.motion[ i ].anim.stop();
 
   }
 
-  this.action[ name ].anim.play();
+  this.motion[ name ].anim.play();
 
 };

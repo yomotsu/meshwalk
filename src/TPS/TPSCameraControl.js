@@ -5,10 +5,13 @@
 
   'use strict';
 
-  var PI2     = Math.PI * 2;
-  var PI_HALF = Math.PI / 2;
+  var PI2     = Math.PI * 2,
+      PI_HALF = Math.PI / 2;
+
   var modulo = function ( n, d ) {
+
     return ( ( n % d ) + d ) % d;
+    
   }
   
   // camera              isntance of THREE.Camera
@@ -68,9 +71,9 @@
         this.trackObject.matrixWorld.elements[ 14 ] + this.offset.z
       );
       position = new THREE.Vector3(
-        Math.cos( this.phi ) * Math.cos( this.theta + Math.PI / 2 ), 
+        Math.cos( this.phi ) * Math.cos( this.theta + PI_HALF ), 
         Math.sin( this.phi ), 
-        Math.cos( this.phi ) * Math.sin( this.theta + Math.PI / 2 )
+        Math.cos( this.phi ) * Math.sin( this.theta + PI_HALF )
       );
       distance = this.collisionTest( position.clone().normalize() );
       position.multiplyScalar( distance );
@@ -240,7 +243,6 @@
 
     this.radius = Math.max( this.radius, this.minRadius );
     this.radius = Math.min( this.radius, this.maxRadius );
-    this.update();
 
   }
 
