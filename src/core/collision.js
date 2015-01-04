@@ -442,5 +442,5 @@
 
 }
 
-} )( THREE, THREEFIELD );
+} )( THREE, GUSOKU );
 

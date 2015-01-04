@@ -26,8 +26,8 @@ canvas{display: block;}
 </div>
 
 <script src="../lib/three.min.js"></script>
-<script src="../build/threefield.min.js"></script>
-<script src="../build/addon/threefield.TPS.min.js"></script>
+<script src="../build/gusoku.min.js"></script>
+<script src="../build/addon/gusoku.TPS.min.js"></script>
 <script>
 
 // See demo/2_keyboardInput.html first
@@ -41,11 +41,11 @@ var world, min, max, partition, octree,
 var keyInputControl;
 var tpsCameraControl;
 
-world = new THREEFIELD.World();
+world = new GUSOKU.World();
 min = new THREE.Vector3( -50, -50, -50 );
 max = new THREE.Vector3(  50,  50,  50 );
 partition = 5;
-octree = new THREEFIELD.Octree( min, max, partition );
+octree = new GUSOKU.Octree( min, max, partition );
 world.add( octree );
 
 
@@ -139,12 +139,12 @@ sphere = new THREE.Mesh(
 );
 playerObjectHolder.add( sphere );
 
-playerController = new THREEFIELD.CharacterController( playerObjectHolder, playerRadius );
+playerController = new GUSOKU.CharacterController( playerObjectHolder, playerRadius );
 world.add( playerController );
 
-keyInputControl = new THREEFIELD.KeyInputControl();
+keyInputControl = new GUSOKU.KeyInputControl();
 
-tpsCameraControl = new THREEFIELD.TPSCameraControl(
+tpsCameraControl = new GUSOKU.TPSCameraControl(
   camera, // three.js camera
   playerObjectHolder, // tracking object
   {

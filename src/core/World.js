@@ -60,4 +60,4 @@
 
   };
 
-} )( THREE, THREEFIELD );
+} )( THREE, GUSOKU );

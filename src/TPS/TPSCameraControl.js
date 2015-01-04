@@ -246,4 +246,4 @@
 
   }
 
-} )( THREE, THREEFIELD );
+} )( THREE, GUSOKU );

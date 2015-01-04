@@ -18,8 +18,8 @@ canvas{display: block;}
 
 <script src="../lib/three.min.js"></script>
 <script src="../lib/bluebird.min.js"></script>
-<script src="../build/threefield.min.js"></script>
-<script src="../build/addon/threefield.TPS.min.js"></script>
+<script src="../build/gusoku.min.js"></script>
+<script src="../build/addon/gusoku.TPS.min.js"></script>
 <script>
 
 'use strict';
@@ -54,11 +54,11 @@ var animationController;
 var vent = new THREE.EventDispatcher();
 
 
-world = new THREEFIELD.World();
+world = new GUSOKU.World();
 min = new THREE.Vector3( -15, -15, -15 );
 max = new THREE.Vector3(  15,  15,  15 );
 partition = 5;
-octree = new THREEFIELD.Octree( min, max, partition );
+octree = new GUSOKU.Octree( min, max, partition );
 world.add( octree );
 
 
@@ -85,12 +85,12 @@ sphere = new THREE.Mesh(
 );
 playerObjectHolder.add( sphere );
 
-playerController = new THREEFIELD.CharacterController( playerObjectHolder, playerRadius );
+playerController = new GUSOKU.CharacterController( playerObjectHolder, playerRadius );
 world.add( playerController );
 
-keyInputControl = new THREEFIELD.KeyInputControl();
+keyInputControl = new GUSOKU.KeyInputControl();
 
-tpsCameraControl = new THREEFIELD.TPSCameraControl(
+tpsCameraControl = new GUSOKU.TPSCameraControl(
   camera, // three.js camera
   playerObjectHolder, // tracking object
   {
@@ -169,7 +169,7 @@ Promise.all( [
   characterMesh.scale.set( .5, .5, .5 );
   scene.add( characterMesh );
 
-  animationController = new THREEFIELD.AnimationController( characterMesh );
+  animationController = new GUSOKU.AnimationController( characterMesh );
   animationController.motion.jump.anim.loop = false;
   animationController.motion.land.anim.loop = false;
   animationController.motion.slide.anim.loop = false;

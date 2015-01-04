@@ -515,13 +515,13 @@
 
   }
 
-} )( THREE, THREEFIELD );
+} )( THREE, GUSOKU );
 
 // @author yomotsu
 // MIT License
 
 
-THREEFIELD.AnimationController = function ( mesh ) {
+GUSOKU.AnimationController = function ( mesh ) {
 
   this.mesh = mesh;
   this.motion = {};
@@ -547,7 +547,7 @@ THREEFIELD.AnimationController = function ( mesh ) {
 
 };
 
-THREEFIELD.AnimationController.prototype.play = function ( name ) {
+GUSOKU.AnimationController.prototype.play = function ( name ) {
 
   var i;
 
@@ -741,7 +741,7 @@ THREEFIELD.AnimationController.prototype.play = function ( name ) {
 
   }
 
-} )( THREE, THREEFIELD );
+} )( THREE, GUSOKU );
 
 // @author yomotsu
 // MIT License
@@ -991,4 +991,4 @@ THREEFIELD.AnimationController.prototype.play = function ( name ) {
 
   }
 
-} )( THREE, THREEFIELD );
+} )( THREE, GUSOKU );

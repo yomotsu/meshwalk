@@ -1,9 +1,9 @@
 // @author yomotsu
 // MIT License
 
-THREEFIELD.triangle = {}
+GUSOKU.triangle = {}
 
-THREEFIELD.triangle.makeBoundingBox = function ( triangle ) {
+GUSOKU.triangle.makeBoundingBox = function ( triangle ) {
 
   var bb = new THREE.Box3();
 
@@ -19,7 +19,7 @@ THREEFIELD.triangle.makeBoundingBox = function ( triangle ) {
 
 }
 
-THREEFIELD.triangle.makeBoundingSphere = function ( triangle, normal ) {
+GUSOKU.triangle.makeBoundingSphere = function ( triangle, normal ) {
  
   var bs = new THREE.Sphere(),
       v = new THREE.Vector3(),

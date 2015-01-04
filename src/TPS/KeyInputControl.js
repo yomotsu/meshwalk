@@ -178,4 +178,4 @@
 
   }
 
-} )( THREE, THREEFIELD );
+} )( THREE, GUSOKU );

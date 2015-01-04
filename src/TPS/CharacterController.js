@@ -515,4 +515,4 @@
 
   }
 
-} )( THREE, THREEFIELD );
+} )( THREE, GUSOKU );

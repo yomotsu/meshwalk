@@ -364,4 +364,4 @@
     this.distance = distance;
   }
 
-} )( THREE, THREEFIELD );
+} )( THREE, GUSOKU );

@@ -3,4 +3,4 @@
  * MIT License
  */
 
-var THREEFIELD = {};
+var GUSOKU = {};

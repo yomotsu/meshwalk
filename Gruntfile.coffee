@@ -12,14 +12,14 @@ module.exports = (grunt) ->
     concat:
       jsCore:
         src: [
-          'src/core/threefield.js'
+          'src/core/gusoku.js'
           'src/core/utils.js'
           'src/core/collision.js'
           'src/core/World.js'
           'src/core/Octree.js'
           'src/core/Collider.js'
         ]
-        dest: 'build/threefield.js'
+        dest: 'build/gusoku.js'
       jsTPS:
         src: [
           'src/TPS/CharacterController.js'
@@ -27,15 +27,15 @@ module.exports = (grunt) ->
           'src/TPS/KeyInputControl.js'
           'src/TPS/TPSCameraControl.js'
         ]
-        dest: 'build/addon/threefield.TPS.js'
+        dest: 'build/addon/gusoku.TPS.js'
 
     uglify:
       jsCore:
         src: '<%= concat.jsCore.dest %>'
-        dest: 'build/threefield.min.js'
+        dest: 'build/gusoku.min.js'
       jsTPS:
         src: '<%= concat.jsTPS.dest %>'
-        dest: 'build/addon/threefield.TPS.min.js'
+        dest: 'build/addon/gusoku.TPS.min.js'
       options:
         preserveComments: 'some'
 
