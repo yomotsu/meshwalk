@@ -178,4 +178,4 @@
 
   }
 
-} )( THREE, GUSOKU );
+} )( THREE, MW );

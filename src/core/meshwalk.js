@@ -3,4 +3,4 @@
  * MIT License
  */
 
-var GUSOKU = {};
+var MW = {};

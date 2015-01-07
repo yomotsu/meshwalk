@@ -364,4 +364,4 @@
     this.distance = distance;
   }
 
-} )( THREE, GUSOKU );
+} )( THREE, MW );

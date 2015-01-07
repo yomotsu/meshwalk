@@ -20,8 +20,8 @@ canvas{display: block;}
 </div>
 
 <script src="../lib/three.min.js"></script>
-<script src="../build/gusoku.min.js"></script>
-<script src="../build/addon/gusoku.TPS.min.js"></script>
+<script src="../build/meshwalk.min.js"></script>
+<script src="../build/addon/meshwalk.TPS.min.js"></script>
 <script>
 
 'use strict';
@@ -32,7 +32,7 @@ var world, min, max, partition, octree,
     playerRadius = 1, playerObjectHolder, playerController;
 
 // make the world,
-world = new GUSOKU.World();
+world = new MW.World();
 
 // then make a octree object,
 // which will be the container of rigid objects such as terrain
@@ -57,7 +57,7 @@ partition = 5;
 //           \  
 //            z 
 // 
-octree = new GUSOKU.Octree( min, max, partition );
+octree = new MW.Octree( min, max, partition );
 world.add( octree );
 
 
@@ -94,7 +94,7 @@ sphere = new THREE.Mesh(
 playerObjectHolder.add( sphere );
 
 // to apply fake gravity and to be controllable object
-playerController = new GUSOKU.CharacterController( playerObjectHolder, playerRadius );
+playerController = new MW.CharacterController( playerObjectHolder, playerRadius );
 world.add( playerController );
 
 

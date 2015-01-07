@@ -515,4 +515,4 @@
 
   }
 
-} )( THREE, GUSOKU );
+} )( THREE, MW );

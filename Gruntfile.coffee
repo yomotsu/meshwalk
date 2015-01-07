@@ -12,14 +12,14 @@ module.exports = (grunt) ->
     concat:
       jsCore:
         src: [
-          'src/core/gusoku.js'
+          'src/core/meshwalk.js'
           'src/core/utils.js'
           'src/core/collision.js'
           'src/core/World.js'
           'src/core/Octree.js'
           'src/core/Collider.js'
         ]
-        dest: 'build/gusoku.js'
+        dest: 'build/meshwalk.js'
       jsTPS:
         src: [
           'src/TPS/CharacterController.js'
@@ -27,15 +27,15 @@ module.exports = (grunt) ->
           'src/TPS/KeyInputControl.js'
           'src/TPS/TPSCameraControl.js'
         ]
-        dest: 'build/addon/gusoku.TPS.js'
+        dest: 'build/addon/meshwalk.TPS.js'
 
     uglify:
       jsCore:
         src: '<%= concat.jsCore.dest %>'
-        dest: 'build/gusoku.min.js'
+        dest: 'build/meshwalk.min.js'
       jsTPS:
         src: '<%= concat.jsTPS.dest %>'
-        dest: 'build/addon/gusoku.TPS.min.js'
+        dest: 'build/addon/meshwalk.TPS.min.js'
       options:
         preserveComments: 'some'
 

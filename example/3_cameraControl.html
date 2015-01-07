@@ -20,8 +20,8 @@ canvas{display: block;}
 </div>
 
 <script src="../lib/three.min.js"></script>
-<script src="../build/gusoku.min.js"></script>
-<script src="../build/addon/gusoku.TPS.min.js"></script>
+<script src="../build/meshwalk.min.js"></script>
+<script src="../build/addon/meshwalk.TPS.min.js"></script>
 <script>
 
 // See demo/2_keyboardInput.html first
@@ -35,11 +35,11 @@ var world, min, max, partition, octree,
 var keyInputControl;
 var tpsCameraControl;
 
-world = new GUSOKU.World();
+world = new MW.World();
 min = new THREE.Vector3( -15, -15, -15 );
 max = new THREE.Vector3(  15,  15,  15 );
 partition = 5;
-octree = new GUSOKU.Octree( min, max, partition );
+octree = new MW.Octree( min, max, partition );
 world.add( octree );
 
 
@@ -83,12 +83,12 @@ sphere = new THREE.Mesh(
 );
 playerObjectHolder.add( sphere );
 
-playerController = new GUSOKU.CharacterController( playerObjectHolder, playerRadius );
+playerController = new MW.CharacterController( playerObjectHolder, playerRadius );
 world.add( playerController );
 
-keyInputControl = new GUSOKU.KeyInputControl();
+keyInputControl = new MW.KeyInputControl();
 
-tpsCameraControl = new GUSOKU.TPSCameraControl(
+tpsCameraControl = new MW.TPSCameraControl(
   camera, // three.js camera
   playerObjectHolder, // tracking object
   {

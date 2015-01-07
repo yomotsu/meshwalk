@@ -246,4 +246,4 @@
 
   }
 
-} )( THREE, GUSOKU );
+} )( THREE, MW );

@@ -25,8 +25,8 @@ canvas{display: block;}
 </div>
 
 <script src="../lib/three.min.js"></script>
-<script src="../build/gusoku.min.js"></script>
-<script src="../build/addon/gusoku.TPS.min.js"></script>
+<script src="../build/meshwalk.min.js"></script>
+<script src="../build/addon/meshwalk.TPS.min.js"></script>
 <script>
 
 'use strict';
@@ -66,7 +66,7 @@ loader.load( './mobuko/mobuko.json', function( geometry, materials ) {
 
   scene.add( characterMesh );
 
-  animationController = new GUSOKU.AnimationController( characterMesh );
+  animationController = new MW.AnimationController( characterMesh );
   animationController.motion.jump.anim.loop = false;
   animationController.motion.land.anim.loop = false;
   animationController.motion.slide.anim.loop = false;

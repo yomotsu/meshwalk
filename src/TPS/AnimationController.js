@@ -2,7 +2,7 @@
 // MIT License
 
 
-GUSOKU.AnimationController = function ( mesh ) {
+MW.AnimationController = function ( mesh ) {
 
   this.mesh = mesh;
   this.motion = {};
@@ -28,7 +28,7 @@ GUSOKU.AnimationController = function ( mesh ) {
 
 };
 
-GUSOKU.AnimationController.prototype.play = function ( name ) {
+MW.AnimationController.prototype.play = function ( name ) {
 
   var i;
 

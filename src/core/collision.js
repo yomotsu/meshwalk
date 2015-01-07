@@ -442,5 +442,5 @@
 
 }
 
-} )( THREE, GUSOKU );
+} )( THREE, MW );
 

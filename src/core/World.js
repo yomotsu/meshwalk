@@ -60,4 +60,4 @@
 
   };
 
-} )( THREE, GUSOKU );
+} )( THREE, MW );
