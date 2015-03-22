@@ -65,7 +65,7 @@ scene.add( light );
 
 
 ground = new THREE.Mesh(
-  new THREE.PlaneGeometry( 100, 100, 10, 10 ),
+  new THREE.PlaneBufferGeometry( 100, 100, 10, 10 ),
   new THREE.MeshNormalMaterial()
 );
 ground.rotation.x = THREE.Math.degToRad( -90 );
@@ -165,7 +165,7 @@ keyInputControl.addEventListener( 'jumpkeypress',   function () { playerControll
 
 // synk with keybord input and camera control input
 keyInputControl.addEventListener( 'movekeychange',  function () {
-  
+
   var cameraFrontAngle = tpsCameraControl.getFrontAngle();
   var characterFrontAngle = keyInputControl.getFrontAngle();
   playerController.direction = THREE.Math.degToRad( 360 ) - cameraFrontAngle + characterFrontAngle;
@@ -178,7 +178,7 @@ tpsCameraControl.addEventListener( 'updated', function () {
   var cameraFrontAngle = tpsCameraControl.getFrontAngle();
   var characterFrontAngle = keyInputControl.getFrontAngle();
   playerController.direction = THREE.Math.degToRad( 360 ) - cameraFrontAngle + characterFrontAngle;
-  
+
 } );
 
 

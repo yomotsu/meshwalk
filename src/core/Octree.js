@@ -90,19 +90,91 @@
 
     importThreeMesh: function ( threeMesh ) {
 
-      threeMesh.updateMatrix();
 
-      var i, l,
+      var i, ii, l, ll,
+          vec3 = new THREE.Vector3(),
           geometry,
           geometryId,
           face,
           normal,
+          index,
+          count,
+          start,
+          a, b, c,
+        	vA  = new THREE.Vector3(),
+        	vB  = new THREE.Vector3(),
+        	vC  = new THREE.Vector3(),
+        	vnA = new THREE.Vector3(),
+        	vnB = new THREE.Vector3(),
+        	vnC = new THREE.Vector3(),
+          ab  = new THREE.Vector3(),
+          cb  = new THREE.Vector3(),
+          faceNormal;
+
+      threeMesh.updateMatrix();
 
       geometryId = threeMesh.geometry.uuid;
-      geometry = threeMesh.geometry.clone(),
+      geometry = threeMesh.geometry.clone();
       geometry.applyMatrix( threeMesh.matrix );
-      geometry.computeFaceNormals();
       geometry.computeVertexNormals();
+
+      if ( geometry instanceof THREE.BufferGeometry ) {
+
+        if ( geometry.attributes.index !== undefined ) {
+
+          var indices   = geometry.attributes.index.array;
+          var positions = geometry.attributes.position.array;
+          var normals   = geometry.attributes.normal.array;
+          var offsets   = geometry.offsets;
+
+          if ( offsets.length === 0 ) {
+
+            offsets = [ { start: 0, count: indices.length, index: 0 } ];
+
+          }
+
+          for ( i = 0, l = offsets.length; i < l; ++ i ) {
+            start  = offsets[ i ].start;
+            count  = offsets[ i ].count;
+            index  = offsets[ i ].index;
+
+            for ( ii = start, ll = start + count; ii < ll; ii += 3 ) {
+
+              a = index + indices[ ii ];
+              b = index + indices[ ii + 1 ];
+              c = index + indices[ ii + 2 ];
+
+              vA = vec3.fromArray( positions, a * 3 ).clone();
+              vB = vec3.fromArray( positions, b * 3 ).clone();
+              vC = vec3.fromArray( positions, c * 3 ).clone();
+
+              // https://github.com/mrdoob/three.js/issues/4691
+              // make face normal
+              cb.subVectors( vC, vB );
+              ab.subVectors( vA, vB );
+              faceNormal = cb.cross( ab ).normalize().clone();
+
+              face = new ns.Face(
+                vA,
+                vB,
+                vC,
+                faceNormal,
+                geometryId
+              );
+
+              this.addFace( face );
+
+            }
+
+          }
+
+        }
+
+        return;
+
+      }
+
+      geometry.computeFaceNormals();
 
       for ( i = 0, l = geometry.faces.length; i < l; i ++ ) {
 
@@ -210,7 +282,7 @@
         tmp.length = 0;
 
       }
-      
+
       return intersectedNodes;
 
     }
@@ -223,7 +295,7 @@
     n = ( n | n << 4 ) & 0x000c30c3;
     n = ( n | n << 2 ) & 0x00249249;
     return n;
-    
+
   }
 
   ns.Octree.getMortonNumber = function ( x, y, z ) {

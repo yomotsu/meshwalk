@@ -54,7 +54,7 @@ document.body.appendChild( renderer.domElement );
 
 
 ground = new THREE.Mesh(
-  new THREE.PlaneGeometry( 30, 30, 10, 10 ),
+  new THREE.PlaneBufferGeometry( 30, 30, 10, 10 ),
   new THREE.MeshBasicMaterial( { color: 0xffffff,  wireframe: true } )
 );
 ground.rotation.x = THREE.Math.degToRad( -90 );
