@@ -23,6 +23,7 @@
     } else if ( object instanceof ns.CharacterController ) {
 
       this.characterPool.push( object );
+      object.world = this;
 
     }
 

@@ -11,9 +11,9 @@
   var modulo = function ( n, d ) {
 
     return ( ( n % d ) + d ) % d;
-    
+
   }
-  
+
   // camera              isntance of THREE.Camera
   // trackObject         isntance of THREE.Object3D
   // params.el           DOM element
@@ -26,7 +26,7 @@
     THREE.EventDispatcher.prototype.apply( this );
     this.camera = camera;
     this.trackObject  = trackObject;
-    this.el           = params && params.el || window;
+    this.el           = params && params.el || document.body;
     this.offset       = params && params.offset || new THREE.Vector3( 0, 0, 0 ),
     this.radius       = params && params.radius    || 10;
     this.minRadius    = params && params.minRadius || 1;
@@ -53,7 +53,7 @@
     this.el.addEventListener( 'mouseup',   this._mouseupListener,   false );
     this.el.addEventListener( 'mousewheel',     this._scrollListener, false );
     this.el.addEventListener( 'DOMMouseScroll', this._scrollListener, false );
-    
+
   };
 
   ns.TPSCameraControl.prototype = {
@@ -71,8 +71,8 @@
         this.trackObject.matrixWorld.elements[ 14 ] + this.offset.z
       );
       position = new THREE.Vector3(
-        Math.cos( this.phi ) * Math.cos( this.theta + PI_HALF ), 
-        Math.sin( this.phi ), 
+        Math.cos( this.phi ) * Math.cos( this.theta + PI_HALF ),
+        Math.sin( this.phi ),
         Math.cos( this.phi ) * Math.sin( this.theta + PI_HALF )
       );
       distance = this.collisionTest( position.clone().normalize() );
@@ -196,6 +196,7 @@
     this._pointerLast.y = this.lat;
     this.el.removeEventListener( 'mousemove', this._mousedragListener, false );
     this.el.addEventListener( 'mousemove', this._mousedragListener, false );
+    document.body.className += ' js-TPSCameraDragging';
 
   }
 
@@ -203,6 +204,7 @@
 
     this.dispatchEvent( { type: 'mouseup' } );
     this.el.removeEventListener( 'mousemove', this._mousedragListener, false );
+    document.body.className = document.body.className.replace( / js-TPSCameraDragging/, '' );
 
   }
 
@@ -223,12 +225,12 @@
   function onscroll ( event ) {
 
     event.preventDefault();
-    
+
     if ( event.wheelDeltaY ) {
 
       // WebKit
       this.radius -= event.wheelDeltaY * 0.05 / 5;
-    
+
     } else if ( event.wheelDelta ) {
 
       // IE

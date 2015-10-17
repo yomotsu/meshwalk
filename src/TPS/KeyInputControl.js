@@ -172,6 +172,7 @@
       )
     ) {
 
+      this.isMoveKeyHolded = false;
       this.dispatchEvent( { type: 'movekeyrelease' } );
 
     }
