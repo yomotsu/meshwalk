@@ -159,15 +159,15 @@ tpsCameraControl = new MW.TPSCameraControl(
 
 
 // bind events
-keyInputControl.addEventListener( 'movekeyhold',    function () { playerController.isRunning = true; } );
-keyInputControl.addEventListener( 'movekeyrelease', function () { playerController.isRunning = false; } );
-keyInputControl.addEventListener( 'jumpkeypress',   function () { playerController.jump(); } );
+keyInputControl.addEventListener( 'movekeyon',    function () { playerController.isRunning = true; } );
+keyInputControl.addEventListener( 'movekeyoff',   function () { playerController.isRunning = false; } );
+keyInputControl.addEventListener( 'jumpkeypress', function () { playerController.jump(); } );
 
 // synk with keybord input and camera control input
 keyInputControl.addEventListener( 'movekeychange',  function () {
 
   var cameraFrontAngle = tpsCameraControl.getFrontAngle();
-  var characterFrontAngle = keyInputControl.getFrontAngle();
+  var characterFrontAngle = keyInputControl.frontAngle;
   playerController.direction = THREE.Math.degToRad( 360 ) - cameraFrontAngle + characterFrontAngle;
 
 } );
@@ -176,7 +176,7 @@ keyInputControl.addEventListener( 'movekeychange',  function () {
 tpsCameraControl.addEventListener( 'updated', function () {
 
   var cameraFrontAngle = tpsCameraControl.getFrontAngle();
-  var characterFrontAngle = keyInputControl.getFrontAngle();
+  var characterFrontAngle = keyInputControl.frontAngle;
   playerController.direction = THREE.Math.degToRad( 360 ) - cameraFrontAngle + characterFrontAngle;
 
 } );
@@ -185,10 +185,15 @@ tpsCameraControl.addEventListener( 'updated', function () {
 ;( function update () {
 
   requestAnimationFrame( update );
-  var delta = clock.getDelta();
-  world.step( delta );
   tpsCameraControl.update();
   renderer.render( scene, camera );
+
+} )();
+
+;( function step () {
+  
+  setTimeout( step, 16.6 );
+  world.step( 0.0166 );
 
 } )();
 

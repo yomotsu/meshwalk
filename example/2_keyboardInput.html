@@ -64,7 +64,7 @@ octree.importThreeMesh( ground );
 
 wall = new THREE.Mesh(
   new THREE.BoxGeometry( 5, 6, 10 ),
-  new THREE.MeshNormalMaterial( { color: 0xffffff,  wireframe: true } )
+  new THREE.MeshNormalMaterial( { wireframe: true } )
 );
 wall.position.set( 0, 3, 0 );
 // wall.rotation.set( 0, 0, THREE.Math.degToRad( 20 ) );
@@ -89,18 +89,23 @@ world.add( playerController );
 keyInputControl = new MW.KeyInputControl();
 
 // bind events
-keyInputControl.addEventListener( 'movekeyhold',    function () { playerController.isRunning = true; } );
-keyInputControl.addEventListener( 'movekeyrelease', function () { playerController.isRunning = false; } );
-keyInputControl.addEventListener( 'movekeychange',  function () { playerController.direction = keyInputControl.getFrontAngle(); } );
-keyInputControl.addEventListener( 'jumpkeypress',   function () { playerController.jump(); } );
+keyInputControl.addEventListener( 'movekeyon',     function () { playerController.isRunning = true; } );
+keyInputControl.addEventListener( 'movekeyoff',    function () { playerController.isRunning = false; } );
+keyInputControl.addEventListener( 'movekeychange', function () { playerController.direction = keyInputControl.frontAngle; } );
+keyInputControl.addEventListener( 'jumpkeypress',  function () { playerController.jump(); } );
 
 
 ;( function update () {
 
   requestAnimationFrame( update );
-  var delta = clock.getDelta();
-  world.step( delta );
   renderer.render( scene, camera );
+
+} )();
+
+;( function step () {
+  
+  setTimeout( step, 16.6 );
+  world.step( 0.0166 );
 
 } )();
 

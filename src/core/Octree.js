@@ -114,18 +114,18 @@
       threeMesh.updateMatrix();
 
       geometryId = threeMesh.geometry.uuid;
-      geometry = threeMesh.geometry.clone();
+      geometry   = threeMesh.geometry.clone();
       geometry.applyMatrix( threeMesh.matrix );
       geometry.computeVertexNormals();
 
       if ( geometry instanceof THREE.BufferGeometry ) {
 
-        if ( geometry.attributes.index !== undefined ) {
+        if ( geometry.index !== undefined ) {
 
-          var indices   = geometry.attributes.index.array;
+          var indices   = geometry.index.array;
           var positions = geometry.attributes.position.array;
           var normals   = geometry.attributes.normal.array;
-          var offsets   = geometry.offsets;
+          var offsets   = geometry.groups;
 
           if ( offsets.length === 0 ) {
 
@@ -134,9 +134,10 @@
           }
 
           for ( i = 0, l = offsets.length; i < l; ++ i ) {
+            
             start  = offsets[ i ].start;
             count  = offsets[ i ].count;
-            index  = offsets[ i ].index;
+            index  = offsets[ i ].materialIndex;
 
             for ( ii = start, ll = start + count; ii < ll; ii += 3 ) {
 
@@ -250,7 +251,6 @@
 
       for ( i = 0, l = depth; i < l; i ++ ) {
 
-        // console.log( i, 111 );
         for ( ii = 0, ll = targetNodes.length; ii < ll; ii ++ ) {
 
           node = targetNodes[ ii ];

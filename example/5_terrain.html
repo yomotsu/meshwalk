@@ -85,24 +85,24 @@ tpsCameraControl = new MW.TPSCameraControl(
 
 
 // bind events
-keyInputControl.addEventListener( 'movekeyhold',    function () { playerController.isRunning = true; } );
-keyInputControl.addEventListener( 'movekeyrelease', function () { playerController.isRunning = false; } );
+keyInputControl.addEventListener( 'movekeyon',    function () { playerController.isRunning = true; } );
+keyInputControl.addEventListener( 'movekeyoff', function () { playerController.isRunning = false; } );
 keyInputControl.addEventListener( 'jumpkeypress',   function () { playerController.jump(); } );
 
 // synk with keybord input and camera control input
 keyInputControl.addEventListener( 'movekeychange',  function () {
 
   var cameraFrontAngle = tpsCameraControl.getFrontAngle();
-  var characterFrontAngle = keyInputControl.getFrontAngle();
+  var characterFrontAngle = keyInputControl.frontAngle;
   playerController.direction = THREE.Math.degToRad( 360 ) - cameraFrontAngle + characterFrontAngle;
 
 } );
 
-// the 'updated' event is fired by `tpsCameraControl.update()`
+// 'updated' event is fired by `tpsCameraControl.update()`
 tpsCameraControl.addEventListener( 'updated', function () {
 
   var cameraFrontAngle = tpsCameraControl.getFrontAngle();
-  var characterFrontAngle = keyInputControl.getFrontAngle();
+  var characterFrontAngle = keyInputControl.frontAngle;
   playerController.direction = THREE.Math.degToRad( 360 ) - cameraFrontAngle + characterFrontAngle;
 
 } );
@@ -136,10 +136,15 @@ loader.load( 'terrain.json', function( geo, mat ) {
   ;( function update () {
 
     requestAnimationFrame( update );
-    var delta = clock.getDelta();
-    world.step( delta );
     tpsCameraControl.update();
     renderer.render( scene, camera );
+
+  } )();
+
+  ;( function step () {
+  
+    setTimeout( step, 16.6 );
+    world.step( 0.0166 );
 
   } )();
 

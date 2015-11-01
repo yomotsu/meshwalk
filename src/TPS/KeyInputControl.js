@@ -28,21 +28,22 @@
   ns.KeyInputControl = function () {
     
     THREE.EventDispatcher.prototype.apply( this );
-    this.mouseAccelarationX = 100;
-    this.mouseAccelarationY = 20;
     this.isDisabled = false;
 
     this.isUp    = false;
     this.isDown  = false;
     this.isLeft  = false;
     this.isRight = false;
+    this.isMoveKeyHolded = false;
     this.frontAngle = 0;
 
-    this._mousedownListener = onkeydown.bind( this );
-    this._mouseupListener   = onkeyup.bind( this );
+    this._keydownListener = onkeydown.bind( this );
+    this._keyupListener   = onkeyup.bind( this );
+    this._blurListener    = onblur.bind( this );
 
-    window.addEventListener( 'keydown', this._mousedownListener, false );
-    window.addEventListener( 'keyup',   this._mouseupListener,   false );
+    window.addEventListener( 'keydown', this._keydownListener, false );
+    window.addEventListener( 'keyup',   this._keyupListener,   false );
+    window.addEventListener( 'blur',    this._blurListener,    false );
 
   }
 
@@ -68,17 +69,7 @@
     else if ( !up && !left && !down &&  right ) { this.frontAngle = DEG_270; }
     else if (  up && !left && !down &&  right ) { this.frontAngle = DEG_315; }
 
-    this.frontAngle = this.frontAngle % DEG_360;
-
   };
-
-  
-  ns.KeyInputControl.prototype.getFrontAngle = function () {
-
-    return this.frontAngle;
-
-  };
-
 
 
   function onkeydown ( e ) {
@@ -111,15 +102,28 @@
         this.jump();
         break;
 
+      default:
+        return;
+
     }
+    
+    var prevAngle = this.frontAngle;
 
     this.updateAngle();
-    this.dispatchEvent( { type: 'movekeychange' } );
 
-    if ( this.isUp || this.isDown || this.isLeft || this.isRight ) {
+    if ( prevAngle !== this.frontAngle ) {
+
+      this.dispatchEvent( { type: 'movekeychange' } );
+
+    }
+
+    if (
+      ( this.isUp || this.isDown || this.isLeft || this.isRight ) &&
+      !this.isMoveKeyHolded
+    ) {
 
       this.isMoveKeyHolded = true;
-      this.dispatchEvent( { type: 'movekeyhold' } );
+      this.dispatchEvent( { type: 'movekeyon' } );
 
     }
 
@@ -154,10 +158,20 @@
       case KEY_SPACE :
         break;
 
+      default:
+        return;
+
     }
+    
+    var prevAngle = this.frontAngle;
 
     this.updateAngle();
-    this.dispatchEvent( { type: 'movekeychange' } );
+
+    if ( prevAngle !== this.frontAngle ) {
+
+      this.dispatchEvent( { type: 'movekeychange' } );
+
+    }
 
     if ( !this.isUp && !this.isDown && !this.isLeft && !this.isRight &&
       (
@@ -173,7 +187,23 @@
     ) {
 
       this.isMoveKeyHolded = false;
-      this.dispatchEvent( { type: 'movekeyrelease' } );
+      this.dispatchEvent( { type: 'movekeyoff' } );
+
+    }
+
+  }
+
+  function onblur ( e ) {
+
+    this.isUp    = false;
+    this.isDown  = false;
+    this.isLeft  = false;
+    this.isRight = false;
+    
+    if ( this.isMoveKeyHolded ) {
+
+      this.isMoveKeyHolded = false;
+      this.dispatchEvent( { type: 'movekeyoff' } );
 
     }
 

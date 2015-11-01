@@ -520,44 +520,123 @@
 // @author yomotsu
 // MIT License
 
-
 MW.AnimationController = function ( mesh ) {
 
-  this.mesh = mesh;
+  this.mesh   = mesh;
   this.motion = {};
+  this.mixer  = new THREE.AnimationMixer( mesh );
+  this.currentMotionName = '';
+
   var i, l, anim;
 
   for ( i = 0, l = this.mesh.geometry.animations.length; i < l; i ++ ) {
 
     anim = this.mesh.geometry.animations[ i ];
-
-    this.motion[ anim.name ] = {
-
-      anim: new THREE.Animation(
-        mesh,
-        anim,
-        THREE.AnimationHandler.CATMULLROM
-      ),
-
-      duration: anim.length * 1000
-
-    };
+    this.motion[ anim.name ] = new THREE.AnimationAction( anim );
+    this.motion[ anim.name ].weight = 0;
+    this.mixer.addAction( this.motion[ anim.name ] );
 
   }
 
 };
 
-MW.AnimationController.prototype.play = function ( name ) {
+MW.AnimationController.prototype = {
 
-  var i;
+  play: function ( name ) {
 
-  for ( i in this.motion ) {
+    if ( this.motion[ this.currentMotionName ] ) {
 
-    this.motion[ i ].anim.stop();
+      this.mixer.crossFade(
+        this.motion[ this.currentMotionName ],
+        this.motion[ name ],
+        .3
+      );
+
+    } else {
+
+      this.mixer.fadeIn( this.motion[ name ], .3 );
+
+    }
+
+    this.currentMotionName = name;
+
+  },
+
+  turn: function () {
+
+    var DURATION  = 200;
+    var TAU = 2 * Math.PI;
+
+    var mod = function ( a, n ) { return ( a % n + n ) % n; }
+
+    var getDeltaAngle = function ( current, target ) {
+
+      var a = mod( ( current - target ), TAU );
+      var b = mod( ( target - current ), TAU );
+
+      return a < b ? -a : b;
+
+    };
+
+    return function ( rad, immediate ) {
+
+
+      var that       = this;
+      var progress   = 0;
+      var prevRotY   = this.mesh.rotation.y;
+      var targetRotY = rad;
+      var deltaY     = getDeltaAngle( prevRotY, targetRotY );
+      // var duration   = Math.abs( deltaY ) * 100;
+      var start      = Date.now();
+      var end        = start + DURATION;
+
+      if ( immediate ) {
+
+        this.mesh.rotation.y = targetRotY;
+        return;
+
+      }
+
+      if ( this._targetRotY === targetRotY ) { return; }
+
+      this._targetRotY = targetRotY;
+
+      ( function () {
+
+        var _targetRotY = targetRotY;
+
+        ( function interval () {
+
+          var now = Date.now();
+          var isAborted = _targetRotY !== that._targetRotY;
+
+          if ( isAborted ) { return; }
+
+          if ( now >= end ) {
+
+            that.mesh.rotation.y = _targetRotY;
+            delete that._targetRotY;
+            return;
+
+          }
+
+          requestAnimationFrame( interval );
+          progress = ( now - start ) / DURATION;
+          that.mesh.rotation.y = prevRotY + deltaY * progress;
+
+        } )();
+
+      } )();
+
+    }
+
+  }(),
+
+  update: function ( delta ) {
+
+    this.mixer.update( delta );
 
   }
-
-  this.motion[ name ].anim.play();
 
 };
 
@@ -591,21 +670,22 @@ MW.AnimationController.prototype.play = function ( name ) {
   ns.KeyInputControl = function () {
     
     THREE.EventDispatcher.prototype.apply( this );
-    this.mouseAccelarationX = 100;
-    this.mouseAccelarationY = 20;
     this.isDisabled = false;
 
     this.isUp    = false;
     this.isDown  = false;
     this.isLeft  = false;
     this.isRight = false;
+    this.isMoveKeyHolded = false;
     this.frontAngle = 0;
 
-    this._mousedownListener = onkeydown.bind( this );
-    this._mouseupListener   = onkeyup.bind( this );
+    this._keydownListener = onkeydown.bind( this );
+    this._keyupListener   = onkeyup.bind( this );
+    this._blurListener    = onblur.bind( this );
 
-    window.addEventListener( 'keydown', this._mousedownListener, false );
-    window.addEventListener( 'keyup',   this._mouseupListener,   false );
+    window.addEventListener( 'keydown', this._keydownListener, false );
+    window.addEventListener( 'keyup',   this._keyupListener,   false );
+    window.addEventListener( 'blur',    this._blurListener,    false );
 
   }
 
@@ -631,17 +711,7 @@ MW.AnimationController.prototype.play = function ( name ) {
     else if ( !up && !left && !down &&  right ) { this.frontAngle = DEG_270; }
     else if (  up && !left && !down &&  right ) { this.frontAngle = DEG_315; }
 
-    this.frontAngle = this.frontAngle % DEG_360;
-
   };
-
-  
-  ns.KeyInputControl.prototype.getFrontAngle = function () {
-
-    return this.frontAngle;
-
-  };
-
 
 
   function onkeydown ( e ) {
@@ -674,15 +744,28 @@ MW.AnimationController.prototype.play = function ( name ) {
         this.jump();
         break;
 
+      default:
+        return;
+
     }
+    
+    var prevAngle = this.frontAngle;
 
     this.updateAngle();
-    this.dispatchEvent( { type: 'movekeychange' } );
 
-    if ( this.isUp || this.isDown || this.isLeft || this.isRight ) {
+    if ( prevAngle !== this.frontAngle ) {
+
+      this.dispatchEvent( { type: 'movekeychange' } );
+
+    }
+
+    if (
+      ( this.isUp || this.isDown || this.isLeft || this.isRight ) &&
+      !this.isMoveKeyHolded
+    ) {
 
       this.isMoveKeyHolded = true;
-      this.dispatchEvent( { type: 'movekeyhold' } );
+      this.dispatchEvent( { type: 'movekeyon' } );
 
     }
 
@@ -717,10 +800,20 @@ MW.AnimationController.prototype.play = function ( name ) {
       case KEY_SPACE :
         break;
 
+      default:
+        return;
+
     }
+    
+    var prevAngle = this.frontAngle;
 
     this.updateAngle();
-    this.dispatchEvent( { type: 'movekeychange' } );
+
+    if ( prevAngle !== this.frontAngle ) {
+
+      this.dispatchEvent( { type: 'movekeychange' } );
+
+    }
 
     if ( !this.isUp && !this.isDown && !this.isLeft && !this.isRight &&
       (
@@ -735,7 +828,24 @@ MW.AnimationController.prototype.play = function ( name ) {
       )
     ) {
 
-      this.dispatchEvent( { type: 'movekeyrelease' } );
+      this.isMoveKeyHolded = false;
+      this.dispatchEvent( { type: 'movekeyoff' } );
+
+    }
+
+  }
+
+  function onblur ( e ) {
+
+    this.isUp    = false;
+    this.isDown  = false;
+    this.isLeft  = false;
+    this.isRight = false;
+    
+    if ( this.isMoveKeyHolded ) {
+
+      this.isMoveKeyHolded = false;
+      this.dispatchEvent( { type: 'movekeyoff' } );
 
     }
 
@@ -756,9 +866,9 @@ MW.AnimationController.prototype.play = function ( name ) {
   var modulo = function ( n, d ) {
 
     return ( ( n % d ) + d ) % d;
-    
+
   }
-  
+
   // camera              isntance of THREE.Camera
   // trackObject         isntance of THREE.Object3D
   // params.el           DOM element
@@ -771,7 +881,7 @@ MW.AnimationController.prototype.play = function ( name ) {
     THREE.EventDispatcher.prototype.apply( this );
     this.camera = camera;
     this.trackObject  = trackObject;
-    this.el           = params && params.el || window;
+    this.el           = params && params.el || document.body;
     this.offset       = params && params.offset || new THREE.Vector3( 0, 0, 0 ),
     this.radius       = params && params.radius    || 10;
     this.minRadius    = params && params.minRadius || 1;
@@ -798,7 +908,7 @@ MW.AnimationController.prototype.play = function ( name ) {
     this.el.addEventListener( 'mouseup',   this._mouseupListener,   false );
     this.el.addEventListener( 'mousewheel',     this._scrollListener, false );
     this.el.addEventListener( 'DOMMouseScroll', this._scrollListener, false );
-    
+
   };
 
   ns.TPSCameraControl.prototype = {
@@ -816,8 +926,8 @@ MW.AnimationController.prototype.play = function ( name ) {
         this.trackObject.matrixWorld.elements[ 14 ] + this.offset.z
       );
       position = new THREE.Vector3(
-        Math.cos( this.phi ) * Math.cos( this.theta + PI_HALF ), 
-        Math.sin( this.phi ), 
+        Math.cos( this.phi ) * Math.cos( this.theta + PI_HALF ),
+        Math.sin( this.phi ),
         Math.cos( this.phi ) * Math.sin( this.theta + PI_HALF )
       );
       distance = this.collisionTest( position.clone().normalize() );
@@ -941,6 +1051,7 @@ MW.AnimationController.prototype.play = function ( name ) {
     this._pointerLast.y = this.lat;
     this.el.removeEventListener( 'mousemove', this._mousedragListener, false );
     this.el.addEventListener( 'mousemove', this._mousedragListener, false );
+    document.body.className += ' js-TPSCameraDragging';
 
   }
 
@@ -948,6 +1059,7 @@ MW.AnimationController.prototype.play = function ( name ) {
 
     this.dispatchEvent( { type: 'mouseup' } );
     this.el.removeEventListener( 'mousemove', this._mousedragListener, false );
+    document.body.className = document.body.className.replace( / js-TPSCameraDragging/, '' );
 
   }
 
@@ -968,12 +1080,12 @@ MW.AnimationController.prototype.play = function ( name ) {
   function onscroll ( event ) {
 
     event.preventDefault();
-    
+
     if ( event.wheelDeltaY ) {
 
       // WebKit
       this.radius -= event.wheelDeltaY * 0.05 / 5;
-    
+
     } else if ( event.wheelDelta ) {
 
       // IE

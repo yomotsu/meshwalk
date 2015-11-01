@@ -105,24 +105,24 @@ tpsCameraControl = new MW.TPSCameraControl(
 
 
 // bind events
-keyInputControl.addEventListener( 'movekeyhold',    function () { playerController.isRunning = true; } );
-keyInputControl.addEventListener( 'movekeyrelease', function () { playerController.isRunning = false; } );
+keyInputControl.addEventListener( 'movekeyon',    function () { playerController.isRunning = true; } );
+keyInputControl.addEventListener( 'movekeyoff', function () { playerController.isRunning = false; } );
 keyInputControl.addEventListener( 'jumpkeypress',   function () { playerController.jump(); } );
 
 // synk with keybord input and camera control input
 keyInputControl.addEventListener( 'movekeychange',  function () {
   
   var cameraFrontAngle = tpsCameraControl.getFrontAngle();
-  var characterFrontAngle = keyInputControl.getFrontAngle();
+  var characterFrontAngle = keyInputControl.frontAngle;
   playerController.direction = THREE.Math.degToRad( 360 ) - cameraFrontAngle + characterFrontAngle;
 
 } );
 
-// the 'updated' event is fired by `tpsCameraControl.update()`
+// 'updated' event is fired by `tpsCameraControl.update()`
 tpsCameraControl.addEventListener( 'updated', function () {
 
   var cameraFrontAngle = tpsCameraControl.getFrontAngle();
-  var characterFrontAngle = keyInputControl.getFrontAngle();
+  var characterFrontAngle = keyInputControl.frontAngle;
   playerController.direction = THREE.Math.degToRad( 360 ) - cameraFrontAngle + characterFrontAngle;
   
 } );
@@ -130,7 +130,7 @@ tpsCameraControl.addEventListener( 'updated', function () {
 
 Promise.all( [
   loadMesh( 'terrain.json' ),
-  loadMesh( 'mobuko/mobuko.json' )
+  loadMesh( 'model/miku.json' )
 ] ).then( function( result ) {
 
   var terrainData   = result[ 0 ];
@@ -166,13 +166,11 @@ Promise.all( [
     characterData.geometry,
     new THREE.MeshFaceMaterial( characterData.materials )
   );
-  characterMesh.scale.set( .5, .5, .5 );
   scene.add( characterMesh );
 
   animationController = new MW.AnimationController( characterMesh );
-  animationController.motion.jump.anim.loop = false;
-  animationController.motion.land.anim.loop = false;
-  animationController.motion.slide.anim.loop = false;
+  animationController.motion.jump.loop  = THREE.LoopOnce;
+  animationController.motion.slide.loop = THREE.LoopOnce;
 
 
   // player motion
@@ -200,12 +198,19 @@ Promise.all( [
     requestAnimationFrame( update );
     vent.dispatchEvent( { type: 'beforerender' } );
     var delta = clock.getDelta();
-    world.step( delta );
     tpsCameraControl.update();
-    THREE.AnimationHandler.update( delta );
+    animationController.update( delta );
     renderer.render( scene, camera );
 
   } )();
+
+
+  ;( function step () {
+  
+  setTimeout( step, 16.6 );
+  world.step( 0.0166 );
+
+} )();
 
 } );
 

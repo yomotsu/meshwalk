@@ -101,9 +101,14 @@ world.add( playerController );
 ;( function update () {
 
   requestAnimationFrame( update );
-  var delta = clock.getDelta();
-  world.step( delta );
   renderer.render( scene, camera );
+
+} )();
+
+;( function step () {
+  
+  setTimeout( step, 16.6 );
+  world.step( 0.0166 );
 
 } )();
 
