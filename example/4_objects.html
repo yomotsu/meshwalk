@@ -184,16 +184,12 @@ tpsCameraControl.addEventListener( 'updated', function () {
 
 ;( function update () {
 
+  var delta = clock.getDelta();
+
   requestAnimationFrame( update );
+  world.step( Math.min( delta, 0.02 ) );
   tpsCameraControl.update();
   renderer.render( scene, camera );
-
-} )();
-
-;( function step () {
-  
-  setTimeout( step, 16.6 );
-  world.step( 0.0166 );
 
 } )();
 
