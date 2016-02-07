@@ -169,8 +169,10 @@ Promise.all( [
   scene.add( characterMesh );
 
   animationController = new MW.AnimationController( characterMesh );
-  animationController.motion.jump.loop  = THREE.LoopOnce;
-  animationController.motion.slide.loop = THREE.LoopOnce;
+  animationController.motion.jump.setLoop( THREE.LoopOnce, 0 );
+  animationController.motion.slide.setLoop( THREE.LoopOnce, 0 );
+  animationController.motion.jump.clampWhenFinished = true;
+  animationController.motion.slide.clampWhenFinished = true;
 
 
   // player motion

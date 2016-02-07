@@ -75,8 +75,10 @@ loader.load( './model/miku.json', function( geometry, materials ) {
 
   animationController = new MW.AnimationController( characterMesh );
   animationController.play( 'idle' );
-  animationController.motion.jump.loop  = THREE.LoopOnce;
-  animationController.motion.slide.loop = THREE.LoopOnce;
+  animationController.motion.jump.setLoop( THREE.LoopOnce, 0 );
+  animationController.motion.slide.setLoop( THREE.LoopOnce, 0 );
+  animationController.motion.jump.clampWhenFinished = true;
+  animationController.motion.slide.clampWhenFinished = true;
 
 } );
 

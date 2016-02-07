@@ -13,9 +13,8 @@ MW.AnimationController = function ( mesh ) {
   for ( i = 0, l = this.mesh.geometry.animations.length; i < l; i ++ ) {
 
     anim = this.mesh.geometry.animations[ i ];
-    this.motion[ anim.name ] = new THREE.AnimationAction( anim );
-    this.motion[ anim.name ].weight = 0;
-    this.mixer.addAction( this.motion[ anim.name ] );
+    this.motion[ anim.name ] = this.mixer.clipAction( anim );
+    this.motion[ anim.name ].setEffectiveWeight( 1 );
 
   }
 
@@ -25,17 +24,22 @@ MW.AnimationController.prototype = {
 
   play: function ( name ) {
 
+    if ( this.currentMotionName === name ) { return; }
+
     if ( this.motion[ this.currentMotionName ] ) {
 
-      this.mixer.crossFade(
-        this.motion[ this.currentMotionName ],
-        this.motion[ name ],
-        .3
-      );
+      var from = this.motion[ this.currentMotionName ].play();
+      var to   = this.motion[ name ].play();
+
+      from.enabled = true;
+      to.enabled = true;
+
+      from.crossFadeTo( to, .3 );
 
     } else {
 
-      this.mixer.fadeIn( this.motion[ name ], .3 );
+      this.motion[ name ].enabled = true;
+      this.motion[ name ].play();
 
     }
 
