@@ -17,4 +17,4 @@ See following demos and check the souce code with some comments.
 4. [objects](http://yomotsu.github.io/meshwalk.js/example/4_objects.html)
 5. [terrain](http://yomotsu.github.io/meshwalk.js/example/5_terrain.html)
 6. [animationController](http://yomotsu.github.io/meshwalk.js/example/6_animationController.html)
-7. [conclusion](http://yomotsu.github.io/meshwalk.js/example/7_conclusion.html)
+7. [all together](http://yomotsu.github.io/meshwalk.js/example/7_allTogether.html)
