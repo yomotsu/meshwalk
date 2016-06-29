@@ -104,7 +104,6 @@ keyInputControl.addEventListener( 'jumpkeypress',  function () { playerControlle
 ;( function update () {
 
   var delta = clock.getDelta();
-  if ( clock.getElapsedTime() > 30 ) { return; }
 
   requestAnimationFrame( update );
   world.step( Math.min( delta, 0.02 ) );

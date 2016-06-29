@@ -9,7 +9,7 @@ examples
 
 ## Usage and Learning
 
-See following demos and check the souce code with some comments.
+See following demos and check the source code with some comments.
 
 1. [getstarted](http://yomotsu.github.io/meshwalk.js/example/1_getstarted.html)
 2. [keyboardInput](http://yomotsu.github.io/meshwalk.js/example/2_keyboardInput.html)
@@ -18,3 +18,4 @@ See following demos and check the souce code with some comments.
 5. [terrain](http://yomotsu.github.io/meshwalk.js/example/5_terrain.html)
 6. [animationController](http://yomotsu.github.io/meshwalk.js/example/6_animationController.html)
 7. [all together](http://yomotsu.github.io/meshwalk.js/example/7_allTogether.html)
+8. [remove collider](http://yomotsu.github.io/meshwalk.js/example/8_meshRemove.html)
