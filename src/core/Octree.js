@@ -134,7 +134,7 @@
           }
 
           for ( i = 0, l = offsets.length; i < l; ++ i ) {
-            
+
             start  = offsets[ i ].start;
             count  = offsets[ i ].count;
             index  = offsets[ i ].materialIndex;
@@ -232,7 +232,33 @@
 
     },
 
-    removeFace: function ( meshID ) {},
+    removeThreeMesh: function ( meshID ) {
+
+      var that = this;
+
+      this.nodes.forEach( function ( nodeDepth ) {
+
+        nodeDepth.forEach( function ( node ) {
+
+          var newTrianglePool = [];
+
+          node.trianglePool.forEach( function ( face ) {
+
+            if ( face.meshID !== meshID ) {
+
+              newTrianglePool.push( face );
+
+            }
+
+          } );
+
+          node.trianglePool = newTrianglePool;
+
+        } );
+
+      } );
+
+    },
 
     getIntersectedNodes: function ( sphere, depth ) {
 
