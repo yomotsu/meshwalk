@@ -8,12 +8,9 @@ var reload       = browserSync.reload;
 var runSequence  = require( 'run-sequence' );
 
 var gulp         = require( 'gulp' );
-var autoprefixer = require( 'gulp-autoprefixer' );
 var concat       = require( 'gulp-concat' );
-var minifyCSS    = require( 'gulp-minify-css' );
 var plumber      = require( 'gulp-plumber' );
 var rename       = require( 'gulp-rename' );
-var sass         = require( 'gulp-sass' );
 var uglify       = require( 'gulp-uglify' );
 var watch        = require( 'gulp-watch' );
 
