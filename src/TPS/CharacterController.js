@@ -6,7 +6,7 @@
 
   ns.CharacterController = function ( object3d, radius ) {
 
-    THREE.EventDispatcher.prototype.apply( this );
+    Object.assign( ns.CharacterController.prototype, EventDispatcher.prototype );
     this.object = object3d;
     this.center = this.object.position.clone();
     this.radius = radius;

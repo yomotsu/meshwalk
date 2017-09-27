@@ -26,6 +26,8 @@ canvas{display: block;}
 </div>
 
 <script src="../lib/three.min.js"></script>
+<script src="../lib/three.eventdispatcher.js"></script>
+
 <script src="../build/meshwalk.min.js"></script>
 <script src="../build/meshwalk.TPS.min.js"></script>
 <script>
@@ -70,7 +72,7 @@ ground = new THREE.Mesh(
 );
 ground.rotation.x = THREE.Math.degToRad( -90 );
 scene.add( ground );
-scene.add( new THREE.WireframeHelper( ground ) );
+// scene.add( new THREE.WireframeHelper( ground ) );
 octree.importThreeMesh( ground );
 
 
@@ -81,7 +83,7 @@ object1 = new THREE.Mesh(
 );
 object1.position.set( 0, 2, 0 );
 scene.add( object1 );
-scene.add( new THREE.WireframeHelper( object1 ) );
+// scene.add( new THREE.WireframeHelper( object1 ) );
 octree.importThreeMesh( object1 );
 
 
@@ -92,7 +94,7 @@ object2 = new THREE.Mesh(
 object2.position.set( -15, 0, 0 );
 object2.rotation.set( THREE.Math.degToRad( 20 ), 0, 0 );
 scene.add( object2 );
-scene.add( new THREE.WireframeHelper( object2 ) );
+// scene.add( new THREE.WireframeHelper( object2 ) );
 octree.importThreeMesh( object2 );
 
 
@@ -103,7 +105,7 @@ object3 = new THREE.Mesh(
 object3.position.set( -15, 4.5, -8 );
 object3.rotation.set( THREE.Math.degToRad( 40 ), 0, 0 );
 scene.add( object3 );
-scene.add( new THREE.WireframeHelper( object3 ) );
+// scene.add( new THREE.WireframeHelper( object3 ) );
 octree.importThreeMesh( object3 );
 
 
@@ -114,7 +116,7 @@ object4 = new THREE.Mesh(
 object4.position.set( -15, 10.5, -13 );
 object4.rotation.set( THREE.Math.degToRad( 60 ), 0, 0 );
 scene.add( object4 );
-scene.add( new THREE.WireframeHelper( object4 ) );
+// scene.add( new THREE.WireframeHelper( object4 ) );
 octree.importThreeMesh( object4 );
 
 
@@ -124,7 +126,7 @@ object5 = new THREE.Mesh(
 );
 object5.position.set( 20, 0, 0 );
 scene.add( object5 );
-scene.add( new THREE.WireframeHelper( object5 ) );
+// scene.add( new THREE.WireframeHelper( object5 ) );
 octree.importThreeMesh( object5 );
 
 

@@ -20,6 +20,8 @@ canvas{display: block;}
 </div>
 
 <script src="../lib/three.min.js"></script>
+<script src="../lib/three.eventdispatcher.js"></script>
+
 <script src="../build/meshwalk.min.js"></script>
 <script src="../build/meshwalk.TPS.min.js"></script>
 <script>
@@ -117,7 +119,7 @@ loader.load( 'terrain.json', function( geo, mat ) {
   );
   box.position.set( -3, 7.5, -13 );
   scene.add( box );
-  scene.add( new THREE.WireframeHelper( box ) );
+  // scene.add( new THREE.WireframeHelper( box ) );
   octree.importThreeMesh( box );
 
 
@@ -128,7 +130,7 @@ loader.load( 'terrain.json', function( geo, mat ) {
   );
   terrain.scale.set( 2, 2, 2 );
   scene.add( terrain );
-  scene.add( new THREE.WireframeHelper( terrain ) );
+  // scene.add( new THREE.WireframeHelper( terrain ) );
   octree.importThreeMesh( terrain );
   tpsCameraControl.rigidObjects.push( terrain );
 
