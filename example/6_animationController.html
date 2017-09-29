@@ -41,7 +41,6 @@
     var ambientLight, characterMesh;
     var animationController;
 
-
     width = window.innerWidth;
     height = window.innerHeight;
     clock = new THREE.Clock();
@@ -54,7 +53,6 @@
 
     ambientLight = new THREE.AmbientLight(0xffffff)
     scene.add(ambientLight);
-
 
     loader.load('./model/miku.json', function(geometry, materials) {
 
@@ -80,7 +78,6 @@
 
     });
 
-    ;
     (function update() {
 
       requestAnimationFrame(update);

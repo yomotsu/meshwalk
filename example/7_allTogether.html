@@ -40,7 +40,6 @@
 
     };
 
-
     var width, height, clock, scene, camera, renderer;
     var ambientLight, terrainMesh, characterMesh, box, sphere;
     var world, min, max, partition, octree,
@@ -51,14 +50,12 @@
     var animationController;
     var vent = new THREE.EventDispatcher();
 
-
     world = new MW.World();
     min = new THREE.Vector3(-15, -15, -15);
     max = new THREE.Vector3(15, 15, 15);
     partition = 5;
     octree = new MW.Octree(min, max, partition);
     world.add(octree);
-
 
     width = window.innerWidth;
     height = window.innerHeight;
@@ -101,7 +98,6 @@
       }
     );
 
-
     // bind events
     keyInputControl.addEventListener('movekeyon', function() { playerController.isRunning = true; });
     keyInputControl.addEventListener('movekeyoff', function() { playerController.isRunning = false; });
@@ -125,7 +121,6 @@
 
     });
 
-
     Promise.all([
       loadMesh('terrain.json'),
       loadMesh('model/miku.json')
@@ -142,7 +137,6 @@
       scene.add(box);
       octree.importThreeMesh(box);
 
-
       terrainMesh = new THREE.Mesh(
         terrainData.geometry,
         new THREE.MeshNormalMaterial()
@@ -152,7 +146,6 @@
       scene.add(terrainMesh);
       octree.importThreeMesh(terrainMesh);
       tpsCameraControl.rigidObjects.push(terrainMesh);
-
 
       characterData.materials.forEach(function(material) {
 
@@ -171,7 +164,6 @@
       animationController.motion.slide.setLoop(THREE.LoopOnce, 0);
       animationController.motion.jump.clampWhenFinished = true;
       animationController.motion.slide.clampWhenFinished = true;
-
 
       // player motion
       playerController.addEventListener('startIdling', function() { animationController.play('idle'); });
@@ -192,8 +184,6 @@
 
       });
 
-
-      ;
       (function update() {
 
         var delta = clock.getDelta();

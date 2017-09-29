@@ -47,7 +47,6 @@
     octree = new MW.Octree(min, max, partition);
     world.add(octree);
 
-
     width = window.innerWidth;
     height = window.innerHeight;
     clock = new THREE.Clock();
@@ -61,7 +60,6 @@
     light = new THREE.DirectionalLight(0xffffff, 1);
     light.position.set(1, 1, 1);
     scene.add(light);
-
 
     // Floor
     ground = new THREE.Mesh(
@@ -217,8 +215,6 @@
 
     });
 
-
-    ;
     (function update() {
 
       var delta = clock.getDelta();

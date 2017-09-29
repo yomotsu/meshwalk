@@ -41,7 +41,6 @@
     octree = new MW.Octree(min, max, partition);
     world.add(octree);
 
-
     width = window.innerWidth;
     height = window.innerHeight;
     clock = new THREE.Clock();
@@ -52,7 +51,6 @@
     renderer.setSize(width, height);
     document.body.appendChild(renderer.domElement);
 
-
     ground = new THREE.Mesh(
       new THREE.PlaneBufferGeometry(30, 30, 10, 10),
       new THREE.MeshBasicMaterial({ color: 0xffffff, wireframe: true })
@@ -60,7 +58,6 @@
     ground.rotation.x = THREE.Math.degToRad(-90);
     scene.add(ground);
     octree.importThreeMesh(ground);
-
 
     wall = new THREE.Mesh(
       new THREE.BoxGeometry(5, 6, 10),
@@ -100,7 +97,6 @@
       }
     );
 
-
     // bind events
     keyInputControl.addEventListener('movekeyon', function() { playerController.isRunning = true; });
     keyInputControl.addEventListener('movekeyoff', function() { playerController.isRunning = false; });
@@ -124,8 +120,6 @@
 
     });
 
-
-    ;
     (function update() {
 
       var delta = clock.getDelta();

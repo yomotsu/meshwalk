@@ -40,7 +40,6 @@
     octree = new MW.Octree(min, max, partition);
     world.add(octree);
 
-
     width = window.innerWidth;
     height = window.innerHeight;
     clock = new THREE.Clock();
@@ -50,7 +49,6 @@
     renderer = new THREE.WebGLRenderer();
     renderer.setSize(width, height);
     document.body.appendChild(renderer.domElement);
-
 
     ground = new THREE.Mesh(
       new THREE.PlaneBufferGeometry(30, 30, 10, 10),
@@ -69,7 +67,6 @@
     // wall.rotation.set( 0, 0, THREE.Math.degToRad( 20 ) );
     scene.add(wall);
     octree.importThreeMesh(wall);
-
 
     playerObjectHolder = new THREE.Object3D();
     playerObjectHolder.position.set(0, 10, 0);
@@ -93,8 +90,6 @@
     keyInputControl.addEventListener('movekeychange', function() { playerController.direction = keyInputControl.frontAngle; });
     keyInputControl.addEventListener('jumpkeypress', function() { playerController.jump(); });
 
-
-    ;
     (function update() {
 
       var delta = clock.getDelta();
