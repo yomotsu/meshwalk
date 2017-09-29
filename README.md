@@ -1,20 +1,10 @@
 # MeshWalk.js
 
+[![three.js](https://img.shields.io/badge/three.js-87-yellow.svg?style=flat-square)](https://threejs.org/docs/)
+
 MeshWalk.js is a JS library which helps your TPS game development with three.js.
 
-## Version Compatability
-
-THREE.js [r88 development](https://github.com/mrdoob/three.js/blob/2b1a620308ce4cd3388a840cc291773a74cfa52f/build/three.min.js)
-
-BLUEBIRD.js [3.5.0](https://cdn.jsdelivr.net/bluebird/latest/bluebird.min.js)
-
-`THREE.r74+ EventDispatcher.prototype.apply() changed to: EventDispatcher.apply()`
-
-`THREE.r84+ EventDispatcher.apply has been removed. Inherit or Object.assign the prototype to mix-in instead.`
-
-`THREE.r88 dev Compatible! :)`
-
-examples
+Examples:
 - [walkthrough: since it's done with previous version, the APIs are a little bit different](https://yomotsu.github.io/walkthrough/)
 - [xmas walkthrough](https://yomotsu.github.io/xmas2014/)
 
@@ -32,7 +22,5 @@ See following demos and check the source code with some comments.
 8. [remove collider](http://yomotsu.github.io/meshwalk.js/example/8_meshRemove.html)
 
 ## Outdated:
-
-`ex. 4&5 THREE.WireframeHelper has been removed. Use THREE.WireframeGeometry instead.`
 
 `ex. 6&7 THREE.MeshFaceMaterial has been removed. Use an Array instead.`
