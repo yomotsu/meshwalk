@@ -4,10 +4,6 @@
  */
 
 var MW = {};
-
-// @author yomotsu
-// MIT License
-
 MW.triangle = {}
 
 MW.triangle.makeBoundingBox = function ( triangle ) {
@@ -705,7 +701,6 @@ MW.triangle.makeBoundingSphere = function ( triangle, normal ) {
     constructor: ns.Octree,
 
     importThreeMesh: function ( threeMesh ) {
-
 
       var i, ii, l, ll,
           vec3 = new THREE.Vector3(),

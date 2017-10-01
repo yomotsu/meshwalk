@@ -1,12 +1,19 @@
-// @author yomotsu
-// MIT License
+// Author: yomotsu | info@pxgrid.com
+
+// Updated: nutiler | josh@stormheart.net
+
+// THREE.r74+ EventDispatcher.prototype.apply() changed to: EventDispatcher.apply()
+// THREE.r84+ EventDispatcher.apply has been removed. Inherit or Object.assign the prototype to mix-in instead.
+// THREE.r88 dev Compatible! :)
+
 ;( function ( THREE, ns ) {
 
   'use strict';
 
   ns.CharacterController = function ( object3d, radius ) {
-
-    THREE.EventDispatcher.prototype.apply( this );
+    
+    Object.assign( ns.CharacterController.prototype, EventDispatcher.prototype );
+    
     this.object = object3d;
     this.center = this.object.position.clone();
     this.radius = radius;
@@ -673,9 +680,9 @@ MW.AnimationController.prototype = {
 
   ns.KeyInputControl = function () {
     
-    THREE.EventDispatcher.prototype.apply( this );
-    this.isDisabled = false;
+    Object.assign( ns.KeyInputControl.prototype, EventDispatcher.prototype );
 
+    this.isDisabled = false;
     this.isUp    = false;
     this.isDown  = false;
     this.isLeft  = false;
@@ -882,7 +889,8 @@ MW.AnimationController.prototype = {
   // params.rigidObjects array of inctances of THREE.Mesh
   ns.TPSCameraControl = function ( camera, trackObject, params ) {
 
-    THREE.EventDispatcher.prototype.apply( this );
+    Object.assign( ns.TPSCameraControl.prototype, EventDispatcher.prototype );
+    
     this.camera = camera;
     this.trackObject  = trackObject;
     this.el           = params && params.el || document.body;

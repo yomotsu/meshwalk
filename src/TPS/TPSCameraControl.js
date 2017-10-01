@@ -23,7 +23,7 @@
   // params.rigidObjects array of inctances of THREE.Mesh
   ns.TPSCameraControl = function ( camera, trackObject, params ) {
 
-    THREE.EventDispatcher.prototype.apply( this );
+    Object.assign( ns.TPSCameraControl.prototype, EventDispatcher.prototype );
     this.camera = camera;
     this.trackObject  = trackObject;
     this.el           = params && params.el || document.body;

@@ -1,9 +1,10 @@
-## MeshWalk.js
+# MeshWalk.js
+
+[![three.js](https://img.shields.io/badge/three.js-87-yellow.svg?style=flat-square)](https://threejs.org/docs/)
 
 MeshWalk.js is a JS library which helps your TPS game development with three.js.
 
-examples
-
+Examples:
 - [walkthrough: since it's done with previous version, the APIs are a little bit different](https://yomotsu.github.io/walkthrough/)
 - [xmas walkthrough](https://yomotsu.github.io/xmas2014/)
 
@@ -19,3 +20,7 @@ See following demos and check the source code with some comments.
 6. [animationController](http://yomotsu.github.io/meshwalk.js/example/6_animationController.html)
 7. [all together](http://yomotsu.github.io/meshwalk.js/example/7_allTogether.html)
 8. [remove collider](http://yomotsu.github.io/meshwalk.js/example/8_meshRemove.html)
+
+## Outdated:
+
+`ex. 6&7 THREE.MeshFaceMaterial has been removed. Use an Array instead.`
