@@ -4,7 +4,16 @@
 <head>
   <meta charset="utf-8">
   <title>6: Animation Controller</title>
-  <link rel="stylesheet" href="./css/examples.css">
+  <style>
+  body{margin: 0;padding: 0; background: #000;}
+  canvas{display: block;}
+  .info{
+    color: #fff;
+    position: absolute;
+    top: 0;
+    left: 0;
+  }
+  </style>
 </head>
 
 <body>
@@ -25,7 +34,6 @@
   </div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/87/three.min.js"></script>
-  <!--<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/87/three.module.js"></script>-->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/es6-promise/4.1.1/es6-promise.auto.min.js"></script>
   
   <script src="../lib/three.eventdispatcher.js"></script>
@@ -34,6 +42,7 @@
   <script src="../build/meshwalk.TPS.min.js"></script>
   
   <script>
+  
     'use strict';
 
     var width, height, clock, scene, camera, renderer;
@@ -50,6 +59,7 @@
     renderer = new THREE.WebGLRenderer();
     renderer.setSize(width, height);
     document.body.appendChild(renderer.domElement);
+    
 
     ambientLight = new THREE.AmbientLight(0xffffff)
     scene.add(ambientLight);
@@ -86,6 +96,7 @@
       renderer.render(scene, camera);
 
     })();
+    
   </script>
 
 </body>
