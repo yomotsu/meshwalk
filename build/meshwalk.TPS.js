@@ -6,7 +6,8 @@
 
   ns.CharacterController = function ( object3d, radius ) {
 
-    THREE.EventDispatcher.prototype.apply( this );
+    Object.assign( ns.CharacterController.prototype, ns.EventDispatcher.prototype );
+
     this.object = object3d;
     this.center = this.object.position.clone();
     this.radius = radius;
@@ -673,7 +674,8 @@ MW.AnimationController.prototype = {
 
   ns.KeyInputControl = function () {
     
-    THREE.EventDispatcher.prototype.apply( this );
+    Object.assign( ns.KeyInputControl.prototype, ns.EventDispatcher.prototype );
+
     this.isDisabled = false;
 
     this.isUp    = false;
@@ -882,7 +884,8 @@ MW.AnimationController.prototype = {
   // params.rigidObjects array of inctances of THREE.Mesh
   ns.TPSCameraControl = function ( camera, trackObject, params ) {
 
-    THREE.EventDispatcher.prototype.apply( this );
+    Object.assign( ns.TPSCameraControl.prototype, ns.EventDispatcher.prototype );
+
     this.camera = camera;
     this.trackObject  = trackObject;
     this.el           = params && params.el || document.body;

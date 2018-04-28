@@ -19,9 +19,9 @@ canvas{display: block;}
   u can import terrain models as heightfields.
 </div>
 
-<script src="../lib/three.min.js"></script>
-<script src="../build/meshwalk.min.js"></script>
-<script src="../build/meshwalk.TPS.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/91/three.min.js"></script>
+<script src="../build/meshwalk.js"></script>
+<script src="../build/meshwalk.TPS.js"></script>
 <script>
 
 // See demo/3_cameraControl.html first
@@ -117,7 +117,10 @@ loader.load( 'terrain.json', function( geo, mat ) {
   );
   box.position.set( -3, 7.5, -13 );
   scene.add( box );
-  scene.add( new THREE.WireframeHelper( box ) );
+
+  const boxHelper = new THREE.WireframeHelper( box );
+  boxHelper.position.copy( box.position );
+  scene.add( boxHelper );
   octree.importThreeMesh( box );
 
 
@@ -128,7 +131,10 @@ loader.load( 'terrain.json', function( geo, mat ) {
   );
   terrain.scale.set( 2, 2, 2 );
   scene.add( terrain );
-  scene.add( new THREE.WireframeHelper( terrain ) );
+
+  const terrainHelper = new THREE.WireframeHelper( terrain );
+  terrainHelper.scale.copy( terrain.scale );
+  scene.add( terrainHelper );
   octree.importThreeMesh( terrain );
   tpsCameraControl.rigidObjects.push( terrain );
 

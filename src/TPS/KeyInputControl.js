@@ -27,7 +27,8 @@
 
   ns.KeyInputControl = function () {
     
-    THREE.EventDispatcher.prototype.apply( this );
+    Object.assign( ns.KeyInputControl.prototype, ns.EventDispatcher.prototype );
+
     this.isDisabled = false;
 
     this.isUp    = false;

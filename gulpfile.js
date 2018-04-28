@@ -28,6 +28,7 @@ gulp.task( 'scripts:core', function () {
     './src/core/meshwalk.js',
     './src/core/utils.js',
     './src/core/collision.js',
+    './src/core/EventDispatcher.js',
     './src/core/World.js',
     './src/core/Octree.js',
     './src/core/Collider.js'
