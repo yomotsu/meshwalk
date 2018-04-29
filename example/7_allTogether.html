@@ -18,11 +18,9 @@ canvas{display: block;}
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/92/three.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/es6-promise/4.1.1/es6-promise.auto.min.js"></script>
-<script src="../build/meshwalk.js"></script>
-<script src="../build/meshwalk.TPS.js"></script>
+<script src="../dist/meshwalk.js"></script>
 <script>
-
-'use strict';
+MW.install( THREE );
 
 var loadMesh = function ( url ) {
 
@@ -52,7 +50,6 @@ var keyInputControl;
 var tpsCameraControl;
 var animationController;
 var vent = new THREE.EventDispatcher();
-
 
 world = new MW.World();
 min = new THREE.Vector3( -15, -15, -15 );

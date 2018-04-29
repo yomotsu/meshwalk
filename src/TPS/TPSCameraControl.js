@@ -1,252 +1,231 @@
-// @author yomotsu
-// MIT License
-
-;( function ( THREE, ns ) {
-
-  'use strict';
-
-  var PI2     = Math.PI * 2,
-      PI_HALF = Math.PI / 2;
-
-  var modulo = function ( n, d ) {
+import EventDispatcher from '../core/EventDispatcher.js';
+
+const PI2     = Math.PI * 2;
+const PI_HALF = Math.PI / 2;
+
+const rotationMatrix = new THREE.Matrix4();
+const rotationX      = new THREE.Matrix4();
+const rotationY      = new THREE.Matrix4();
 
-    return ( ( n % d ) + d ) % d;
+// camera              isntance of THREE.Camera
+// trackObject         isntance of THREE.Object3D
+// params.el           DOM element
+// params.radius       number
+// params.minRadius    number
+// params.maxRadius    number
+// params.rigidObjects array of inctances of THREE.Mesh
+export class TPSCameraControl extends EventDispatcher {
+
+	constructor( camera, trackObject, params = {} ) {
+
+		super();
+
+		this.camera = camera;
+		this.trackObject  = trackObject;
+		this.el           = params.el || document.body;
+		this.offset       = params.offset || new THREE.Vector3( 0, 0, 0 ),
+		this.radius       = params.radius    || 10;
+		this.minRadius    = params.minRadius || 1;
+		this.maxRadius    = params.maxRadius || 30;
+		this.rigidObjects = params.rigidObjects || [];
+		this.lat   = 0;
+		this.lon   = 0;
+		this.phi   = 0; // angle of zenith
+		this.theta = 0; // angle of azimuth
+		this.mouseAccelerationX = params.mouseAccelerationX !== undefined ? params.mouseAccelerationX : 100;
+		this.mouseAccelerationY = params.mouseAccelerationY !== undefined ? params.mouseAccelerationY : 30;
+		this._pointerStart = { x: 0, y: 0 };
+		this._pointerLast  = { x: 0, y: 0 };
 
-  }
+		this.setNearPlainCornersWithPadding();
+		this.update();
 
-  // camera              isntance of THREE.Camera
-  // trackObject         isntance of THREE.Object3D
-  // params.el           DOM element
-  // params.radius       number
-  // params.minRadius    number
-  // params.maxRadius    number
-  // params.rigidObjects array of inctances of THREE.Mesh
-  ns.TPSCameraControl = function ( camera, trackObject, params ) {
+		this._mousedownListener = onmousedown.bind( this );
+		this._mouseupListener   = onmouseup.bind( this );
+		this._mousedragListener = onmousedrag.bind( this );
+		this._scrollListener    = onscroll.bind( this );
 
-    Object.assign( ns.TPSCameraControl.prototype, ns.EventDispatcher.prototype );
+		this.el.addEventListener( 'mousedown', this._mousedownListener );
+		this.el.addEventListener( 'mouseup',   this._mouseupListener );
+		this.el.addEventListener( 'mousewheel',     this._scrollListener );
+		this.el.addEventListener( 'DOMMouseScroll', this._scrollListener );
 
-    this.camera = camera;
-    this.trackObject  = trackObject;
-    this.el           = params && params.el || document.body;
-    this.offset       = params && params.offset || new THREE.Vector3( 0, 0, 0 ),
-    this.radius       = params && params.radius    || 10;
-    this.minRadius    = params && params.minRadius || 1;
-    this.maxRadius    = params && params.maxRadius || 30;
-    this.rigidObjects = params && params.rigidObjects || [];
-    this.lat   = 0;
-    this.lon   = 0;
-    this.phi   = 0; // angle of zenith
-    this.theta = 0; // angle of azimuth
-    this.mouseAccelerationX = params && params.mouseAccelerationX !== undefined ? params.mouseAccelerationX : 100;
-    this.mouseAccelerationY = params && params.mouseAccelerationY !== undefined ? params.mouseAccelerationY : 30;
-    this._pointerStart = { x: 0, y: 0 };
-    this._pointerLast  = { x: 0, y: 0 };
+	}
 
-    this.setNearPlainCornersWithPadding();
-    this.update();
+	update() {
 
-    this._mousedownListener = onmousedown.bind( this );
-    this._mouseupListener   = onmouseup.bind( this );
-    this._mousedragListener = onmousedrag.bind( this )
-    this._scrollListener    = onscroll.bind( this );
+		this._center = new THREE.Vector3(
+			this.trackObject.matrixWorld.elements[ 12 ] + this.offset.x,
+			this.trackObject.matrixWorld.elements[ 13 ] + this.offset.y,
+			this.trackObject.matrixWorld.elements[ 14 ] + this.offset.z
+		);
 
-    this.el.addEventListener( 'mousedown', this._mousedownListener, false );
-    this.el.addEventListener( 'mouseup',   this._mouseupListener,   false );
-    this.el.addEventListener( 'mousewheel',     this._scrollListener, false );
-    this.el.addEventListener( 'DOMMouseScroll', this._scrollListener, false );
+		const position = new THREE.Vector3(
+			Math.cos( this.phi ) * Math.cos( this.theta + PI_HALF ),
+			Math.sin( this.phi ),
+			Math.cos( this.phi ) * Math.sin( this.theta + PI_HALF )
+		);
+		const distance = this.collisionTest( position.clone().normalize() );
+		position.multiplyScalar( distance );
+		position.add( this._center );
+		this.camera.position.copy( position );
 
-  };
+		if ( this.lat === 90 ) {
 
-  ns.TPSCameraControl.prototype = {
+			this.camera.up.set(
+				Math.cos( this.theta + Math.PI ),
+				0,
+				Math.sin( this.theta + Math.PI )
+			);
 
-    constructor: ns.TPSCameraControl,
+		} else if ( this.lat === - 90 ) {
 
-    update: function () {
+			this.camera.up.set(
+				Math.cos( this.theta ),
+				0,
+				Math.sin( this.theta )
+			);
 
-      var position,
-          distance;
+		} else {
 
-      this._center = new THREE.Vector3(
-        this.trackObject.matrixWorld.elements[ 12 ] + this.offset.x,
-        this.trackObject.matrixWorld.elements[ 13 ] + this.offset.y,
-        this.trackObject.matrixWorld.elements[ 14 ] + this.offset.z
-      );
-      position = new THREE.Vector3(
-        Math.cos( this.phi ) * Math.cos( this.theta + PI_HALF ),
-        Math.sin( this.phi ),
-        Math.cos( this.phi ) * Math.sin( this.theta + PI_HALF )
-      );
-      distance = this.collisionTest( position.clone().normalize() );
-      position.multiplyScalar( distance );
-      position.add( this._center );
-      this.camera.position.copy( position );
+			this.camera.up.set( 0, 1, 0 );
 
-      if ( this.lat === 90 ) {
+		}
 
-        this.camera.up.set(
-          Math.cos( this.theta + Math.PI ),
-          0,
-          Math.sin( this.theta + Math.PI )
-        );
+		this.camera.lookAt( this._center );
+		this.dispatchEvent( { type: 'updated' } );
 
-      } else if ( this.lat === -90 ) {
+	}
 
-        this.camera.up.set(
-          Math.cos( this.theta ),
-          0,
-          Math.sin( this.theta )
-        );
+	getFrontAngle() {
 
-      } else {
+		return PI2 + this.theta;
 
-        this.camera.up.set( 0, 1, 0 );
+	}
 
-      }
+	setNearPlainCornersWithPadding() {
 
-      this.camera.lookAt( this._center );
-      this.dispatchEvent( { type: 'updated' } );
+		const near = this.camera.near;
+		const halfFov = this.camera.fov * 0.5;
+		const h = ( Math.tan( halfFov * THREE.Math.DEG2RAD ) * near );
+		const w = h * this.camera.aspect;
 
-    },
+		this.nearPlainCornersWithPadding = [
+			new THREE.Vector3( - w - near, - h - near, 0 ),
+			new THREE.Vector3(   w + near, - h - near, 0 ),
+			new THREE.Vector3(   w + near,   h + near, 0 ),
+			new THREE.Vector3( - w - near,   h + near, 0 )
+		];
 
-    getFrontAngle: function () {
+	}
 
-      return PI2 + this.theta;
+	setLatLon( lat, lon ) {
 
-    },
+		this.lat = lat > 90 ? 90 : lat < - 90 ? - 90 : lat;
+		this.lon = lon < 0 ? 360 + lon % 360 : lon % 360;
 
-    setNearPlainCornersWithPadding: function () {
+		this.phi   =   this.lat * THREE.Math.DEG2RAD;
+		this.theta = - this.lon * THREE.Math.DEG2RAD;
 
-      var near = this.camera.near,
-          halfFov = this.camera.fov * 0.5,
-          h = ( Math.tan( THREE.Math.degToRad( halfFov ) ) * near ),
-          w = h * this.camera.aspect;
+	}
 
-      this.nearPlainCornersWithPadding = [
-        new THREE.Vector3( -w - near, -h - near, 0 ),
-        new THREE.Vector3(  w + near, -h - near, 0 ),
-        new THREE.Vector3(  w + near,  h + near, 0 ),
-        new THREE.Vector3( -w - near,  h + near, 0 )
-      ];
+	collisionTest( direction ) {
 
-    },
+		let distance = this.radius;
 
-    setLatLon: function ( lat, lon ) {
+		rotationX.makeRotationX( this.phi );
+		rotationY.makeRotationY( this.theta );
+		rotationMatrix.multiplyMatrices( rotationX, rotationY );
 
-      this.lat = lat >  90 ?  90 :
-                 lat < -90 ? -90 :
-                 lat;
-      this.lon = lon < 0 ? 360 + lon % 360 : lon % 360;
+		for ( let i = 0; i < 4; i ++ ) {
 
-      this.phi   =  THREE.Math.degToRad( this.lat );
-      this.theta = -THREE.Math.degToRad( this.lon );
+			const nearPlainCorner = this.nearPlainCornersWithPadding[ i ].clone();
+			nearPlainCorner.applyMatrix4( rotationMatrix );
 
-    },
+			const origin = new THREE.Vector3(
+				this._center.x + nearPlainCorner.x,
+				this._center.y + nearPlainCorner.y,
+				this._center.z + nearPlainCorner.z
+			);
+			const raycaster = new THREE.Raycaster(
+				origin,           // origin
+				direction,        // direction
+				this.camera.near, // near
+				this.radius       // far
+			);
+			const intersects = raycaster.intersectObjects( this.rigidObjects );
 
-    collisionTest: function ( direction ) {
+			if ( intersects.length !== 0 && intersects[ 0 ].distance < distance ) {
 
-      var i,
-          distance = this.radius,
-          nearPlainCorner,
-          rotationMatrix = new THREE.Matrix4(),
-          rotationX = new THREE.Matrix4().makeRotationX( this.phi ),
-          rotationY = new THREE.Matrix4().makeRotationY( this.theta ),
-          origin,
-          raycaster,
-          intersects;
+				distance = intersects[ 0 ].distance;
 
-      rotationMatrix.multiplyMatrices( rotationX, rotationY );
+			}
 
-      for ( i = 0; i < 4; i ++ ) {
+		}
 
-        nearPlainCorner = this.nearPlainCornersWithPadding[ i ].clone();
-        nearPlainCorner.applyMatrix4( rotationMatrix );
+		return distance;
 
-        origin = new THREE.Vector3(
-          this._center.x + nearPlainCorner.x,
-          this._center.y + nearPlainCorner.y,
-          this._center.z + nearPlainCorner.z
-        );
-        raycaster = new THREE.Raycaster(
-          origin,           // origin
-          direction,        // direction
-          this.camera.near, // near
-          this.radius       // far
-        );
-        intersects = raycaster.intersectObjects( this.rigidObjects );
+	}
 
-        if ( intersects.length !== 0 && intersects[ 0 ].distance < distance ) {
+}
 
-          distance = intersects[ 0 ].distance;
+function onmousedown( event ) {
 
-        }
+	this.dispatchEvent( { type: 'mousedown' } );
+	this._pointerStart.x = event.clientX;
+	this._pointerStart.y = event.clientY;
+	this._pointerLast.x = this.lon;
+	this._pointerLast.y = this.lat;
+	this.el.removeEventListener( 'mousemove', this._mousedragListener, false );
+	this.el.addEventListener( 'mousemove', this._mousedragListener, false );
+	document.body.classList.add( 'js-TPSCameraDragging' );
 
-      }
+}
 
-      return distance;
+function onmouseup() {
 
-    }
+	this.dispatchEvent( { type: 'mouseup' } );
+	this.el.removeEventListener( 'mousemove', this._mousedragListener, false );
+	document.body.classList.remove( 'js-TPSCameraDragging' );
 
-  };
+}
 
-  function onmousedown ( event ) {
+function onmousedrag( event ) {
 
-    this.dispatchEvent( { type: 'mousedown' } );
-    this._pointerStart.x = event.clientX;
-    this._pointerStart.y = event.clientY;
-    this._pointerLast.x = this.lon;
-    this._pointerLast.y = this.lat;
-    this.el.removeEventListener( 'mousemove', this._mousedragListener, false );
-    this.el.addEventListener( 'mousemove', this._mousedragListener, false );
-    document.body.className += ' js-TPSCameraDragging';
+	const w = this.el.offsetWidth;
+	const h = this.el.offsetHeight;
+	const x = ( this._pointerStart.x - event.clientX ) / w * 2;
+	const y = ( this._pointerStart.y - event.clientY ) / h * 2;
 
-  }
+	this.setLatLon(
+		this._pointerLast.y + y * this.mouseAccelerationY,
+		this._pointerLast.x + x * this.mouseAccelerationX
+	);
 
-  function onmouseup () {
+}
 
-    this.dispatchEvent( { type: 'mouseup' } );
-    this.el.removeEventListener( 'mousemove', this._mousedragListener, false );
-    document.body.className = document.body.className.replace( / js-TPSCameraDragging/, '' );
+function onscroll( event ) {
 
-  }
+	event.preventDefault();
 
-  function onmousedrag ( event ) {
+	if ( event.wheelDeltaY ) {
 
-    var w = this.el.offsetWidth,
-        h = this.el.offsetHeight,
-        x = ( this._pointerStart.x - event.clientX ) / w * 2,
-        y = ( this._pointerStart.y - event.clientY ) / h * 2;
+		// WebKit
+		this.radius -= event.wheelDeltaY * 0.05 / 5;
 
-    this.setLatLon(
-      this._pointerLast.y + y * this.mouseAccelerationY,
-      this._pointerLast.x + x * this.mouseAccelerationX
-    );
+	} else if ( event.wheelDelta ) {
 
-  }
+		// IE
+		this.radius -= event.wheelDelta * 0.05 / 5;
 
-  function onscroll ( event ) {
+	} else if ( event.detail ) {
 
-    event.preventDefault();
+		// Firefox
+		this.radius += event.detail / 5;
 
-    if ( event.wheelDeltaY ) {
+	}
 
-      // WebKit
-      this.radius -= event.wheelDeltaY * 0.05 / 5;
+	this.radius = Math.max( this.radius, this.minRadius );
+	this.radius = Math.min( this.radius, this.maxRadius );
 
-    } else if ( event.wheelDelta ) {
-
-      // IE
-      this.radius -= event.wheelDelta * 0.05 / 5;
-
-    } else if ( event.detail ) {
-
-      // Firefox
-      this.radius += event.detail / 5;
-
-    }
-
-    this.radius = Math.max( this.radius, this.minRadius );
-    this.radius = Math.min( this.radius, this.maxRadius );
-
-  }
-
-} )( THREE, MW );
+}

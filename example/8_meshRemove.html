@@ -21,13 +21,12 @@ canvas{display: block;}
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/92/three.min.js"></script>
-<script src="../build/meshwalk.js"></script>
-<script src="../build/meshwalk.TPS.js"></script>
+<script src="../dist/meshwalk.js"></script>
 <script>
 
 // See demo/1_getstarted.html first
 
-'use strict';
+MW.install( THREE );
 
 var width, height, clock, scene, camera, renderer;
 var ground, wall, sphere;

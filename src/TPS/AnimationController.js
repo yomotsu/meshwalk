@@ -1,126 +1,115 @@
-// @author yomotsu
-// MIT License
+const TURN_DURATION = 200;
+const TAU = 2 * Math.PI;
+const modulo = ( n, d ) => ( ( n % d ) + d ) % d;
+const getDeltaTurnAngle = ( current, target ) => {
 
-MW.AnimationController = function ( mesh ) {
+	const a = modulo( ( current - target ), TAU );
+	const b = modulo( ( target - current ), TAU );
 
-  this.mesh   = mesh;
-  this.motion = {};
-  this.mixer  = new THREE.AnimationMixer( mesh );
-  this.currentMotionName = '';
-
-  var i, l, anim;
-
-  for ( i = 0, l = this.mesh.geometry.animations.length; i < l; i ++ ) {
-
-    anim = this.mesh.geometry.animations[ i ];
-    this.motion[ anim.name ] = this.mixer.clipAction( anim );
-    this.motion[ anim.name ].setEffectiveWeight( 1 );
-
-  }
+	return a < b ? - a : b;
 
 };
 
-MW.AnimationController.prototype = {
+export class AnimationController {
 
-  play: function ( name ) {
+	constructor( mesh ) {
 
-    if ( this.currentMotionName === name ) { return; }
+		this.mesh   = mesh;
+		this.motion = {};
+		this.mixer  = new THREE.AnimationMixer( mesh );
+		this.currentMotionName = '';
 
-    if ( this.motion[ this.currentMotionName ] ) {
+		for ( let i = 0, l = this.mesh.geometry.animations.length; i < l; i ++ ) {
 
-      var from = this.motion[ this.currentMotionName ].play();
-      var to   = this.motion[ name ].play();
+			const anim = this.mesh.geometry.animations[ i ];
+			this.motion[ anim.name ] = this.mixer.clipAction( anim );
+			this.motion[ anim.name ].setEffectiveWeight( 1 );
 
-      from.enabled = true;
-      to.enabled = true;
+		}
 
-      from.crossFadeTo( to, .3 );
+	}
 
-    } else {
+	play( name ) {
 
-      this.motion[ name ].enabled = true;
-      this.motion[ name ].play();
+		if ( this.currentMotionName === name ) return;
 
-    }
+		if ( this.motion[ this.currentMotionName ] ) {
 
-    this.currentMotionName = name;
+			const from = this.motion[ this.currentMotionName ].play();
+			const to   = this.motion[ name ].play();
 
-  },
+			from.enabled = true;
+			to.enabled = true;
 
-  turn: function () {
+			from.crossFadeTo( to, .3 );
 
-    var DURATION  = 200;
-    var TAU = 2 * Math.PI;
+		} else {
 
-    var mod = function ( a, n ) { return ( a % n + n ) % n; }
+			this.motion[ name ].enabled = true;
+			this.motion[ name ].play();
 
-    var getDeltaAngle = function ( current, target ) {
+		}
 
-      var a = mod( ( current - target ), TAU );
-      var b = mod( ( target - current ), TAU );
+		this.currentMotionName = name;
 
-      return a < b ? -a : b;
+	}
 
-    };
+	turn( rad, immediate ) {
 
-    return function ( rad, immediate ) {
+		const that       = this;
+		const prevRotY   = this.mesh.rotation.y;
+		const targetRotY = rad;
+		const deltaY     = getDeltaTurnAngle( prevRotY, targetRotY );
+		// const duration   = Math.abs( deltaY ) * 100;
+		const start      = Date.now();
+		const end        = start + TURN_DURATION;
 
+		let progress   = 0;
 
-      var that       = this;
-      var progress   = 0;
-      var prevRotY   = this.mesh.rotation.y;
-      var targetRotY = rad;
-      var deltaY     = getDeltaAngle( prevRotY, targetRotY );
-      // var duration   = Math.abs( deltaY ) * 100;
-      var start      = Date.now();
-      var end        = start + DURATION;
+		if ( immediate ) {
 
-      if ( immediate ) {
+		  this.mesh.rotation.y = targetRotY;
+		  return;
 
-        this.mesh.rotation.y = targetRotY;
-        return;
+		}
 
-      }
+		if ( this._targetRotY === targetRotY ) return;
 
-      if ( this._targetRotY === targetRotY ) { return; }
+		this._targetRotY = targetRotY;
 
-      this._targetRotY = targetRotY;
+		{
 
-      ( function () {
+			let _targetRotY = targetRotY;
 
-        var _targetRotY = targetRotY;
+			( function interval() {
 
-        ( function interval () {
+				const now = Date.now();
+				const isAborted = _targetRotY !== that._targetRotY;
 
-          var now = Date.now();
-          var isAborted = _targetRotY !== that._targetRotY;
+				if ( isAborted ) return;
 
-          if ( isAborted ) { return; }
+				if ( now >= end ) {
 
-          if ( now >= end ) {
+				  that.mesh.rotation.y = _targetRotY;
+				  delete that._targetRotY;
+				  return;
 
-            that.mesh.rotation.y = _targetRotY;
-            delete that._targetRotY;
-            return;
+				}
 
-          }
+				requestAnimationFrame( interval );
+				progress = ( now - start ) / TURN_DURATION;
+				that.mesh.rotation.y = prevRotY + deltaY * progress;
 
-          requestAnimationFrame( interval );
-          progress = ( now - start ) / DURATION;
-          that.mesh.rotation.y = prevRotY + deltaY * progress;
+			} )();
 
-        } )();
+		}
 
-      } )();
+	}
 
-    }
+	update( delta ) {
 
-  }(),
+		this.mixer.update( delta );
 
-  update: function ( delta ) {
+	}
 
-    this.mixer.update( delta );
-
-  }
-
-};
+}

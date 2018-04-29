@@ -1,213 +1,210 @@
-// @author yomotsu
-// MIT License
+import EventDispatcher from '../core/EventDispatcher.js';
 
-;( function ( THREE, ns ) {
+const KEY_W     = 87;
+const KEY_UP    = 38;
+const KEY_S     = 83;
+const KEY_DOWN  = 40;
+const KEY_A     = 65;
+const KEY_LEFT  = 37;
+const KEY_D     = 68;
+const KEY_RIGHT = 39;
+const KEY_SPACE = 32;
 
-  'use strict';
+const DEG2RAD = Math.PI / 180;
+const DEG_0   =   0 * DEG2RAD;
+const DEG_45  =  45 * DEG2RAD;
+const DEG_90  =  90 * DEG2RAD;
+const DEG_135 = 135 * DEG2RAD;
+const DEG_180 = 180 * DEG2RAD;
+const DEG_225 = 225 * DEG2RAD;
+const DEG_270 = 270 * DEG2RAD;
+const DEG_315 = 315 * DEG2RAD;
+const DEG_360 = 360 * DEG2RAD;
 
-  var KEY_W     = 87,
-      KEY_UP    = 38,
-      KEY_S     = 83,
-      KEY_DOWN  = 40,
-      KEY_A     = 65,
-      KEY_LEFT  = 37,
-      KEY_D     = 68,
-      KEY_RIGHT = 39,
-      KEY_SPACE = 32;
+export class KeyInputControl extends EventDispatcher {
 
-  var DEG_0   = THREE.Math.degToRad(   0 ),
-      DEG_45  = THREE.Math.degToRad(  45 ),
-      DEG_90  = THREE.Math.degToRad(  90 ),
-      DEG_135 = THREE.Math.degToRad( 135 ),
-      DEG_180 = THREE.Math.degToRad( 180 ),
-      DEG_225 = THREE.Math.degToRad( 225 ),
-      DEG_270 = THREE.Math.degToRad( 270 ),
-      DEG_315 = THREE.Math.degToRad( 315 ),
-      DEG_360 = THREE.Math.degToRad( 360 );
+	constructor() {
 
-  ns.KeyInputControl = function () {
-    
-    Object.assign( ns.KeyInputControl.prototype, ns.EventDispatcher.prototype );
+		super();
 
-    this.isDisabled = false;
+		this.isDisabled = false;
 
-    this.isUp    = false;
-    this.isDown  = false;
-    this.isLeft  = false;
-    this.isRight = false;
-    this.isMoveKeyHolded = false;
-    this.frontAngle = 0;
+		this.isUp    = false;
+		this.isDown  = false;
+		this.isLeft  = false;
+		this.isRight = false;
+		this.isMoveKeyHolded = false;
+		this.frontAngle = 0;
 
-    this._keydownListener = onkeydown.bind( this );
-    this._keyupListener   = onkeyup.bind( this );
-    this._blurListener    = onblur.bind( this );
+		this._keydownListener = onkeydown.bind( this );
+		this._keyupListener   = onkeyup.bind( this );
+		this._blurListener    = onblur.bind( this );
 
-    window.addEventListener( 'keydown', this._keydownListener, false );
-    window.addEventListener( 'keyup',   this._keyupListener,   false );
-    window.addEventListener( 'blur',    this._blurListener,    false );
+		window.addEventListener( 'keydown', this._keydownListener );
+		window.addEventListener( 'keyup',   this._keyupListener   );
+		window.addEventListener( 'blur',    this._blurListener    );
 
-  }
+	}
 
-  ns.KeyInputControl.prototype.jump = function () {
+	jump() {
 
-    this.dispatchEvent( { type: 'jumpkeypress' } );
+		this.dispatchEvent( { type: 'jumpkeypress' } );
 
-  };
+	}
 
-  ns.KeyInputControl.prototype.updateAngle = function () {
+	updateAngle() {
 
-    var up    = this.isUp;
-    var down  = this.isDown;
-    var left  = this.isLeft;
-    var right = this.isRight;
+		var up    = this.isUp;
+		var down  = this.isDown;
+		var left  = this.isLeft;
+		var right = this.isRight;
 
-    if (  up && !left && !down && !right )      { this.frontAngle = DEG_0  ; }
-    else if (  up &&  left && !down && !right ) { this.frontAngle = DEG_45 ; }
-    else if ( !up &&  left && !down && !right ) { this.frontAngle = DEG_90 ; }
-    else if ( !up &&  left &&  down && !right ) { this.frontAngle = DEG_135; }
-    else if ( !up && !left &&  down && !right ) { this.frontAngle = DEG_180; }
-    else if ( !up && !left &&  down &&  right ) { this.frontAngle = DEG_225; }
-    else if ( !up && !left && !down &&  right ) { this.frontAngle = DEG_270; }
-    else if (  up && !left && !down &&  right ) { this.frontAngle = DEG_315; }
+		if      (   up && ! left && ! down && ! right ) this.frontAngle = DEG_0;
+		else if (   up &&   left && ! down && ! right ) this.frontAngle = DEG_45;
+		else if ( ! up &&   left && ! down && ! right ) this.frontAngle = DEG_90;
+		else if ( ! up &&   left &&   down && ! right ) this.frontAngle = DEG_135;
+		else if ( ! up && ! left &&   down && ! right ) this.frontAngle = DEG_180;
+		else if ( ! up && ! left &&   down &&   right ) this.frontAngle = DEG_225;
+		else if ( ! up && ! left && ! down &&   right ) this.frontAngle = DEG_270;
+		else if (   up && ! left && ! down &&   right ) this.frontAngle = DEG_315;
 
-  };
+	}
 
+}
 
-  function onkeydown ( e ) {
+function onkeydown( event ) {
 
-    if ( this.isDisabled ) { return; }
+	if ( this.isDisabled ) return;
 
-    switch ( e.keyCode ) {
+	switch ( event.keyCode ) {
 
-      case KEY_W :
-      case KEY_UP :
-        this.isUp = true;
-        break;
+		case KEY_W :
+		case KEY_UP :
+			this.isUp = true;
+			break;
 
-      case KEY_S :
-      case KEY_DOWN :
-        this.isDown = true;
-        break;
+		case KEY_S :
+		case KEY_DOWN :
+			this.isDown = true;
+			break;
 
-      case KEY_A :
-      case KEY_LEFT :
-        this.isLeft = true;
-        break;
+		case KEY_A :
+		case KEY_LEFT :
+			this.isLeft = true;
+			break;
 
-      case KEY_D :
-      case KEY_RIGHT :
-        this.isRight = true;
-        break;
+		case KEY_D :
+		case KEY_RIGHT :
+			this.isRight = true;
+			break;
 
-      case KEY_SPACE :
-        this.jump();
-        break;
+		case KEY_SPACE :
+			this.jump();
+			break;
 
-      default:
-        return;
+		default:
+			return;
 
-    }
-    
-    var prevAngle = this.frontAngle;
+	}
 
-    this.updateAngle();
+	var prevAngle = this.frontAngle;
 
-    if ( prevAngle !== this.frontAngle ) {
+	this.updateAngle();
 
-      this.dispatchEvent( { type: 'movekeychange' } );
+	if ( prevAngle !== this.frontAngle ) {
 
-    }
+		this.dispatchEvent( { type: 'movekeychange' } );
 
-    if (
-      ( this.isUp || this.isDown || this.isLeft || this.isRight ) &&
-      !this.isMoveKeyHolded
-    ) {
+	}
 
-      this.isMoveKeyHolded = true;
-      this.dispatchEvent( { type: 'movekeyon' } );
+	if (
+		( this.isUp || this.isDown || this.isLeft || this.isRight ) &&
+		! this.isMoveKeyHolded
+	) {
 
-    }
+		this.isMoveKeyHolded = true;
+		this.dispatchEvent( { type: 'movekeyon' } );
 
-  }
+	}
 
-  function onkeyup ( e ) {
+}
 
-    if ( this.isDisabled ) { return; }
+function onkeyup( event ) {
 
-    switch ( e.keyCode ) {
+	if ( this.isDisabled ) return;
 
-      case KEY_W :
-      case KEY_UP :
-        this.isUp = false;
-        break;
+	switch ( event.keyCode ) {
 
-      case KEY_S :
-      case KEY_DOWN :
-        this.isDown = false;
-        break;
-        
-      case KEY_A :
-      case KEY_LEFT :
-        this.isLeft = false;
-        break;
+		case KEY_W :
+		case KEY_UP :
+			this.isUp = false;
+			break;
 
-      case KEY_D :
-      case KEY_RIGHT :
-        this.isRight = false;
-        break;
+		case KEY_S :
+		case KEY_DOWN :
+			this.isDown = false;
+			break;
 
-      case KEY_SPACE :
-        break;
+		case KEY_A :
+		case KEY_LEFT :
+			this.isLeft = false;
+			break;
 
-      default:
-        return;
+		case KEY_D :
+		case KEY_RIGHT :
+			this.isRight = false;
+			break;
 
-    }
-    
-    var prevAngle = this.frontAngle;
+		case KEY_SPACE :
+			break;
 
-    this.updateAngle();
+		default:
+			return;
 
-    if ( prevAngle !== this.frontAngle ) {
+	}
 
-      this.dispatchEvent( { type: 'movekeychange' } );
+	var prevAngle = this.frontAngle;
 
-    }
+	this.updateAngle();
 
-    if ( !this.isUp && !this.isDown && !this.isLeft && !this.isRight &&
-      (
-           e.keyCode === KEY_W
-        || e.keyCode === KEY_UP
-        || e.keyCode === KEY_S
-        || e.keyCode === KEY_DOWN
-        || e.keyCode === KEY_A
-        || e.keyCode === KEY_LEFT
-        || e.keyCode === KEY_D
-        || e.keyCode === KEY_RIGHT
-      )
-    ) {
+	if ( prevAngle !== this.frontAngle ) {
 
-      this.isMoveKeyHolded = false;
-      this.dispatchEvent( { type: 'movekeyoff' } );
+		this.dispatchEvent( { type: 'movekeychange' } );
 
-    }
+	}
 
-  }
+	if ( ! this.isUp && ! this.isDown && ! this.isLeft && ! this.isRight &&
+		(
+			   event.keyCode === KEY_W
+			|| event.keyCode === KEY_UP
+			|| event.keyCode === KEY_S
+			|| event.keyCode === KEY_DOWN
+			|| event.keyCode === KEY_A
+			|| event.keyCode === KEY_LEFT
+			|| event.keyCode === KEY_D
+			|| event.keyCode === KEY_RIGHT
+		)
+	) {
 
-  function onblur ( e ) {
+		this.isMoveKeyHolded = false;
+		this.dispatchEvent( { type: 'movekeyoff' } );
 
-    this.isUp    = false;
-    this.isDown  = false;
-    this.isLeft  = false;
-    this.isRight = false;
-    
-    if ( this.isMoveKeyHolded ) {
+	}
 
-      this.isMoveKeyHolded = false;
-      this.dispatchEvent( { type: 'movekeyoff' } );
+}
 
-    }
+function onblur() {
 
-  }
+	this.isUp    = false;
+	this.isDown  = false;
+	this.isLeft  = false;
+	this.isRight = false;
 
-} )( THREE, MW );
+	if ( this.isMoveKeyHolded ) {
+
+		this.isMoveKeyHolded = false;
+		this.dispatchEvent( { type: 'movekeyoff' } );
+
+	}
+
+}

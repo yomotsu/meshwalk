@@ -26,13 +26,10 @@ canvas{display: block;}
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/92/three.min.js"></script>
-<script src="../build/meshwalk.js"></script>
-<script src="../build/meshwalk.TPS.js"></script>
+<script src="../dist/meshwalk.js"></script>
 <script>
 
 // See demo/2_keyboardInput.html first
-
-'use strict';
 
 var width, height, clock, scene, camera, renderer;
 var light, ground, object1, object2, object3, object4, object5, sphere;
@@ -40,6 +37,8 @@ var world, min, max, partition, octree,
     playerRadius = 1, playerObjectHolder, playerController;
 var keyInputControl;
 var tpsCameraControl;
+
+MW.install( THREE );
 
 world = new MW.World();
 min = new THREE.Vector3( -50, -50, -50 );

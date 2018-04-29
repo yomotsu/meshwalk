@@ -1,64 +1,53 @@
-// @author yomotsu
-// MIT License
+import { THREE } from '../install.js';
+import { Octree } from './Octree.js';
 
-;( function ( THREE, ns ) {
+export class World {
 
-  'use strict';
+	constructor() {
 
-  ns.World = function () {
+		this.colliderPool = [];
+		this.characterPool = [];
 
-    // console.log( 'THREEFIELD.World' );
+	}
 
-    this.colliderPool  = [];
-    this.characterPool = [];
+	add( object ) {
 
-  };
+		if ( object.isOctree ) {
 
-  ns.World.prototype.add = function ( object ) {
-    
-    if ( object instanceof ns.Octree ) {
+			this.colliderPool.push( object );
 
-      this.colliderPool.push( object );
+		} else if ( object.isCharacterController ) {
 
-    } else if ( object instanceof ns.CharacterController ) {
+			this.characterPool.push( object );
+			object.world = this;
 
-      this.characterPool.push( object );
-      object.world = this;
+		}
 
-    }
+	}
 
-  };
+	step( dt ) {
 
-  ns.World.prototype.step = function ( dt ) {
+		for ( let i = 0, l = this.characterPool.length; i < l; i ++ ) {
 
-    var character,
-        octree,
-        sphere,
-        intersectedNodes,
-        faces,
-        contactInfo,
-        i, ii, iii, l, ll, lll;
+			const character = this.characterPool[ i ];
+			let faces;
 
-    for ( i = 0, l = this.characterPool.length; i < l; i ++ ) {
+			// octree で絞られた node に含まれる face だけを
+			// charactore に渡して判定する
+			for ( let ii = 0, ll = this.colliderPool.length; ii < ll; ii ++ ) {
 
-      character = this.characterPool[ i ];
+				const octree = this.colliderPool[ ii ];
+				const sphere = new THREE.Sphere( character.center, character.radius + character.groundPadding );
+				const intersectedNodes = octree.getIntersectedNodes( sphere, octree.maxDepth );
+				faces = Octree.uniqTriangkesfromNodes( intersectedNodes );
 
-      // octree で絞られた node に含まれる face だけを
-      // charactore に渡して判定する
-      for ( ii = 0, ll = this.colliderPool.length; ii < ll; ii ++ ) {
+			}
 
-        octree = this.colliderPool[ ii ];
-        sphere = new THREE.Sphere( character.center, character.radius + character.groundPadding );
-        intersectedNodes = octree.getIntersectedNodes( sphere, octree.maxDepth );
-        faces = ns.Octree.uniqTriangkesfromNodes( intersectedNodes );
+			character.collisionCandidate = faces;
+			character.update( dt );
 
-      }
-      
-      character.collisionCandidate = faces;
-      character.update( dt );
+		}
 
-    }
+	}
 
-  };
-
-} )( THREE, MW );
+}

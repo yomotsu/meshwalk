@@ -32,17 +32,15 @@ canvas{display: block;}
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/92/three.min.js"></script>
-<script src="../build/meshwalk.js"></script>
-<script src="../build/meshwalk.TPS.js"></script>
+<script src="../dist/meshwalk.js"></script>
 <script>
-
-'use strict';
 
 var width, height, clock, scene, camera, renderer;
 var loader = new THREE.JSONLoader();
 var ambientLight, characterMesh;
 var animationController;
 
+MW.install( THREE );
 
 width = window.innerWidth;
 height = window.innerHeight;
