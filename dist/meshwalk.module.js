@@ -1068,12 +1068,7 @@ var CharacterController = function (_EventDispatcher) {
 												_this.dispatchEvent({ type: 'startFalling' });
 									}
 
-									if (!wasGrounded && _this.isGrounded) {
-												// startIdlingが先に発生している問題がある
-												// TODO このイベントのn秒後にstartIdlingを始めるように変更する
-												// this.dispatchEvent( { type: 'endJumping' } );
-
-									}
+									if (!wasGrounded && _this.isGrounded) ;
 
 									wasGrounded = _this.isGrounded;
 									wasOnSlope = _this.isOnSlope;

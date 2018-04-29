@@ -18,7 +18,8 @@
   "scripts": {
     "dev": "npm run watch",
     "watch": "rollup --config --watch",
-    "build": "rollup --config && uglifyjs dist/meshwalk.js -cm --preamble \"/*!\n * meshwalk\n * https://github.com/yomotsu/meshwalk\n * (c) 2014 @yomotsu\n * Released under the MIT License.\n */\" > dist/meshwalk.min.js"
+    "build": "rollup --config && uglifyjs dist/meshwalk.js -cm --preamble \"/*!\n * meshwalk\n * https://github.com/yomotsu/meshwalk\n * (c) 2014 @yomotsu\n * Released under the MIT License.\n */\" > dist/meshwalk.min.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [
     "three",
