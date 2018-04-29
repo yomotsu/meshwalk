@@ -4,7 +4,7 @@
   "author": "Yomotsu",
   "license": "MIT",
   "main": "dist/meshwalk.js",
-  "repository": "yomotsu/meshwalk",
+  "repository": "yomotsu/meshwalk.js",
   "jsnext:main": "dist/meshwalk.module.js",
   "module": "dist/meshwalk.module.js",
   "devDependencies": {
