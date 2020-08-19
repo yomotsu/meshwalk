@@ -1,19 +1,29 @@
+import { THREE } from '../install.js';
+import { onInstallHandlers } from '../install.js';
 import EventDispatcher from '../core/EventDispatcher.js';
 
 const PI2     = Math.PI * 2;
 const PI_HALF = Math.PI / 2;
 
-const rotationMatrix = new THREE.Matrix4();
-const rotationX      = new THREE.Matrix4();
-const rotationY      = new THREE.Matrix4();
+let rotationMatrix;
+let rotationX;
+let rotationY;
 
-// camera              isntance of THREE.Camera
-// trackObject         isntance of THREE.Object3D
+onInstallHandlers.push( () => {
+
+	rotationMatrix = new THREE.Matrix4();
+	rotationX      = new THREE.Matrix4();
+	rotationY      = new THREE.Matrix4();
+
+} );
+
+// camera              instance of THREE.Camera
+// trackObject         instance of THREE.Object3D
 // params.el           DOM element
 // params.radius       number
 // params.minRadius    number
 // params.maxRadius    number
-// params.rigidObjects array of inctances of THREE.Mesh
+// params.rigidObjects array of instances of THREE.Mesh
 export class TPSCameraControl extends EventDispatcher {
 
 	constructor( camera, trackObject, params = {} ) {
@@ -40,15 +50,15 @@ export class TPSCameraControl extends EventDispatcher {
 		this.setNearPlainCornersWithPadding();
 		this.update();
 
-		this._mousedownListener = onmousedown.bind( this );
-		this._mouseupListener   = onmouseup.bind( this );
-		this._mousedragListener = onmousedrag.bind( this );
-		this._scrollListener    = onscroll.bind( this );
+		this._onMouseDown = onMouseDown.bind( this );
+		this._onMouseUp   = onMouseUp.bind( this );
+		this._onMouseDrag = onMouseDrag.bind( this );
+		this._onScroll    = onScroll.bind( this );
 
-		this.el.addEventListener( 'mousedown', this._mousedownListener );
-		this.el.addEventListener( 'mouseup',   this._mouseupListener );
-		this.el.addEventListener( 'mousewheel',     this._scrollListener );
-		this.el.addEventListener( 'DOMMouseScroll', this._scrollListener );
+		this.el.addEventListener( 'mousedown', this._onMouseDown );
+		this.el.addEventListener( 'mouseup',   this._onMouseUp );
+		this.el.addEventListener( 'mousewheel',     this._onScroll );
+		this.el.addEventListener( 'DOMMouseScroll', this._onScroll );
 
 	}
 
@@ -169,28 +179,28 @@ export class TPSCameraControl extends EventDispatcher {
 
 }
 
-function onmousedown( event ) {
+function onMouseDown( event ) {
 
 	this.dispatchEvent( { type: 'mousedown' } );
 	this._pointerStart.x = event.clientX;
 	this._pointerStart.y = event.clientY;
 	this._pointerLast.x = this.lon;
 	this._pointerLast.y = this.lat;
-	this.el.removeEventListener( 'mousemove', this._mousedragListener, false );
-	this.el.addEventListener( 'mousemove', this._mousedragListener, false );
+	this.el.removeEventListener( 'mousemove', this._onMouseDrag, false );
+	this.el.addEventListener( 'mousemove', this._onMouseDrag, false );
 	document.body.classList.add( 'js-TPSCameraDragging' );
 
 }
 
-function onmouseup() {
+function onMouseUp() {
 
 	this.dispatchEvent( { type: 'mouseup' } );
-	this.el.removeEventListener( 'mousemove', this._mousedragListener, false );
+	this.el.removeEventListener( 'mousemove', this._onMouseDrag, false );
 	document.body.classList.remove( 'js-TPSCameraDragging' );
 
 }
 
-function onmousedrag( event ) {
+function onMouseDrag( event ) {
 
 	const w = this.el.offsetWidth;
 	const h = this.el.offsetHeight;
@@ -204,7 +214,7 @@ function onmousedrag( event ) {
 
 }
 
-function onscroll( event ) {
+function onScroll( event ) {
 
 	event.preventDefault();
 

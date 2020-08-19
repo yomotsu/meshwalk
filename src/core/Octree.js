@@ -89,7 +89,7 @@ export class Octree {
 
 		const geometryId = threeMesh.geometry.uuid;
 		const geometry   = threeMesh.geometry.clone();
-		geometry.applyMatrix( threeMesh.matrix );
+		geometry.applyMatrix4( threeMesh.matrix );
 		geometry.computeVertexNormals();
 
 		if ( geometry instanceof THREE.BufferGeometry ) {
@@ -99,7 +99,8 @@ export class Octree {
 				const indices   = geometry.index.array;
 				const positions = geometry.attributes.position.array;
 				// const normals   = geometry.attributes.normal.array;
-				const offsets   = ( geometry.groups.length !== 0 ) ? geometry.groups : [ { start: 0, count: indices.length, index: 0 } ];
+
+				const offsets   = ( geometry.groups.length !== 0 ) ? geometry.groups : [ { start: 0, count: indices.length, materialIndex: 0 } ];
 
 				for ( let i = 0, l = offsets.length; i < l; ++ i ) {
 
@@ -286,13 +287,15 @@ Octree.separate3Bit = function ( n ) {
 
 Octree.getMortonNumber = function ( x, y, z ) {
 
-	return Octree.separate3Bit( x ) |
-	       Octree.separate3Bit( y ) << 1 |
-	       Octree.separate3Bit( z ) << 2;
+	return (
+		Octree.separate3Bit( x ) |
+		Octree.separate3Bit( y ) << 1 |
+		Octree.separate3Bit( z ) << 2
+	);
 
 };
 
-Octree.uniqTriangkesfromNodes = function ( nodes ) {
+Octree.uniqTrianglesFromNodes = function ( nodes ) {
 
 	const uniq = [];
 	let isContained = false;

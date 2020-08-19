@@ -20,10 +20,9 @@ canvas{display: block;}
   <button onclick="removeBox();">remove box collision</button>
 </div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/92/three.min.js"></script>
-<script src="../dist/meshwalk.js"></script>
-<script>
-
+<script type="module">
+import * as THREE from 'https://unpkg.com/three@0.119.1/build/three.module.js';
+import * as MW from '../dist/meshwalk.module.js';
 // See demo/1_getstarted.html first
 
 MW.install( THREE );

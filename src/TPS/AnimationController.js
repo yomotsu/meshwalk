@@ -68,8 +68,8 @@ export class AnimationController {
 
 		if ( immediate ) {
 
-		  this.mesh.rotation.y = targetRotY;
-		  return;
+			this.mesh.rotation.y = targetRotY;
+			return;
 
 		}
 
@@ -90,9 +90,9 @@ export class AnimationController {
 
 				if ( now >= end ) {
 
-				  that.mesh.rotation.y = _targetRotY;
-				  delete that._targetRotY;
-				  return;
+					that.mesh.rotation.y = _targetRotY;
+					delete that._targetRotY;
+					return;
 
 				}
 

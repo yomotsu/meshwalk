@@ -1,3 +1,5 @@
+import { THREE } from '../install.js';
+
 // aabb: <THREE.Box3>
 // Plane: <THREE.Plane>
 export function isIntersectionAABBPlane( aabb, Plane ) {
@@ -162,12 +164,14 @@ export function isIntersectionTriangleAABB( a, b, c, aabb ) {
 		return false;
 
 	}
+
 	// ... [-extents.y, extents.y] and [min(v0.y,v1.y,v2.y), max(v0.y,v1.y,v2.y)] do not overlap
 	if ( Math.max( v0.y, v1.y, v2.y ) < - extents.y || Math.min( v0.y, v1.y, v2.y ) > extents.y ) {
 
 		return false;
 
 	}
+
 	// ... [-extents.z, extents.z] and [min(v0.z,v1.z,v2.z), max(v0.z,v1.z,v2.z)] do not overlap
 	if ( Math.max( v0.z, v1.z, v2.z ) < - extents.z || Math.min( v0.z, v1.z, v2.z ) > extents.z ) {
 
@@ -229,7 +233,7 @@ export function isIntersectionSphereTriangle( sphere, a, b, c, normal ) {
 
 	// http://realtimecollisiondetection.net/blog/?p=103
 
-	// vs plain of traiangle face
+	// vs plain of triangle face
 	const A = new THREE.Vector3().subVectors( a, sphere.center );
 	const B = new THREE.Vector3().subVectors( b, sphere.center );
 	const C = new THREE.Vector3().subVectors( c, sphere.center );

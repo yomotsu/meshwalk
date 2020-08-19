@@ -1,4 +1,5 @@
-import EventDispatcher from '../core/EventDispatcher.js';
+import { THREE } from '../install.js';
+import EventDispatcher from './EventDispatcher.js';
 import {
 	testSegmentTriangle,
 	isIntersectionSphereTriangle,
@@ -34,7 +35,7 @@ export class CharacterController extends EventDispatcher {
 		let isFirstUpdate = true;
 		let wasGrounded;
 		let wasOnSlope;
-		let wasIdling;
+		// let wasIdling;
 		let wasRunning;
 		let wasJumping;
 
@@ -46,7 +47,7 @@ export class CharacterController extends EventDispatcher {
 				isFirstUpdate = false;
 				wasGrounded = this.isGrounded;
 				wasOnSlope  = this.isOnSlope;
-				wasIdling   = this.isIdling;
+				// wasIdling   = this.isIdling;
 				wasRunning  = this.isRunning;
 				wasJumping  = this.isJumping;
 				return;
@@ -91,7 +92,7 @@ export class CharacterController extends EventDispatcher {
 
 			wasGrounded = this.isGrounded;
 			wasOnSlope  = this.isOnSlope;
-			wasIdling   = this.isIdling;
+			// wasIdling   = this.isIdling;
 			wasRunning  = this.isRunning;
 			wasJumping  = this.isJumping;
 
@@ -120,15 +121,15 @@ export class CharacterController extends EventDispatcher {
 	updateVelocity() {
 
 		const FALL_VELOCITY = - 20;
-		const frontDierction = - Math.cos( this.direction );
-		const rightDierction = - Math.sin( this.direction );
+		const frontDirection = - Math.cos( this.direction );
+		const rightDirection = - Math.sin( this.direction );
 
 		let isHittingCeiling = false;
 
 		this.velocity.set(
-			rightDierction * this.movementSpeed * this.isRunning,
+			rightDirection * this.movementSpeed * this.isRunning,
 			FALL_VELOCITY,
-			frontDierction * this.movementSpeed * this.isRunning
+			frontDirection * this.movementSpeed * this.isRunning
 		);
 
 		// 急勾配や自由落下など、自動で付与される速度の処理
@@ -146,15 +147,15 @@ export class CharacterController extends EventDispatcher {
 
 			// TODO 0.2 はマジックナンバーなので、幾何学的な求め方を考える
 			var slidingDownVelocity = FALL_VELOCITY;
-			var holizontalSpead = - slidingDownVelocity / ( 1 - this.groundNormal.y ) * 0.2;
+			var horizontalSpeed = - slidingDownVelocity / ( 1 - this.groundNormal.y ) * 0.2;
 
-			this.velocity.x = this.groundNormal.x * holizontalSpead;
+			this.velocity.x = this.groundNormal.x * horizontalSpeed;
 			this.velocity.y = FALL_VELOCITY;
-			this.velocity.z = this.groundNormal.z * holizontalSpead;
+			this.velocity.z = this.groundNormal.z * horizontalSpeed;
 
-		// ジャンプの処理
 		} else if ( ! this.isGrounded && ! this.isOnSlope && this.isJumping ) {
 
+			// ジャンプの処理
 			this.velocity.y = this.currentJumpPower * - FALL_VELOCITY;
 
 		}
@@ -162,7 +163,7 @@ export class CharacterController extends EventDispatcher {
 
 		// 壁に向かった場合、壁方向の速度を0にする処理
 		// vs walls and sliding on the wall
-		const direction2D = new THREE.Vector2( rightDierction, frontDierction );
+		const direction2D = new THREE.Vector2( rightDirection, frontDirection );
 		// const frontAngle = Math.atan2( direction2D.y, direction2D.x );
 		const negativeFrontAngle = Math.atan2( - direction2D.y, - direction2D.x );
 
@@ -175,18 +176,18 @@ export class CharacterController extends EventDispatcher {
 
 			  // フェイスは地面なので、壁としての衝突の可能性はない。
 			  // 速度の減衰はしないでいい
-			  continue;
+				continue;
 
 			}
 
 			if ( ! isHittingCeiling && normal.y < 0 ) {
 
-			  isHittingCeiling = true;
+				isHittingCeiling = true;
 
 			}
 
-			const wallNomal2D = new THREE.Vector2( normal.x, normal.z ).normalize();
-			const wallAngle = Math.atan2( wallNomal2D.y, wallNomal2D.x );
+			const wallNormal2D = new THREE.Vector2( normal.x, normal.z ).normalize();
+			const wallAngle = Math.atan2( wallNormal2D.y, wallNormal2D.x );
 
 			if (
 			  Math.abs( negativeFrontAngle - wallAngle ) >= Math.PI * 0.5 && //  90deg
@@ -195,17 +196,17 @@ export class CharacterController extends EventDispatcher {
 
 			  // フェイスは進行方向とは逆方向、要は背中側の壁なので
 			  // 速度の減衰はしないでいい
-			  continue;
+				continue;
 
 			}
 
 			// 上記までの条件に一致しなければ、フェイスは壁
 			// 壁の法線を求めて、その逆方向に向いている速度ベクトルを0にする
-			wallNomal2D.set(
-			  direction2D.dot( wallNomal2D ) * wallNomal2D.x,
-			  direction2D.dot( wallNomal2D ) * wallNomal2D.y
+			wallNormal2D.set(
+			  direction2D.dot( wallNormal2D ) * wallNormal2D.x,
+			  direction2D.dot( wallNormal2D ) * wallNormal2D.y
 			);
-			direction2D.sub( wallNomal2D );
+			direction2D.sub( wallNormal2D );
 
 			this.velocity.x = direction2D.x * this.movementSpeed * this.isRunning;
 			this.velocity.z = direction2D.y * this.movementSpeed * this.isRunning;
@@ -407,7 +408,7 @@ export class CharacterController extends EventDispatcher {
 			  // this triangle is a ground or slope, not a wall or ceil
 			  // フェイスは急勾配でない坂、つまり地面。
 			  // 接地の処理は updatePosition() 内で解決しているので無視する
-			  continue;
+				continue;
 
 			}
 
@@ -417,8 +418,8 @@ export class CharacterController extends EventDispatcher {
 			// ジャンプ降下中に、急勾配な坂に衝突したらジャンプ終わり
 			if ( this.isJumping && 0 >= this.currentJumpPower && isSlopeFace ) {
 
-			  this.isJumping = false;
-			  this.isGrounded = true;
+				this.isJumping = false;
+				this.isGrounded = true;
 			  // console.log( 'jump end' );
 
 			}
@@ -428,27 +429,27 @@ export class CharacterController extends EventDispatcher {
 			  // 地面の上にいる場合はy(縦)方向は同一のまま
 			  // x, z (横) 方向だけを変更して押し出す
 			  // http://gamedev.stackexchange.com/questions/80293/how-do-i-resolve-a-sphere-triangle-collision-in-a-given-direction
-			  point1.copy( normal ).multiplyScalar( - this.radius ).add( this.center );
-			  direction.set( normal.x, 0, normal.z ).normalize();
-			  const plainD = face.a.dot( normal );
-			  const t = ( plainD - ( normal.x * point1.x + normal.y * point1.y + normal.z * point1.z ) ) / ( normal.x * direction.x + normal.y * direction.y + normal.z * direction.z );
-			  point2.copy( direction ).multiplyScalar( t ).add( point1 );
-			  translateScoped.subVectors( point2, point1 );
+				point1.copy( normal ).multiplyScalar( - this.radius ).add( this.center );
+				direction.set( normal.x, 0, normal.z ).normalize();
+				const plainD = face.a.dot( normal );
+				const t = ( plainD - ( normal.x * point1.x + normal.y * point1.y + normal.z * point1.z ) ) / ( normal.x * direction.x + normal.y * direction.y + normal.z * direction.z );
+				point2.copy( direction ).multiplyScalar( t ).add( point1 );
+				translateScoped.subVectors( point2, point1 );
 
-			  if ( Math.abs( translate.x ) > Math.abs( translateScoped.x ) ) {
+				if ( Math.abs( translate.x ) > Math.abs( translateScoped.x ) ) {
 
-			    translate.x += translateScoped.x;
+					translate.x += translateScoped.x;
 
-			  }
+				}
 
-			  if ( Math.abs( translate.z ) > Math.abs( translateScoped.z ) ) {
+				if ( Math.abs( translate.z ) > Math.abs( translateScoped.z ) ) {
 
-			    translate.z += translateScoped.z;
+					translate.z += translateScoped.z;
 
-			  }
+				}
 
-			  // break;
-			  continue;
+				// break;
+				continue;
 
 			}
 
@@ -465,9 +466,7 @@ export class CharacterController extends EventDispatcher {
 
 		if ( this.isJumping || ! this.isGrounded || this.isOnSlope ) return;
 
-		// since ios dose not support porformance.now()
-		// this.jumpStartTime = performance.now();
-		this.jumpStartTime = Date.now();
+		this.jumpStartTime = performance.now();
 		this.currentJumpPower = 1;
 		this.isJumping = true;
 
@@ -479,9 +478,7 @@ export class CharacterController extends EventDispatcher {
 
 		if ( ! this.isJumping ) return;
 
-		// since ios dose not support porformance.now()
-		// var elapsed = performance.now() - this.jumpStartTime;
-		const elapsed = Date.now() - this.jumpStartTime;
+		const elapsed = performance.now() - this.jumpStartTime;
 		const progress = elapsed / JUMP_DURATION;
 		this.currentJumpPower = Math.cos( Math.min( progress, 1 ) * Math.PI );
 

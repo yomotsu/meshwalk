@@ -4,7 +4,7 @@ export default class EventDispatcher {
 
 	constructor() {
 
-		this._listeners = {}
+		this._listeners = {};
 
 	}
 
