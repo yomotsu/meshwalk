@@ -15,11 +15,11 @@
     "@babel/runtime": "^7.11.2",
     "@rollup/plugin-babel": "^5.2.0",
     "rollup": "^2.26.3",
-    "uglify-js": "^3.10.1"
+    "terser": "^5.2.0"
   },
   "scripts": {
     "dev": "rollup --config --watch",
-    "build": "rollup --config && uglifyjs dist/meshwalk.js -cm --preamble \"/*!\n * meshwalk\n * https://github.com/yomotsu/meshwalk\n * (c) 2014 @yomotsu\n * Released under the MIT License.\n */\" > dist/meshwalk.min.js",
+    "build": "rollup --config && terser dist/meshwalk.js -o dist/meshwalk.min.js --comments '/^!/'",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "browserslist": [
