@@ -1,11 +1,12 @@
-import babel from 'rollup-plugin-babel'
+import babel from '@rollup/plugin-babel';
+import pkg from './package.json';
 
 const license = `/*!
- * meshwalk.js
- * https://github.com/yomotsu/meshwalk.js
+* ${ pkg.name }
+ * https://github.com/${ pkg.repository }
  * (c) 2015 @yomotsu
  * Released under the MIT License.
- */`
+ */`;
 
 export default {
 	input: 'src/index.js',
@@ -26,6 +27,9 @@ export default {
 	],
 	// sourceMap: false,
 	plugins: [
-		babel( { exclude: 'node_modules/**' } )
+		babel( {
+			babelHelpers: 'bundled',
+			exclude: 'node_modules/**'
+		} )
 	]
 };

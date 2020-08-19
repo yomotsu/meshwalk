@@ -19,7 +19,6 @@ const DEG_180 = 180 * DEG2RAD;
 const DEG_225 = 225 * DEG2RAD;
 const DEG_270 = 270 * DEG2RAD;
 const DEG_315 = 315 * DEG2RAD;
-const DEG_360 = 360 * DEG2RAD;
 
 export class KeyInputControl extends EventDispatcher {
 
@@ -33,12 +32,12 @@ export class KeyInputControl extends EventDispatcher {
 		this.isDown  = false;
 		this.isLeft  = false;
 		this.isRight = false;
-		this.isMoveKeyHolded = false;
+		this.isMoveKeyHolding = false;
 		this.frontAngle = 0;
 
-		this._keydownListener = onkeydown.bind( this );
-		this._keyupListener   = onkeyup.bind( this );
-		this._blurListener    = onblur.bind( this );
+		this._keydownListener = onKeyDown.bind( this );
+		this._keyupListener   = onKeyUp.bind( this );
+		this._blurListener    = onBlur.bind( this );
 
 		window.addEventListener( 'keydown', this._keydownListener );
 		window.addEventListener( 'keyup',   this._keyupListener   );
@@ -54,10 +53,10 @@ export class KeyInputControl extends EventDispatcher {
 
 	updateAngle() {
 
-		var up    = this.isUp;
-		var down  = this.isDown;
-		var left  = this.isLeft;
-		var right = this.isRight;
+		const up    = this.isUp;
+		const down  = this.isDown;
+		const left  = this.isLeft;
+		const right = this.isRight;
 
 		if      (   up && ! left && ! down && ! right ) this.frontAngle = DEG_0;
 		else if (   up &&   left && ! down && ! right ) this.frontAngle = DEG_45;
@@ -72,9 +71,10 @@ export class KeyInputControl extends EventDispatcher {
 
 }
 
-function onkeydown( event ) {
+function onKeyDown( event ) {
 
 	if ( this.isDisabled ) return;
+	if ( isInputEvent( event ) ) return;
 
 	switch ( event.keyCode ) {
 
@@ -107,7 +107,7 @@ function onkeydown( event ) {
 
 	}
 
-	var prevAngle = this.frontAngle;
+	const prevAngle = this.frontAngle;
 
 	this.updateAngle();
 
@@ -119,17 +119,17 @@ function onkeydown( event ) {
 
 	if (
 		( this.isUp || this.isDown || this.isLeft || this.isRight ) &&
-		! this.isMoveKeyHolded
+		! this.isMoveKeyHolding
 	) {
 
-		this.isMoveKeyHolded = true;
+		this.isMoveKeyHolding = true;
 		this.dispatchEvent( { type: 'movekeyon' } );
 
 	}
 
 }
 
-function onkeyup( event ) {
+function onKeyUp( event ) {
 
 	if ( this.isDisabled ) return;
 
@@ -163,7 +163,7 @@ function onkeyup( event ) {
 
 	}
 
-	var prevAngle = this.frontAngle;
+	const prevAngle = this.frontAngle;
 
 	this.updateAngle();
 
@@ -175,36 +175,49 @@ function onkeyup( event ) {
 
 	if ( ! this.isUp && ! this.isDown && ! this.isLeft && ! this.isRight &&
 		(
-			   event.keyCode === KEY_W
-			|| event.keyCode === KEY_UP
-			|| event.keyCode === KEY_S
-			|| event.keyCode === KEY_DOWN
-			|| event.keyCode === KEY_A
-			|| event.keyCode === KEY_LEFT
-			|| event.keyCode === KEY_D
-			|| event.keyCode === KEY_RIGHT
+			event.keyCode === KEY_W    ||
+			event.keyCode === KEY_UP   ||
+			event.keyCode === KEY_S    ||
+			event.keyCode === KEY_DOWN ||
+			event.keyCode === KEY_A    ||
+			event.keyCode === KEY_LEFT ||
+			event.keyCode === KEY_D    ||
+			event.keyCode === KEY_RIGHT
 		)
 	) {
 
-		this.isMoveKeyHolded = false;
+		this.isMoveKeyHolding = false;
 		this.dispatchEvent( { type: 'movekeyoff' } );
 
 	}
 
 }
 
-function onblur() {
+function onBlur() {
 
 	this.isUp    = false;
 	this.isDown  = false;
 	this.isLeft  = false;
 	this.isRight = false;
 
-	if ( this.isMoveKeyHolded ) {
+	if ( this.isMoveKeyHolding ) {
 
-		this.isMoveKeyHolded = false;
+		this.isMoveKeyHolding = false;
 		this.dispatchEvent( { type: 'movekeyoff' } );
 
 	}
+
+}
+
+function isInputEvent( event ) {
+
+	const target = event.target;
+
+	return (
+		target.tagName === 'INPUT' ||
+		target.tagName === 'SELECT' ||
+		target.tagName === 'TEXTAREA' ||
+		target.isContentEditable
+	);
 
 }

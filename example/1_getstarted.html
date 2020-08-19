@@ -19,9 +19,10 @@ canvas{display: block;}
   The red sphere as a player character will just fall down to the ground mesh. <button onclick="playerController.center.set( 0, 10, 0 );">retry</button>
 </div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/92/three.min.js"></script>
-<script src="../dist/meshwalk.js"></script>
-<script>
+<script type="module">
+import * as THREE from 'https://unpkg.com/three@0.119.1/build/three.module.js';
+import * as MW from '../dist/meshwalk.module.js';
+
 var width, height, clock, scene, camera, renderer;
 var ground, sphere;
 var world, min, max, partition, octree,

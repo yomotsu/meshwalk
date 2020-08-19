@@ -8,18 +8,38 @@
   "jsnext:main": "dist/meshwalk.module.js",
   "module": "dist/meshwalk.module.js",
   "devDependencies": {
-    "babel-core": "^6.26.3",
-    "babel-preset-env": "1.6.1",
-    "rollup": "^0.58.2",
-    "rollup-plugin-babel": "3.0.4",
-    "rollup-watch": "^4.3.1",
-    "uglify-js": "^3.3.23"
+    "@babel/core": "^7.11.1",
+    "@babel/plugin-proposal-object-rest-spread": "^7.11.0",
+    "@babel/plugin-transform-runtime": "^7.11.0",
+    "@babel/preset-env": "^7.11.0",
+    "@babel/runtime": "^7.11.2",
+    "@rollup/plugin-babel": "^5.2.0",
+    "rollup": "^2.26.3",
+    "uglify-js": "^3.10.1"
   },
   "scripts": {
-    "dev": "npm run watch",
-    "watch": "rollup --config --watch",
+    "dev": "rollup --config --watch",
     "build": "rollup --config && uglifyjs dist/meshwalk.js -cm --preamble \"/*!\n * meshwalk\n * https://github.com/yomotsu/meshwalk\n * (c) 2014 @yomotsu\n * Released under the MIT License.\n */\" > dist/meshwalk.min.js",
     "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "browserslist": [
+    "ie >= 11",
+    "safari >= 9",
+    "ios >= 9",
+    "Android >= 5"
+  ],
+  "babel": {
+    "presets": [
+      [
+        "@babel/preset-env",
+        {
+          "useBuiltIns": false
+        }
+      ]
+    ],
+    "plugins": [
+      "@babel/plugin-proposal-object-rest-spread"
+    ]
   },
   "keywords": [
     "three",

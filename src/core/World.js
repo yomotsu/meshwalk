@@ -33,13 +33,13 @@ export class World {
 			let faces;
 
 			// octree で絞られた node に含まれる face だけを
-			// charactore に渡して判定する
+			// character に渡して判定する
 			for ( let ii = 0, ll = this.colliderPool.length; ii < ll; ii ++ ) {
 
 				const octree = this.colliderPool[ ii ];
 				const sphere = new THREE.Sphere( character.center, character.radius + character.groundPadding );
 				const intersectedNodes = octree.getIntersectedNodes( sphere, octree.maxDepth );
-				faces = Octree.uniqTriangkesfromNodes( intersectedNodes );
+				faces = Octree.uniqTrianglesFromNodes( intersectedNodes );
 
 			}
 
