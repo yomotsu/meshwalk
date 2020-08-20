@@ -1,9 +1,17 @@
 import { THREE, onInstallHandlers } from '../install.js';
 
+let vec3;
+let vec3_0;
+let vec3_1;
+
 let center;
 let extents;
 
 onInstallHandlers.push( () => {
+
+	vec3 = new THREE.Vector3();
+	vec3_0 = new THREE.Vector3();
+	vec3_1 = new THREE.Vector3();
 
 	center = new THREE.Vector3();
 	extents = new THREE.Vector3();
@@ -328,7 +336,7 @@ export function isIntersectionSphereTriangle( sphere, a, b, c, normal ) {
 	B.subVectors( b, sphere.center );
 	C.subVectors( c, sphere.center );
 	const rr = sphere.radius * sphere.radius;
-	V.crossVectors( B.clone().sub( A ), C.clone().sub( A ) );
+	V.crossVectors( vec3_0.subVectors( B, A ), vec3_1.subVectors( C, A ) );
 	const d = A.dot( V );
 	const e = V.dot( V );
 
@@ -453,29 +461,57 @@ export function isIntersectionSphereTriangle( sphere, a, b, c, normal ) {
 // }
 
 
+let ab;
+let ac;
+let qp;
+let n;
+
+let ap;
+let e;
+
+let au;
+let bv;
+let cw;
+
+onInstallHandlers.push( () => {
+
+	ab = new THREE.Vector3();
+	ac = new THREE.Vector3();
+	qp = new THREE.Vector3();
+	n  = new THREE.Vector3();
+
+	ap = new THREE.Vector3();
+	e  = new THREE.Vector3();
+
+	au = new THREE.Vector3();
+	bv = new THREE.Vector3();
+	cw = new THREE.Vector3();
+
+} );
+
 export function testSegmentTriangle( p, q, a, b, c ) {
 
-	const ab = b.clone().sub( a );
-	const ac = c.clone().sub( a );
-	const qp = p.clone().sub( q );
+	ab.subVectors( b, a );
+	ac.subVectors( c, a );
+	qp.subVectors( p, q );
 
-	const n = ab.clone().cross( ac );
+	n.copy( ab ).cross( ac );
 
 	const d = qp.dot( n );
 	if ( d <= 0 ) return false;
 
-	const ap = p.clone().sub( a );
+	ap.subVectors( p, a );
 	let t = ap.dot( n );
 
 	if ( t < 0 ) return 0;
 	if ( t > d ) return 0;
 
-	const e = qp.clone().cross( ap );
+	e.copy( qp ).cross( ap );
 	let v = ac.dot( e );
 
 	if ( v < 0 || v > d ) return 0;
 
-	let w = ab.clone().dot( e ) * - 1;
+	let w = vec3.copy( ab ).dot( e ) * - 1;
 
 	if ( w < 0 || v + w > d ) return 0;
 
@@ -485,9 +521,9 @@ export function testSegmentTriangle( p, q, a, b, c ) {
 	w *= ood;
 	const u = 1 - v - w;
 
-	const au = a.clone().multiplyScalar( u );
-	const bv = b.clone().multiplyScalar( v );
-	const cw = c.clone().multiplyScalar( w );
+	au.copy( a ).multiplyScalar( u );
+	bv.copy( b ).multiplyScalar( v );
+	cw.copy( c ).multiplyScalar( w );
 	const contactPoint = au.clone().add( bv ).add( cw );
 
 	return { contactPoint };
