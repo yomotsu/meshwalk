@@ -126,15 +126,61 @@
 	  };
 	}
 
+	var vec3;
+	var vec3_0;
+	var vec3_1;
+	var center;
+	var extents;
+	onInstallHandlers.push(function () {
+	  vec3 = new THREE$1.Vector3();
+	  vec3_0 = new THREE$1.Vector3();
+	  vec3_1 = new THREE$1.Vector3();
+	  center = new THREE$1.Vector3();
+	  extents = new THREE$1.Vector3();
+	}); // aabb: <THREE.Box3>
 	// Plane: <THREE.Plane>
 
 	function isIntersectionAABBPlane(aabb, Plane) {
-	  var center = new THREE$1.Vector3().addVectors(aabb.max, aabb.min).multiplyScalar(0.5);
-	  var extents = new THREE$1.Vector3().subVectors(aabb.max, center);
+	  center.addVectors(aabb.max, aabb.min).multiplyScalar(0.5);
+	  extents.subVectors(aabb.max, center);
 	  var r = extents.x * Math.abs(Plane.normal.x) + extents.y * Math.abs(Plane.normal.y) + extents.z * Math.abs(Plane.normal.z);
 	  var s = Plane.normal.dot(center) - Plane.constant;
 	  return Math.abs(s) <= r;
-	} // based on http://www.gamedev.net/topic/534655-aabb-triangleplane-intersection--distance-to-plane-is-incorrect-i-have-solved-it/
+	}
+	var v0;
+	var v1;
+	var v2;
+	var f0;
+	var f1;
+	var f2;
+	var a00;
+	var a01;
+	var a02;
+	var a10;
+	var a11;
+	var a12;
+	var a20;
+	var a21;
+	var a22;
+	var plane;
+	onInstallHandlers.push(function () {
+	  v0 = new THREE$1.Vector3();
+	  v1 = new THREE$1.Vector3();
+	  v2 = new THREE$1.Vector3();
+	  f0 = new THREE$1.Vector3();
+	  f1 = new THREE$1.Vector3();
+	  f2 = new THREE$1.Vector3();
+	  a00 = new THREE$1.Vector3();
+	  a01 = new THREE$1.Vector3();
+	  a02 = new THREE$1.Vector3();
+	  a10 = new THREE$1.Vector3();
+	  a11 = new THREE$1.Vector3();
+	  a12 = new THREE$1.Vector3();
+	  a20 = new THREE$1.Vector3();
+	  a21 = new THREE$1.Vector3();
+	  a22 = new THREE$1.Vector3();
+	  plane = new THREE$1.Plane();
+	}); // based on http://www.gamedev.net/topic/534655-aabb-triangleplane-intersection--distance-to-plane-is-incorrect-i-have-solved-it/
 	//
 	// a: <THREE.Vector3>, // vertex of a triangle
 	// b: <THREE.Vector3>, // vertex of a triangle
@@ -144,26 +190,26 @@
 	function isIntersectionTriangleAABB(a, b, c, aabb) {
 	  var p0, p1, p2, r; // Compute box center and extents of AABoundingBox (if not already given in that format)
 
-	  var center = new THREE$1.Vector3().addVectors(aabb.max, aabb.min).multiplyScalar(0.5);
-	  var extents = new THREE$1.Vector3().subVectors(aabb.max, center); // Translate triangle as conceptually moving AABB to origin
+	  center.addVectors(aabb.max, aabb.min).multiplyScalar(0.5);
+	  extents.subVectors(aabb.max, center); // Translate triangle as conceptually moving AABB to origin
 
-	  var v0 = new THREE$1.Vector3().subVectors(a, center);
-	  var v1 = new THREE$1.Vector3().subVectors(b, center);
-	  var v2 = new THREE$1.Vector3().subVectors(c, center); // Compute edge vectors for triangle
+	  v0.subVectors(a, center);
+	  v1.subVectors(b, center);
+	  v2.subVectors(c, center); // Compute edge vectors for triangle
 
-	  var f0 = new THREE$1.Vector3().subVectors(v1, v0);
-	  var f1 = new THREE$1.Vector3().subVectors(v2, v1);
-	  var f2 = new THREE$1.Vector3().subVectors(v0, v2); // Test axes a00..a22 (category 3)
+	  f0.subVectors(v1, v0);
+	  f1.subVectors(v2, v1);
+	  f2.subVectors(v0, v2); // Test axes a00..a22 (category 3)
 
-	  var a00 = new THREE$1.Vector3(0, -f0.z, f0.y);
-	  var a01 = new THREE$1.Vector3(0, -f1.z, f1.y);
-	  var a02 = new THREE$1.Vector3(0, -f2.z, f2.y);
-	  var a10 = new THREE$1.Vector3(f0.z, 0, -f0.x);
-	  var a11 = new THREE$1.Vector3(f1.z, 0, -f1.x);
-	  var a12 = new THREE$1.Vector3(f2.z, 0, -f2.x);
-	  var a20 = new THREE$1.Vector3(-f0.y, f0.x, 0);
-	  var a21 = new THREE$1.Vector3(-f1.y, f1.x, 0);
-	  var a22 = new THREE$1.Vector3(-f2.y, f2.x, 0); // Test axis a00
+	  a00.set(0, -f0.z, f0.y);
+	  a01.set(0, -f1.z, f1.y);
+	  a02.set(0, -f2.z, f2.y);
+	  a10.set(f0.z, 0, -f0.x);
+	  a11.set(f1.z, 0, -f1.x);
+	  a12.set(f2.z, 0, -f2.x);
+	  a20.set(-f0.y, f0.x, 0);
+	  a21.set(-f1.y, f1.x, 0);
+	  a22.set(-f2.y, f2.x, 0); // Test axis a00
 
 	  p0 = v0.dot(a00);
 	  p1 = v1.dot(a00);
@@ -273,8 +319,7 @@
 	  // Face Normal is -ve as Triangle is clockwise winding (and XNA uses -z for into screen)
 
 
-	  var plane = new THREE$1.Plane();
-	  plane.normal = new THREE$1.Vector3().copy(f1).cross(f0).normalize();
+	  plane.normal.copy(f1).cross(f0).normalize();
 	  plane.constant = plane.normal.dot(a);
 	  return isIntersectionAABBPlane(aabb, plane);
 	} // sphere1: <THREE.Sphere>
@@ -290,7 +335,37 @@
 	  if (sphere.center.z < aabb.min.z) sqDist += (aabb.min.z - sphere.center.z) * (aabb.min.z - sphere.center.z);
 	  if (sphere.center.z > aabb.max.z) sqDist += (sphere.center.z - aabb.max.z) * (sphere.center.z - aabb.max.z);
 	  return sqDist <= sphere.radius * sphere.radius;
-	} //http://clb.demon.fi/MathGeoLib/docs/Triangle.cpp_code.html#459
+	}
+	var A;
+	var B;
+	var C;
+	var V;
+	var AB;
+	var BC;
+	var CA;
+	var Q1;
+	var Q2;
+	var Q3;
+	var QC;
+	var QA;
+	var QB;
+	var negatedNormal;
+	onInstallHandlers.push(function () {
+	  A = new THREE$1.Vector3();
+	  B = new THREE$1.Vector3();
+	  C = new THREE$1.Vector3();
+	  V = new THREE$1.Vector3();
+	  AB = new THREE$1.Vector3();
+	  BC = new THREE$1.Vector3();
+	  CA = new THREE$1.Vector3();
+	  Q1 = new THREE$1.Vector3();
+	  Q2 = new THREE$1.Vector3();
+	  Q3 = new THREE$1.Vector3();
+	  QC = new THREE$1.Vector3();
+	  QA = new THREE$1.Vector3();
+	  QB = new THREE$1.Vector3();
+	  negatedNormal = new THREE$1.Vector3();
+	}); //http://clb.demon.fi/MathGeoLib/docs/Triangle.cpp_code.html#459
 	// sphere: <THREE.Sphere>
 	// a: <THREE.Vector3>, // vertex of a triangle
 	// b: <THREE.Vector3>, // vertex of a triangle
@@ -300,11 +375,11 @@
 	function isIntersectionSphereTriangle(sphere, a, b, c, normal) {
 	  // http://realtimecollisiondetection.net/blog/?p=103
 	  // vs plain of triangle face
-	  var A = new THREE$1.Vector3().subVectors(a, sphere.center);
-	  var B = new THREE$1.Vector3().subVectors(b, sphere.center);
-	  var C = new THREE$1.Vector3().subVectors(c, sphere.center);
+	  A.subVectors(a, sphere.center);
+	  B.subVectors(b, sphere.center);
+	  C.subVectors(c, sphere.center);
 	  var rr = sphere.radius * sphere.radius;
-	  var V = new THREE$1.Vector3().crossVectors(B.clone().sub(A), C.clone().sub(A));
+	  V.crossVectors(vec3_0.subVectors(B, A), vec3_1.subVectors(C, A));
 	  var d = A.dot(V);
 	  var e = V.dot(V);
 
@@ -325,28 +400,28 @@
 	  } // vs edge
 
 
-	  var AB = new THREE$1.Vector3().subVectors(B, A);
-	  var BC = new THREE$1.Vector3().subVectors(C, B);
-	  var CA = new THREE$1.Vector3().subVectors(A, C);
+	  AB.subVectors(B, A);
+	  BC.subVectors(C, B);
+	  CA.subVectors(A, C);
 	  var d1 = ab - aa;
 	  var d2 = bc - bb;
 	  var d3 = ac - cc;
 	  var e1 = AB.dot(AB);
 	  var e2 = BC.dot(BC);
 	  var e3 = CA.dot(CA);
-	  var Q1 = new THREE$1.Vector3().subVectors(A.multiplyScalar(e1), AB.multiplyScalar(d1));
-	  var Q2 = new THREE$1.Vector3().subVectors(B.multiplyScalar(e2), BC.multiplyScalar(d2));
-	  var Q3 = new THREE$1.Vector3().subVectors(C.multiplyScalar(e3), CA.multiplyScalar(d3));
-	  var QC = new THREE$1.Vector3().subVectors(C.multiplyScalar(e1), Q1);
-	  var QA = new THREE$1.Vector3().subVectors(A.multiplyScalar(e2), Q2);
-	  var QB = new THREE$1.Vector3().subVectors(B.multiplyScalar(e3), Q3);
+	  Q1.subVectors(A.multiplyScalar(e1), AB.multiplyScalar(d1));
+	  Q2.subVectors(B.multiplyScalar(e2), BC.multiplyScalar(d2));
+	  Q3.subVectors(C.multiplyScalar(e3), CA.multiplyScalar(d3));
+	  QC.subVectors(C.multiplyScalar(e1), Q1);
+	  QA.subVectors(A.multiplyScalar(e2), Q2);
+	  QB.subVectors(B.multiplyScalar(e3), Q3);
 
 	  if (Q1.dot(Q1) > rr * e1 * e1 && Q1.dot(QC) >= 0 || Q2.dot(Q2) > rr * e2 * e2 && Q2.dot(QA) >= 0 || Q3.dot(Q3) > rr * e3 * e3 && Q3.dot(QB) >= 0) {
 	    return false;
 	  }
 
 	  var distance = Math.sqrt(d * d / e) - sphere.radius - 1;
-	  var negatedNormal = new THREE$1.Vector3(-normal.x, -normal.y, -normal.z);
+	  negatedNormal.set(-normal.x, -normal.y, -normal.z);
 	  var contactPoint = sphere.center.clone().add(negatedNormal.multiplyScalar(distance));
 	  return {
 	    distance: distance,
@@ -392,30 +467,50 @@
 	//   }
 	// }
 
+	var ab;
+	var ac;
+	var qp;
+	var n;
+	var ap;
+	var e;
+	var au;
+	var bv;
+	var cw;
+	onInstallHandlers.push(function () {
+	  ab = new THREE$1.Vector3();
+	  ac = new THREE$1.Vector3();
+	  qp = new THREE$1.Vector3();
+	  n = new THREE$1.Vector3();
+	  ap = new THREE$1.Vector3();
+	  e = new THREE$1.Vector3();
+	  au = new THREE$1.Vector3();
+	  bv = new THREE$1.Vector3();
+	  cw = new THREE$1.Vector3();
+	});
 	function testSegmentTriangle(p, q, a, b, c) {
-	  var ab = b.clone().sub(a);
-	  var ac = c.clone().sub(a);
-	  var qp = p.clone().sub(q);
-	  var n = ab.clone().cross(ac);
+	  ab.subVectors(b, a);
+	  ac.subVectors(c, a);
+	  qp.subVectors(p, q);
+	  n.copy(ab).cross(ac);
 	  var d = qp.dot(n);
 	  if (d <= 0) return false;
-	  var ap = p.clone().sub(a);
+	  ap.subVectors(p, a);
 	  var t = ap.dot(n);
 	  if (t < 0) return 0;
 	  if (t > d) return 0;
-	  var e = qp.clone().cross(ap);
+	  e.copy(qp).cross(ap);
 	  var v = ac.dot(e);
 	  if (v < 0 || v > d) return 0;
-	  var w = ab.clone().dot(e) * -1;
+	  var w = vec3.copy(ab).dot(e) * -1;
 	  if (w < 0 || v + w > d) return 0;
 	  var ood = 1 / d;
 	  t *= ood;
 	  v *= ood;
 	  w *= ood;
 	  var u = 1 - v - w;
-	  var au = a.clone().multiplyScalar(u);
-	  var bv = b.clone().multiplyScalar(v);
-	  var cw = c.clone().multiplyScalar(w);
+	  au.copy(a).multiplyScalar(u);
+	  bv.copy(b).multiplyScalar(v);
+	  cw.copy(c).multiplyScalar(w);
 	  var contactPoint = au.clone().add(bv).add(cw);
 	  return {
 	    contactPoint: contactPoint
@@ -719,6 +814,10 @@
 	// 	}
 	// }
 
+	var sphere;
+	onInstallHandlers.push(function () {
+	  sphere = new THREE$1.Sphere();
+	});
 	var World = /*#__PURE__*/function () {
 	  function World() {
 	    _classCallCheck(this, World);
@@ -747,7 +846,7 @@
 
 	        for (var ii = 0, ll = this.colliderPool.length; ii < ll; ii++) {
 	          var octree = this.colliderPool[ii];
-	          var sphere = new THREE$1.Sphere(character.center, character.radius + character.groundPadding);
+	          sphere.set(character.center, character.radius + character.groundPadding);
 	          var intersectedNodes = octree.getIntersectedNodes(sphere, octree.maxDepth);
 	          faces = Octree.uniqTrianglesFromNodes(intersectedNodes);
 	        }
@@ -822,6 +921,30 @@
 	  return EventDispatcher;
 	}();
 
+	var FALL_VELOCITY = -20;
+	var JUMP_DURATION = 1000;
+	var PI_HALF = Math.PI * 0.5;
+	var PI_ONE_HALF = Math.PI * 1.5;
+	var direction2D;
+	var wallNormal2D;
+	var groundingHead;
+	var groundingTo;
+	var point1;
+	var point2;
+	var direction;
+	var translateScoped;
+	var translate;
+	onInstallHandlers.push(function () {
+	  direction2D = new THREE$1.Vector2();
+	  wallNormal2D = new THREE$1.Vector2();
+	  groundingHead = new THREE$1.Vector3();
+	  groundingTo = new THREE$1.Vector3();
+	  point1 = new THREE$1.Vector3();
+	  point2 = new THREE$1.Vector3();
+	  direction = new THREE$1.Vector3();
+	  translateScoped = new THREE$1.Vector3();
+	  translate = new THREE$1.Vector3();
+	});
 	var CharacterController = /*#__PURE__*/function (_EventDispatcher) {
 	  _inherits(CharacterController, _EventDispatcher);
 
@@ -933,7 +1056,6 @@
 	  }, {
 	    key: "updateVelocity",
 	    value: function updateVelocity() {
-	      var FALL_VELOCITY = -20;
 	      var frontDirection = -Math.cos(this.direction);
 	      var rightDirection = -Math.sin(this.direction);
 	      var isHittingCeiling = false;
@@ -959,7 +1081,7 @@
 	      // vs walls and sliding on the wall
 
 
-	      var direction2D = new THREE$1.Vector2(rightDirection, frontDirection); // const frontAngle = Math.atan2( direction2D.y, direction2D.x );
+	      direction2D.set(rightDirection, frontDirection); // const frontAngle = Math.atan2( direction2D.y, direction2D.x );
 
 	      var negativeFrontAngle = Math.atan2(-direction2D.y, -direction2D.x);
 
@@ -976,11 +1098,11 @@
 	          isHittingCeiling = true;
 	        }
 
-	        var wallNormal2D = new THREE$1.Vector2(normal.x, normal.z).normalize();
+	        wallNormal2D.set(normal.x, normal.z).normalize();
 	        var wallAngle = Math.atan2(wallNormal2D.y, wallNormal2D.x);
 
-	        if (Math.abs(negativeFrontAngle - wallAngle) >= Math.PI * 0.5 && //  90deg
-	        Math.abs(negativeFrontAngle - wallAngle) <= Math.PI * 1.5 // 270deg
+	        if (Math.abs(negativeFrontAngle - wallAngle) >= PI_HALF && //  90deg
+	        Math.abs(negativeFrontAngle - wallAngle) <= PI_ONE_HALF // 270deg
 	        ) {
 	            // フェイスは進行方向とは逆方向、要は背中側の壁なので
 	            // 速度の減衰はしないでいい
@@ -1021,11 +1143,11 @@
 	      var groundContactInfo;
 	      var groundContactInfoTmp;
 	      var faces = this.collisionCandidate;
-	      var head = new THREE$1.Vector3(this.center.x, this.center.y + this.radius, this.center.z);
-	      var to = new THREE$1.Vector3(this.center.x, this.center.y - 1e10, this.center.z);
+	      groundingHead.set(this.center.x, this.center.y + this.radius, this.center.z);
+	      groundingTo.set(this.center.x, this.center.y - 1e10, this.center.z);
 
 	      for (var i = 0, l = faces.length; i < l; i++) {
-	        groundContactInfoTmp = testSegmentTriangle(head, to, faces[i].a, faces[i].b, faces[i].c);
+	        groundContactInfoTmp = testSegmentTriangle(groundingHead, groundingTo, faces[i].a, faces[i].b, faces[i].c);
 
 	        if (groundContactInfoTmp && !groundContactInfo) {
 	          groundContactInfo = groundContactInfoTmp;
@@ -1042,7 +1164,7 @@
 
 	      this.groundHeight = groundContactInfo.contactPoint.y;
 	      this.groundNormal.copy(groundContactInfo.face.normal);
-	      var top = head.y;
+	      var top = groundingHead.y;
 	      var bottom = this.center.y - this.radius - this.groundPadding; // ジャンプ中、かつ上方向に移動中だったら、強制接地しない
 
 	      if (this.isJumping && 0 < this.currentJumpPower) {
@@ -1096,12 +1218,6 @@
 	      var face;
 	      var normal; // let distance;
 
-	      var point1 = new THREE$1.Vector3();
-	      var point2 = new THREE$1.Vector3();
-	      var direction = new THREE$1.Vector3();
-	      var translateScoped = new THREE$1.Vector3();
-	      var translate = new THREE$1.Vector3();
-
 	      if (this.contactInfo.length === 0) {
 	        // 何とも衝突していない
 	        // centerの値をそのままつかって終了
@@ -1110,6 +1226,8 @@
 	      } //
 	      // vs walls and sliding on the wall
 
+
+	      translate.set(0, 0, 0);
 
 	      for (var i = 0, l = this.contactInfo.length; i < l; i++) {
 	        face = this.contactInfo[i].face;
@@ -1176,7 +1294,6 @@
 	  }, {
 	    key: "updateJumping",
 	    value: function updateJumping() {
-	      var JUMP_DURATION = 1000;
 	      if (!this.isJumping) return;
 	      var elapsed = performance.now() - this.jumpStartTime;
 	      var progress = elapsed / JUMP_DURATION;
@@ -1466,8 +1583,8 @@
 	  return target.tagName === 'INPUT' || target.tagName === 'SELECT' || target.tagName === 'TEXTAREA' || target.isContentEditable;
 	}
 
-	var PI2 = Math.PI * 2;
-	var PI_HALF = Math.PI / 2;
+	var PI_2 = Math.PI * 2;
+	var PI_HALF$1 = Math.PI / 2;
 	var rotationMatrix;
 	var rotationX;
 	var rotationY;
@@ -1543,8 +1660,8 @@
 	  _createClass(TPSCameraControl, [{
 	    key: "update",
 	    value: function update() {
-	      this._center = new THREE$1.Vector3(this.trackObject.matrixWorld.elements[12] + this.offset.x, this.trackObject.matrixWorld.elements[13] + this.offset.y, this.trackObject.matrixWorld.elements[14] + this.offset.z);
-	      var position = new THREE$1.Vector3(Math.cos(this.phi) * Math.cos(this.theta + PI_HALF), Math.sin(this.phi), Math.cos(this.phi) * Math.sin(this.theta + PI_HALF));
+	      this._center = new THREE$1.Vector3(this.trackObject.position.x + this.offset.x, this.trackObject.position.y + this.offset.y, this.trackObject.position.z + this.offset.z);
+	      var position = new THREE$1.Vector3(Math.cos(this.phi) * Math.cos(this.theta + PI_HALF$1), Math.sin(this.phi), Math.cos(this.phi) * Math.sin(this.theta + PI_HALF$1));
 	      var distance = this.collisionTest(position.clone().normalize());
 	      position.multiplyScalar(distance);
 	      position.add(this._center);
@@ -1566,7 +1683,7 @@
 	  }, {
 	    key: "getFrontAngle",
 	    value: function getFrontAngle() {
-	      return PI2 + this.theta;
+	      return PI_2 + this.theta;
 	    }
 	  }, {
 	    key: "setNearPlainCornersWithPadding",
