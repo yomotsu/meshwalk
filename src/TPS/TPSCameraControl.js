@@ -64,9 +64,9 @@ export class TPSCameraControl extends EventDispatcher {
 	update() {
 
 		this._center = new THREE.Vector3(
-			this.trackObject.matrixWorld.elements[ 12 ] + this.offset.x,
-			this.trackObject.matrixWorld.elements[ 13 ] + this.offset.y,
-			this.trackObject.matrixWorld.elements[ 14 ] + this.offset.z
+			this.trackObject.position.x + this.offset.x,
+			this.trackObject.position.y + this.offset.y,
+			this.trackObject.position.z + this.offset.z
 		);
 
 		const position = new THREE.Vector3(
