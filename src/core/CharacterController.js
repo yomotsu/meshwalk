@@ -1,9 +1,38 @@
-import { THREE } from '../install.js';
+import { THREE, onInstallHandlers } from '../install.js';
 import EventDispatcher from './EventDispatcher.js';
 import {
 	testSegmentTriangle,
 	isIntersectionSphereTriangle,
 } from '../math/collision.js';
+
+const FALL_VELOCITY = - 20;
+const JUMP_DURATION = 1000;
+const PI_HALF = Math.PI * 0.5;
+const PI_ONE_HALF = Math.PI * 1.5;
+
+let direction2D;
+let wallNormal2D;
+let groundingHead;
+let groundingTo;
+let point1;
+let point2;
+let direction;
+let translateScoped;
+let translate;
+
+onInstallHandlers.push( () => {
+
+	direction2D = new THREE.Vector2();
+	wallNormal2D = new THREE.Vector2();
+	groundingHead = new THREE.Vector3();
+	groundingTo = new THREE.Vector3();
+	point1 = new THREE.Vector3();
+	point2 = new THREE.Vector3();
+	direction = new THREE.Vector3();
+	translateScoped = new THREE.Vector3();
+	translate = new THREE.Vector3();
+
+} );
 
 export class CharacterController extends EventDispatcher {
 
@@ -120,7 +149,6 @@ export class CharacterController extends EventDispatcher {
 
 	updateVelocity() {
 
-		const FALL_VELOCITY = - 20;
 		const frontDirection = - Math.cos( this.direction );
 		const rightDirection = - Math.sin( this.direction );
 
@@ -163,7 +191,7 @@ export class CharacterController extends EventDispatcher {
 
 		// 壁に向かった場合、壁方向の速度を0にする処理
 		// vs walls and sliding on the wall
-		const direction2D = new THREE.Vector2( rightDirection, frontDirection );
+		direction2D.set( rightDirection, frontDirection );
 		// const frontAngle = Math.atan2( direction2D.y, direction2D.x );
 		const negativeFrontAngle = Math.atan2( - direction2D.y, - direction2D.x );
 
@@ -186,12 +214,12 @@ export class CharacterController extends EventDispatcher {
 
 			}
 
-			const wallNormal2D = new THREE.Vector2( normal.x, normal.z ).normalize();
+			wallNormal2D.set( normal.x, normal.z ).normalize();
 			const wallAngle = Math.atan2( wallNormal2D.y, wallNormal2D.x );
 
 			if (
-			  Math.abs( negativeFrontAngle - wallAngle ) >= Math.PI * 0.5 && //  90deg
-			  Math.abs( negativeFrontAngle - wallAngle ) <= Math.PI * 1.5    // 270deg
+			  Math.abs( negativeFrontAngle - wallAngle ) >= PI_HALF &&  //  90deg
+			  Math.abs( negativeFrontAngle - wallAngle ) <= PI_ONE_HALF // 270deg
 			) {
 
 			  // フェイスは進行方向とは逆方向、要は背中側の壁なので
@@ -244,13 +272,13 @@ export class CharacterController extends EventDispatcher {
 		let groundContactInfoTmp;
 		const faces = this.collisionCandidate;
 
-		const head = new THREE.Vector3(
+		groundingHead.set(
 			this.center.x,
 			this.center.y + this.radius,
 			this.center.z
 		);
 
-		const to = new THREE.Vector3(
+		groundingTo.set(
 			this.center.x,
 			this.center.y - 1e10,
 			this.center.z
@@ -259,8 +287,8 @@ export class CharacterController extends EventDispatcher {
 		for ( let i = 0, l = faces.length; i < l; i ++ ) {
 
 			groundContactInfoTmp = testSegmentTriangle(
-				head,
-				to,
+				groundingHead,
+				groundingTo,
 				faces[ i ].a,
 				faces[ i ].b,
 				faces[ i ].c
@@ -292,7 +320,7 @@ export class CharacterController extends EventDispatcher {
 		this.groundHeight = groundContactInfo.contactPoint.y;
 		this.groundNormal.copy( groundContactInfo.face.normal );
 
-		const top    = head.y;
+		const top    = groundingHead.y;
 		const bottom = this.center.y - this.radius - this.groundPadding;
 
 		// ジャンプ中、かつ上方向に移動中だったら、強制接地しない
@@ -371,11 +399,6 @@ export class CharacterController extends EventDispatcher {
 		let face;
 		let normal;
 		// let distance;
-		const point1 = new THREE.Vector3();
-		const point2 = new THREE.Vector3();
-		const direction = new THREE.Vector3();
-		const translateScoped = new THREE.Vector3();
-		const translate = new THREE.Vector3();
 
 		if ( this.contactInfo.length === 0 ) {
 
@@ -388,7 +411,7 @@ export class CharacterController extends EventDispatcher {
 
 		//
 		// vs walls and sliding on the wall
-
+		translate.set( 0, 0, 0 );
 		for ( let i = 0, l = this.contactInfo.length; i < l; i ++ ) {
 
 			face = this.contactInfo[ i ].face;
@@ -473,8 +496,6 @@ export class CharacterController extends EventDispatcher {
 	}
 
 	updateJumping() {
-
-		const JUMP_DURATION = 1000;
 
 		if ( ! this.isJumping ) return;
 

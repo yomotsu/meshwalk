@@ -1,11 +1,21 @@
-import { THREE } from '../install.js';
+import { THREE, onInstallHandlers } from '../install.js';
+
+let center;
+let extents;
+
+onInstallHandlers.push( () => {
+
+	center = new THREE.Vector3();
+	extents = new THREE.Vector3();
+
+} );
 
 // aabb: <THREE.Box3>
 // Plane: <THREE.Plane>
 export function isIntersectionAABBPlane( aabb, Plane ) {
 
-	const center = new THREE.Vector3().addVectors( aabb.max, aabb.min ).multiplyScalar( 0.5 );
-	const extents = new THREE.Vector3().subVectors( aabb.max, center );
+	center.addVectors( aabb.max, aabb.min ).multiplyScalar( 0.5 );
+	extents.subVectors( aabb.max, center );
 
 	const r = extents.x * Math.abs( Plane.normal.x ) + extents.y * Math.abs( Plane.normal.y ) + extents.z * Math.abs( Plane.normal.z );
 	const s = Plane.normal.dot( center ) - Plane.constant;
@@ -13,6 +23,50 @@ export function isIntersectionAABBPlane( aabb, Plane ) {
 	return Math.abs( s ) <= r;
 
 }
+
+let v0;
+let v1;
+let v2;
+
+let f0;
+let f1;
+let f2;
+
+let a00;
+let a01;
+let a02;
+let a10;
+let a11;
+let a12;
+let a20;
+let a21;
+let a22;
+
+let plane;
+
+onInstallHandlers.push( () => {
+
+	v0 = new THREE.Vector3();
+	v1 = new THREE.Vector3();
+	v2 = new THREE.Vector3();
+
+	f0 = new THREE.Vector3();
+	f1 = new THREE.Vector3();
+	f2 = new THREE.Vector3();
+
+	a00 = new THREE.Vector3();
+	a01 = new THREE.Vector3();
+	a02 = new THREE.Vector3();
+	a10 = new THREE.Vector3();
+	a11 = new THREE.Vector3();
+	a12 = new THREE.Vector3();
+	a20 = new THREE.Vector3();
+	a21 = new THREE.Vector3();
+	a22 = new THREE.Vector3();
+
+	plane = new THREE.Plane();
+
+} );
 
 // based on http://www.gamedev.net/topic/534655-aabb-triangleplane-intersection--distance-to-plane-is-incorrect-i-have-solved-it/
 //
@@ -25,29 +79,29 @@ export function isIntersectionTriangleAABB( a, b, c, aabb ) {
 	let p0, p1, p2, r;
 
 	// Compute box center and extents of AABoundingBox (if not already given in that format)
-	const center = new THREE.Vector3().addVectors( aabb.max, aabb.min ).multiplyScalar( 0.5 );
-	const extents = new THREE.Vector3().subVectors( aabb.max, center );
+	center.addVectors( aabb.max, aabb.min ).multiplyScalar( 0.5 );
+	extents.subVectors( aabb.max, center );
 
 	// Translate triangle as conceptually moving AABB to origin
-	const v0 = new THREE.Vector3().subVectors( a, center );
-	const v1 = new THREE.Vector3().subVectors( b, center );
-	const v2 = new THREE.Vector3().subVectors( c, center );
+	v0.subVectors( a, center );
+	v1.subVectors( b, center );
+	v2.subVectors( c, center );
 
 	// Compute edge vectors for triangle
-	const f0 = new THREE.Vector3().subVectors( v1, v0 );
-	const f1 = new THREE.Vector3().subVectors( v2, v1 );
-	const f2 = new THREE.Vector3().subVectors( v0, v2 );
+	f0.subVectors( v1, v0 );
+	f1.subVectors( v2, v1 );
+	f2.subVectors( v0, v2 );
 
 	// Test axes a00..a22 (category 3)
-	const a00 = new THREE.Vector3( 0, - f0.z, f0.y );
-	const a01 = new THREE.Vector3( 0, - f1.z, f1.y );
-	const a02 = new THREE.Vector3( 0, - f2.z, f2.y );
-	const a10 = new THREE.Vector3( f0.z, 0, - f0.x );
-	const a11 = new THREE.Vector3( f1.z, 0, - f1.x );
-	const a12 = new THREE.Vector3( f2.z, 0, - f2.x );
-	const a20 = new THREE.Vector3( - f0.y, f0.x, 0 );
-	const a21 = new THREE.Vector3( - f1.y, f1.x, 0 );
-	const a22 = new THREE.Vector3( - f2.y, f2.x, 0 );
+	a00.set( 0, - f0.z, f0.y );
+	a01.set( 0, - f1.z, f1.y );
+	a02.set( 0, - f2.z, f2.y );
+	a10.set( f0.z, 0, - f0.x );
+	a11.set( f1.z, 0, - f1.x );
+	a12.set( f2.z, 0, - f2.x );
+	a20.set( - f0.y, f0.x, 0 );
+	a21.set( - f1.y, f1.x, 0 );
+	a22.set( - f2.y, f2.x, 0 );
 
 	// Test axis a00
 	p0 = v0.dot( a00 );
@@ -181,8 +235,7 @@ export function isIntersectionTriangleAABB( a, b, c, aabb ) {
 
 	// Test separating axis corresponding to triangle face normal (category 2)
 	// Face Normal is -ve as Triangle is clockwise winding (and XNA uses -z for into screen)
-	const plane = new THREE.Plane();
-	plane.normal = new THREE.Vector3().copy( f1 ).cross( f0 ).normalize();
+	plane.normal.copy( f1 ).cross( f0 ).normalize();
 	plane.constant = plane.normal.dot( a );
 
 	return isIntersectionAABBPlane( aabb, plane );
@@ -221,6 +274,43 @@ export function isIntersectionSphereAABB( sphere, aabb ) {
 
 }
 
+let A;
+let B;
+let C;
+let V;
+
+let AB;
+let BC;
+let CA;
+let Q1;
+let Q2;
+let Q3;
+let QC;
+let QA;
+let QB;
+
+let negatedNormal;
+
+onInstallHandlers.push( () => {
+
+	A = new THREE.Vector3();
+	B = new THREE.Vector3();
+	C = new THREE.Vector3();
+	V = new THREE.Vector3();
+
+	AB = new THREE.Vector3();
+	BC = new THREE.Vector3();
+	CA = new THREE.Vector3();
+	Q1 = new THREE.Vector3();
+	Q2 = new THREE.Vector3();
+	Q3 = new THREE.Vector3();
+	QC = new THREE.Vector3();
+	QA = new THREE.Vector3();
+	QB = new THREE.Vector3();
+
+	negatedNormal = new THREE.Vector3();
+
+} );
 
 //http://clb.demon.fi/MathGeoLib/docs/Triangle.cpp_code.html#459
 
@@ -234,11 +324,11 @@ export function isIntersectionSphereTriangle( sphere, a, b, c, normal ) {
 	// http://realtimecollisiondetection.net/blog/?p=103
 
 	// vs plain of triangle face
-	const A = new THREE.Vector3().subVectors( a, sphere.center );
-	const B = new THREE.Vector3().subVectors( b, sphere.center );
-	const C = new THREE.Vector3().subVectors( c, sphere.center );
+	A.subVectors( a, sphere.center );
+	B.subVectors( b, sphere.center );
+	C.subVectors( c, sphere.center );
 	const rr = sphere.radius * sphere.radius;
-	const V = new THREE.Vector3().crossVectors( B.clone().sub( A ), C.clone().sub( A ) );
+	V.crossVectors( B.clone().sub( A ), C.clone().sub( A ) );
 	const d = A.dot( V );
 	const e = V.dot( V );
 
@@ -267,21 +357,21 @@ export function isIntersectionSphereTriangle( sphere, a, b, c, normal ) {
 	}
 
 	// vs edge
-	const AB = new THREE.Vector3().subVectors( B, A );
-	const BC = new THREE.Vector3().subVectors( C, B );
-	const CA = new THREE.Vector3().subVectors( A, C );
+	AB.subVectors( B, A );
+	BC.subVectors( C, B );
+	CA.subVectors( A, C );
 	const d1 = ab - aa;
 	const d2 = bc - bb;
 	const d3 = ac - cc;
 	const e1 = AB.dot( AB );
 	const e2 = BC.dot( BC );
 	const e3 = CA.dot( CA );
-	const Q1 = new THREE.Vector3().subVectors( A.multiplyScalar( e1 ), AB.multiplyScalar( d1 ) );
-	const Q2 = new THREE.Vector3().subVectors( B.multiplyScalar( e2 ), BC.multiplyScalar( d2 ) );
-	const Q3 = new THREE.Vector3().subVectors( C.multiplyScalar( e3 ), CA.multiplyScalar( d3 ) );
-	const QC = new THREE.Vector3().subVectors( C.multiplyScalar( e1 ), Q1 );
-	const QA = new THREE.Vector3().subVectors( A.multiplyScalar( e2 ), Q2 );
-	const QB = new THREE.Vector3().subVectors( B.multiplyScalar( e3 ), Q3 );
+	Q1.subVectors( A.multiplyScalar( e1 ), AB.multiplyScalar( d1 ) );
+	Q2.subVectors( B.multiplyScalar( e2 ), BC.multiplyScalar( d2 ) );
+	Q3.subVectors( C.multiplyScalar( e3 ), CA.multiplyScalar( d3 ) );
+	QC.subVectors( C.multiplyScalar( e1 ), Q1 );
+	QA.subVectors( A.multiplyScalar( e2 ), Q2 );
+	QB.subVectors( B.multiplyScalar( e3 ), Q3 );
 
 	if (
 		( Q1.dot( Q1 ) > rr * e1 * e1 ) && ( Q1.dot( QC ) >= 0 ) ||
@@ -294,7 +384,7 @@ export function isIntersectionSphereTriangle( sphere, a, b, c, normal ) {
 	}
 
 	const distance = Math.sqrt( d * d / e ) - sphere.radius - 1;
-	const negatedNormal = new THREE.Vector3( - normal.x, - normal.y, - normal.z );
+	negatedNormal.set( - normal.x, - normal.y, - normal.z );
 	const contactPoint = sphere.center.clone().add( negatedNormal.multiplyScalar( distance ) );
 
 	return {

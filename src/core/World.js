@@ -1,5 +1,13 @@
-import { THREE } from '../install.js';
+import { THREE, onInstallHandlers } from '../install.js';
 import { Octree } from './Octree.js';
+
+let sphere;
+
+onInstallHandlers.push( () => {
+
+	sphere = new THREE.Sphere();
+
+} );
 
 export class World {
 
@@ -37,7 +45,7 @@ export class World {
 			for ( let ii = 0, ll = this.colliderPool.length; ii < ll; ii ++ ) {
 
 				const octree = this.colliderPool[ ii ];
-				const sphere = new THREE.Sphere( character.center, character.radius + character.groundPadding );
+				sphere.set( character.center, character.radius + character.groundPadding );
 				const intersectedNodes = octree.getIntersectedNodes( sphere, octree.maxDepth );
 				faces = Octree.uniqTrianglesFromNodes( intersectedNodes );
 

@@ -1,8 +1,7 @@
-import { THREE } from '../install.js';
-import { onInstallHandlers } from '../install.js';
+import { THREE, onInstallHandlers } from '../install.js';
 import EventDispatcher from '../core/EventDispatcher.js';
 
-const PI2     = Math.PI * 2;
+const PI_2     = Math.PI * 2;
 const PI_HALF = Math.PI / 2;
 
 let rotationMatrix;
@@ -109,7 +108,7 @@ export class TPSCameraControl extends EventDispatcher {
 
 	getFrontAngle() {
 
-		return PI2 + this.theta;
+		return PI_2 + this.theta;
 
 	}
 
