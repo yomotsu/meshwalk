@@ -24,117 +24,110 @@ import * as THREE from 'https://unpkg.com/three@0.119.1/build/three.module.js';
 import * as MW from '../dist/meshwalk.module.js';
 // See demo/2_keyboardInput.html first
 
-var width, height, clock, scene, camera, renderer;
-var ground, wall, sphere;
-var world, min, max, partition, octree,
-    playerRadius = 1, playerObjectHolder, playerController;
-var keyInputControl;
-var tpsCameraControl;
-
 MW.install( THREE );
 
-world = new MW.World();
-min = new THREE.Vector3( -15, -15, -15 );
-max = new THREE.Vector3(  15,  15,  15 );
-partition = 5;
-octree = new MW.Octree( min, max, partition );
-world.add( octree );
+const DEG360 = Math.PI * 2;
+
+const world = new MW.World();
+const min = new THREE.Vector3( - 15, - 15, - 15 );
+const max = new THREE.Vector3(  15,  15,  15 );
+const partition = 5;
+const region = new MW.Octree( min, max, partition );
+world.add( region );
 
 
-width = window.innerWidth;
-height = window.innerHeight;
-clock = new THREE.Clock();
-scene = new THREE.Scene();
-camera = new THREE.PerspectiveCamera( 40, width / height, 1, 1000 );
+const width = window.innerWidth;
+const height = window.innerHeight;
+const clock = new THREE.Clock();
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera( 40, width / height, 1, 1000 );
 camera.position.set( 0, 5, 30 );
-renderer = new THREE.WebGLRenderer();
+const renderer = new THREE.WebGLRenderer();
 renderer.setSize( width, height );
 document.body.appendChild( renderer.domElement );
 
 
-ground = new THREE.Mesh(
-  new THREE.PlaneBufferGeometry( 30, 30, 10, 10 ),
-  new THREE.MeshBasicMaterial( { color: 0xffffff,  wireframe: true } )
+const ground = new THREE.Mesh(
+	new THREE.PlaneBufferGeometry( 30, 30, 10, 10 ),
+	new THREE.MeshBasicMaterial( { color: 0xffffff,  wireframe: true } )
 );
-ground.rotation.x = THREE.Math.degToRad( -90 );
+ground.rotation.x = - 90 * THREE.Math.DEG2RAD;
 scene.add( ground );
-octree.importThreeMesh( ground );
+region.importThreeMesh( ground );
 
 
-wall = new THREE.Mesh(
-  new THREE.BoxGeometry( 5, 6, 10 ),
-  new THREE.MeshNormalMaterial( { wireframe: true } )
+const wall = new THREE.Mesh(
+	new THREE.BoxGeometry( 5, 6, 10 ),
+	new THREE.MeshNormalMaterial( { wireframe: true } )
 );
 wall.position.set( 0, 3, 0 );
-// wall.rotation.set( 0, 0, THREE.Math.degToRad( 20 ) );
 scene.add( wall );
-octree.importThreeMesh( wall );
+region.importThreeMesh( wall );
 
-
-playerObjectHolder = new THREE.Object3D();
+const playerRadius = 1;
+const playerObjectHolder = new THREE.Object3D();
 playerObjectHolder.position.set( 0, 10, 0 );
 scene.add( playerObjectHolder );
 
-sphere = new THREE.Mesh(
-  new THREE.SphereGeometry( playerRadius, 16, 16 ),
-  new THREE.MeshBasicMaterial( { color: 0xff0000,  wireframe: true} )
+const sphere = new THREE.Mesh(
+	new THREE.SphereGeometry( playerRadius, 16, 16 ),
+	new THREE.MeshBasicMaterial( { color: 0xff0000,  wireframe: true} )
 );
 playerObjectHolder.add( sphere );
 
-playerController = new MW.CharacterController( playerObjectHolder, playerRadius );
+const playerController = new MW.CharacterController( playerObjectHolder, playerRadius );
 world.add( playerController );
 
-keyInputControl = new MW.KeyInputControl();
+const keyInputControl = new MW.KeyInputControl();
 
-tpsCameraControl = new MW.TPSCameraControl(
-  camera, // three.js camera
-  playerObjectHolder, // tracking object
-  {
-    el: renderer.domElement,
-    offset: new THREE.Vector3( 0, 1.8, 0 ), // eye height
-    // radius: 1, // default distance of the character to the camera
-    // minRadius: 1,
-    // maxRadius: 80,
-    rigidObjects: [ ground, wall ]
-  }
+const tpsCameraControl = new MW.TPSCameraControl(
+	camera, // three.js camera
+	playerObjectHolder, // tracking object
+	{
+		el: renderer.domElement,
+		offset: new THREE.Vector3( 0, 1.8, 0 ), // eye height
+		// radius: 1, // default distance of the character to the camera
+		// minRadius: 1,
+		// maxRadius: 80,
+		rigidObjects: [ ground, wall ],
+	}
 );
 
 
 // bind events
-keyInputControl.addEventListener( 'movekeyon',    function () { playerController.isRunning = true; } );
-keyInputControl.addEventListener( 'movekeyoff',   function () { playerController.isRunning = false; } );
-keyInputControl.addEventListener( 'jumpkeypress', function () { playerController.jump(); } );
+keyInputControl.addEventListener( 'movekeyon',    () => playerController.isRunning = true );
+keyInputControl.addEventListener( 'movekeyoff',   () => playerController.isRunning = false );
+keyInputControl.addEventListener( 'jumpkeypress', () => playerController.jump() );
 
 // synk with keybord input and camera control input
-keyInputControl.addEventListener( 'movekeychange',  function () {
+keyInputControl.addEventListener( 'movekeychange', () => {
 
-  var cameraFrontAngle    = tpsCameraControl.getFrontAngle();
-  var characterFrontAngle = keyInputControl.frontAngle;
-  playerController.direction = THREE.Math.degToRad( 360 ) - cameraFrontAngle + characterFrontAngle;
+	const cameraFrontAngle    = tpsCameraControl.getFrontAngle();
+	const characterFrontAngle = keyInputControl.frontAngle;
+	playerController.direction = DEG360 - cameraFrontAngle + characterFrontAngle;
 
 } );
 
 // the 'updated' event is fired by `tpsCameraControl.update()`
-tpsCameraControl.addEventListener( 'updated', function () {
+tpsCameraControl.addEventListener( 'updated', () => {
 
-  var cameraFrontAngle    = tpsCameraControl.getFrontAngle();
-  var characterFrontAngle = keyInputControl.frontAngle;
-  playerController.direction = THREE.Math.degToRad( 360 ) - cameraFrontAngle + characterFrontAngle;
+	const cameraFrontAngle    = tpsCameraControl.getFrontAngle();
+	const characterFrontAngle = keyInputControl.frontAngle;
+	playerController.direction = DEG360 - cameraFrontAngle + characterFrontAngle;
 
 } );
 
 
-;( function update () {
+( function update () {
 
-  var delta = clock.getDelta();
+	const delta = clock.getDelta();
 
-  requestAnimationFrame( update );
-  world.step( Math.min( delta, 0.02 ) );
-  tpsCameraControl.update();
-  renderer.render( scene, camera );
+	requestAnimationFrame( update );
+	world.step( Math.min( delta, 0.02 ) );
+	tpsCameraControl.update();
+	renderer.render( scene, camera );
 
 } )();
-
 </script>
 
 </body>

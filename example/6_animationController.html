@@ -21,14 +21,14 @@ canvas{display: block;}
   <button onclick="animationController.play( 'jump' );">jump</button>
   <button onclick="animationController.play( 'slide' );">slide</button>
   <br>
-  <button onclick="animationController.turn( THREE.Math.degToRad( 90 ) );">turn to 90deg</button>
-  <button onclick="animationController.turn( THREE.Math.degToRad( 270 ) );">turn to 270deg</button>
-  <button onclick="animationController.turn( THREE.Math.degToRad( 180 ) );">turn to 180deg</button>
-  <button onclick="animationController.turn( THREE.Math.degToRad( 0 ) );">turn to 0deg</button>
+  <button onclick="animationController.turn( 90  * THREE.Math.DEG2RAD );">turn to 90deg</button>
+  <button onclick="animationController.turn( 270 * THREE.Math.DEG2RAD );">turn to 270deg</button>
+  <button onclick="animationController.turn( 180 * THREE.Math.DEG2RAD );">turn to 180deg</button>
+  <button onclick="animationController.turn( 0   * THREE.Math.DEG2RAD );">turn to 0deg</button>
   <br>
-  <button onclick="animationController.turn( THREE.Math.degToRad( 90 ), true );">turn to 90deg immediate</button>
-  <button onclick="animationController.turn( THREE.Math.degToRad( 270 ), true );">turn to 270deg immediate</button>
-  <button onclick="animationController.turn( THREE.Math.degToRad( 0 ), true );">turn to 0deg immediate</button>
+  <button onclick="animationController.turn( 90  * THREE.Math.DEG2RAD, true );">turn to 90deg immediate</button>
+  <button onclick="animationController.turn( 270 * THREE.Math.DEG2RAD, true );">turn to 270deg immediate</button>
+  <button onclick="animationController.turn( 0   * THREE.Math.DEG2RAD, true );">turn to 0deg immediate</button>
 </div>
 
 <script src="https://unpkg.com/three@0.98.0/build/three.min.js"></script>
@@ -80,7 +80,7 @@ loader.load( './model/miku.json', function( geometry, materials ) {
 
 } );
 
-;( function update () {
+( function update () {
 
   requestAnimationFrame( update );
   var delta = clock.getDelta();

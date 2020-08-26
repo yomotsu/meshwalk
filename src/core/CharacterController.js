@@ -68,7 +68,7 @@ export class CharacterController extends EventDispatcher {
 		let wasRunning;
 		let wasJumping;
 
-		this.events = () => {
+		this._events = () => {
 
 			// 初回のみ、過去状態を作るだけで終わり
 			if ( isFirstUpdate ) {
@@ -137,17 +137,17 @@ export class CharacterController extends EventDispatcher {
 		this.groundHeight = - Infinity;
 		this.groundNormal.set( 0, 1, 0 );
 
-		this.updateGrounding();
-		this.updateJumping();
-		this.updatePosition( dt );
-		this.collisionDetection();
-		this.solvePosition();
-		this.updateVelocity();
-		this.events();
+		this._updateGrounding();
+		this._updateJumping();
+		this._updatePosition( dt );
+		this._collisionDetection();
+		this._solvePosition();
+		this._updateVelocity();
+		this._events();
 
 	}
 
-	updateVelocity() {
+	_updateVelocity() {
 
 		const frontDirection = - Math.cos( this.direction );
 		const rightDirection = - Math.sin( this.direction );
@@ -174,8 +174,8 @@ export class CharacterController extends EventDispatcher {
 		} else if ( this.isOnSlope ) {
 
 			// TODO 0.2 はマジックナンバーなので、幾何学的な求め方を考える
-			var slidingDownVelocity = FALL_VELOCITY;
-			var horizontalSpeed = - slidingDownVelocity / ( 1 - this.groundNormal.y ) * 0.2;
+			const slidingDownVelocity = FALL_VELOCITY;
+			const horizontalSpeed = - slidingDownVelocity / ( 1 - this.groundNormal.y ) * 0.2;
 
 			this.velocity.x = this.groundNormal.x * horizontalSpeed;
 			this.velocity.y = FALL_VELOCITY;
@@ -251,7 +251,7 @@ export class CharacterController extends EventDispatcher {
 
 	}
 
-	updateGrounding() {
+	_updateGrounding() {
 
 		// "頭上からほぼ無限に下方向までの線 (segment)" vs "フェイス (triangle)" の
 		// 交差判定を行う
@@ -343,7 +343,7 @@ export class CharacterController extends EventDispatcher {
 
 	}
 
-	updatePosition( dt ) {
+	_updatePosition( dt ) {
 
 		// 壁などを無視してひとまず(速度 * 時間)だけ
 		// centerの座標を進める
@@ -362,7 +362,7 @@ export class CharacterController extends EventDispatcher {
 
 	}
 
-	collisionDetection() {
+	_collisionDetection() {
 
 		// 交差していそうなフェイス (collisionCandidate) のリストから、
 		// 実際に交差している壁フェイスを抜き出して
@@ -390,7 +390,7 @@ export class CharacterController extends EventDispatcher {
 
 	}
 
-	solvePosition() {
+	_solvePosition() {
 
 		// updatePosition() で center を動かした後
 		// 壁と衝突し食い込んでいる場合、
@@ -495,7 +495,7 @@ export class CharacterController extends EventDispatcher {
 
 	}
 
-	updateJumping() {
+	_updateJumping() {
 
 		if ( ! this.isJumping ) return;
 

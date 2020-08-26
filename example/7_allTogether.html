@@ -16,7 +16,7 @@ canvas{display: block;}
 </head>
 <body>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/es6-promise/4.1.1/es6-promise.auto.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/es6-promise/4.2.8/es6-promise.auto.min.js"></script>
 <script src="https://unpkg.com/three@0.98.0/build/three.min.js"></script>
 <script src="../dist/meshwalk.js"></script>
 <script>
@@ -24,12 +24,11 @@ THREE.Geometry.prototype.applyMatrix4 = THREE.Geometry.prototype.applyMatrix;
 
 MW.install( THREE );
 
-var loadMesh = function ( url ) {
+const loadMesh = function ( url ) {
 
   return new Promise( function( resolve, reject ) {
 
-    var loader = new THREE.JSONLoader();
-
+    const loader = new THREE.JSONLoader();
     loader.load( url, function( geometry, materials ) {
 
       resolve( {
@@ -46,19 +45,19 @@ var loadMesh = function ( url ) {
 
 var width, height, clock, scene, camera, renderer;
 var ambientLight, terrainMesh, characterMesh, box, sphere;
-var world, min, max, partition, octree,
+var world, min, max, partition, region,
     playerRadius = 1, playerObjectHolder, playerController;
 var keyInputControl;
 var tpsCameraControl;
 var animationController;
-var vent = new THREE.EventDispatcher();
+var eventDispatcher = new THREE.EventDispatcher();
 
 world = new MW.World();
 min = new THREE.Vector3( -15, -15, -15 );
 max = new THREE.Vector3(  15,  15,  15 );
 partition = 5;
-octree = new MW.Octree( min, max, partition );
-world.add( octree );
+region = new MW.Octree( min, max, partition );
+world.add( region );
 
 
 width = window.innerWidth;
@@ -139,9 +138,9 @@ Promise.all( [
     new THREE.BoxGeometry( 14, 1, 5 ),
     new THREE.MeshNormalMaterial()
   );
-  box.position.set( -3, 7.5, -13 );
+  box.position.set( - 3, 7.5, - 13 );
   scene.add( box );
-  octree.importThreeMesh( box );
+  region.importThreeMesh( box );
 
 
   terrainMesh = new THREE.Mesh(
@@ -151,7 +150,7 @@ Promise.all( [
   );
   terrainMesh.scale.set( 2, 2, 2 );
   scene.add( terrainMesh );
-  octree.importThreeMesh( terrainMesh );
+  region.importThreeMesh( terrainMesh );
   tpsCameraControl.rigidObjects.push( terrainMesh );
 
 
@@ -194,12 +193,12 @@ Promise.all( [
   } );
 
 
-  ;( function update () {
+  ( function update () {
 
-    var delta = clock.getDelta();
+    const delta = clock.getDelta();
 
     requestAnimationFrame( update );
-    vent.dispatchEvent( { type: 'beforerender' } );
+    eventDispatcher.dispatchEvent( { type: 'beforerender' } );
     world.step( Math.min( delta, 0.02 ) );
     tpsCameraControl.update();
     animationController.update( delta );
