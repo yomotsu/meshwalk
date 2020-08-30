@@ -1,5 +1,6 @@
-import babel from '@rollup/plugin-babel';
 import pkg from './package.json';
+import babel from '@rollup/plugin-babel';
+import { nodeResolve } from '@rollup/plugin-node-resolve';
 
 const license = `/*!
 * ${ pkg.name }
@@ -27,6 +28,7 @@ export default {
 	],
 	// sourceMap: false,
 	plugins: [
+		nodeResolve(),
 		babel( {
 			babelHelpers: 'bundled',
 			exclude: 'node_modules/**'

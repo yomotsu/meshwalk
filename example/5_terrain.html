@@ -27,8 +27,6 @@ import * as MW from '../dist/meshwalk.module.js';
 
 MW.install( THREE );
 
-const DEG360 = Math.PI * 2;
-
 const world = new MW.World();
 const min = new THREE.Vector3( - 15, - 15, - 15 );
 const max = new THREE.Vector3(  15,  15,  15 );
@@ -42,7 +40,7 @@ const height = window.innerHeight;
 const clock = new THREE.Clock();
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera( 40, width / height, 1, 1000 );
-camera.position.set( 0, 5, 30 );
+camera.position.set( 0, 0, 6 );
 const renderer = new THREE.WebGLRenderer();
 renderer.setSize( width, height );
 document.body.appendChild( renderer.domElement );
@@ -64,17 +62,10 @@ world.add( playerController );
 
 const keyInputControl = new MW.KeyInputControl();
 
-const tpsCameraControl = new MW.TPSCameraControl(
+const tpsCameraControls = new MW.TPSCameraControls(
 	camera, // three.js camera
 	playerObjectHolder, // tracking object
-	{
-		el: renderer.domElement,
-		offset: new THREE.Vector3( 0, 1.8, 0 ), // eye height
-		// radius: 1, // default distance of the character to the camera
-		// minRadius: 1,
-		// maxRadius: 80,
-		rigidObjects: [],
-	}
+	renderer.domElement
 );
 
 
@@ -86,18 +77,18 @@ keyInputControl.addEventListener( 'jumpkeypress', () => playerController.jump() 
 // synk with keybord input and camera control input
 keyInputControl.addEventListener( 'movekeychange', () => {
 
-	const cameraFrontAngle = tpsCameraControl.getFrontAngle();
+	const cameraFrontAngle = tpsCameraControls.frontAngle;
 	const characterFrontAngle = keyInputControl.frontAngle;
-	playerController.direction = DEG360 - cameraFrontAngle + characterFrontAngle;
+	playerController.direction = cameraFrontAngle + characterFrontAngle;
 
 } );
 
-// 'updated' event is fired by `tpsCameraControl.update()`
-tpsCameraControl.addEventListener( 'updated', () => {
+// 'updated' event is fired by `tpsCameraControls.update()`
+tpsCameraControls.addEventListener( 'update', () => {
 
-	const cameraFrontAngle = tpsCameraControl.getFrontAngle();
+	const cameraFrontAngle = tpsCameraControls.frontAngle;
 	const characterFrontAngle = keyInputControl.frontAngle;
-	playerController.direction = DEG360 - cameraFrontAngle + characterFrontAngle;
+	playerController.direction = cameraFrontAngle + characterFrontAngle;
 
 } );
 
@@ -126,7 +117,7 @@ loader.load( 'terrain.glb', ( gltf ) => {
 	terrainHelper.scale.copy( terrain.scale );
 	scene.add( terrainHelper );
 	region.importThreeMesh( terrain );
-	tpsCameraControl.rigidObjects.push( terrain );
+	tpsCameraControls.colliderMeshes.push( terrain );
 
 
 	( function update () {
@@ -135,7 +126,7 @@ loader.load( 'terrain.glb', ( gltf ) => {
 
 		requestAnimationFrame( update );
 		world.step( Math.min( delta, 0.02 ) );
-		tpsCameraControl.update();
+		tpsCameraControls.update( delta );
 		renderer.render( scene, camera );
 
 	} )();

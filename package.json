@@ -14,6 +14,7 @@
     "@babel/preset-env": "^7.11.0",
     "@babel/runtime": "^7.11.2",
     "@rollup/plugin-babel": "^5.2.0",
+    "@rollup/plugin-node-resolve": "^9.0.0",
     "rollup": "^2.26.3",
     "terser": "^5.2.0"
   },
@@ -48,5 +49,8 @@
     "game",
     "collision",
     "physics"
-  ]
+  ],
+  "dependencies": {
+    "camera-controls": "^1.22.1"
+  }
 }

@@ -6,4 +6,4 @@ export { CharacterController } from './core/CharacterController.js';
 
 export { AnimationController } from './TPS/AnimationController.js';
 export { KeyInputControl } from './TPS/KeyInputControl.js';
-export { TPSCameraControl } from './TPS/TPSCameraControl.js';
+export { TPSCameraControls } from './TPS/TPSCameraControls.js';
