@@ -2695,12 +2695,13 @@
 	    _this = _super.call(this, camera, domElement);
 	    _this.minDistance = 1;
 	    _this.maxDistance = 30;
-	    _this.azimuthRotateSpeed = -0.3; // negative value to invert rotation direction
+	    _this.azimuthRotateSpeed = 0.3; // negative value to invert rotation direction
 
 	    _this.polarRotateSpeed = -0.2; // negative value to invert rotation direction
 
 	    _this.minPolarAngle = 30 * THREE$1.Math.DEG2RAD;
 	    _this.maxPolarAngle = 120 * THREE$1.Math.DEG2RAD;
+	    _this.draggingDampingFactor = 1;
 	    _this.mouseButtons.right = CameraControls.ACTION.NONE;
 	    _this.mouseButtons.middle = CameraControls.ACTION.NONE;
 	    _this.touches.two = CameraControls.ACTION.TOUCH_DOLLY;
