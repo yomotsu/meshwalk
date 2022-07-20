@@ -16,7 +16,7 @@
     "@rollup/plugin-babel": "^5.2.0",
     "@rollup/plugin-node-resolve": "^9.0.0",
     "rollup": "^2.26.3",
-    "terser": "^5.2.0"
+    "terser": "^5.14.2"
   },
   "scripts": {
     "dev": "rollup --config --watch",
