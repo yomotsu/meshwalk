@@ -45,7 +45,7 @@ export class CharacterController extends EventDispatcher {
 		this.center = this.object.position.clone();
 		this.radius = radius;
 		this.groundPadding = .5;
-		this.maxSlopeGradient = Math.cos( 50 * THREE.Math.DEG2RAD );
+		this.maxSlopeGradient = Math.cos( 50 * THREE.MathUtils.DEG2RAD );
 		this.isGrounded = false;
 		this.isOnSlope  = false;
 		this.isIdling   = false;

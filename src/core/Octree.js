@@ -99,20 +99,18 @@ export class Octree {
 				const indices   = geometry.index.array;
 				const positions = geometry.attributes.position.array;
 				// const normals   = geometry.attributes.normal.array;
+				const groups   = ( geometry.groups.length !== 0 ) ? geometry.groups : [ { start: 0, count: indices.length, materialIndex: 0 } ];
 
-				const offsets   = ( geometry.groups.length !== 0 ) ? geometry.groups : [ { start: 0, count: indices.length, materialIndex: 0 } ];
+				for ( let i = 0, l = groups.length; i < l; ++ i ) {
 
-				for ( let i = 0, l = offsets.length; i < l; ++ i ) {
-
-					const start  = offsets[ i ].start;
-					const count  = offsets[ i ].count;
-					const index  = offsets[ i ].materialIndex;
+					const start  = groups[ i ].start;
+					const count  = groups[ i ].count;
 
 					for ( let ii = start, ll = start + count; ii < ll; ii += 3 ) {
 
-						const a = index + indices[ ii ];
-						const b = index + indices[ ii + 1 ];
-						const c = index + indices[ ii + 2 ];
+						const a = indices[ ii ];
+						const b = indices[ ii + 1 ];
+						const c = indices[ ii + 2 ];
 
 						const vA = new THREE.Vector3().fromArray( positions, a * 3 );
 						const vB = new THREE.Vector3().fromArray( positions, b * 3 );

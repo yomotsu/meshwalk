@@ -20,7 +20,7 @@ canvas{display: block;}
 </div>
 
 <script type="module">
-import * as THREE from 'https://unpkg.com/three@0.120.0/build/three.module.js';
+import * as THREE from 'https://unpkg.com/three@0.148.0/build/three.module.js';
 import * as MW from '../dist/meshwalk.module.js';
 // See demo/1_getstarted.html first
 
@@ -46,10 +46,10 @@ document.body.appendChild( renderer.domElement );
 
 
 const ground = new THREE.Mesh(
-  new THREE.PlaneBufferGeometry( 30, 30, 10, 10 ),
+  new THREE.PlaneGeometry( 30, 30, 10, 10 ),
   new THREE.MeshBasicMaterial( { color: 0xffffff,  wireframe: true } )
 );
-ground.rotation.x = THREE.Math.degToRad( -90 );
+ground.rotation.x = - 90 * THREE.MathUtils.DEG2RAD;
 scene.add( ground );
 region.importThreeMesh( ground );
 

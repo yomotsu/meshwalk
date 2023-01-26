@@ -16,12 +16,12 @@ canvas{display: block;}
 </head>
 <body>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/es6-promise/4.2.8/es6-promise.auto.min.js"></script>
 <script src="https://unpkg.com/three@0.98.0/build/three.min.js"></script>
 <script src="../dist/meshwalk.js"></script>
 <script>
 THREE.Geometry.prototype.applyMatrix4 = THREE.Geometry.prototype.applyMatrix;
 
+THREE.MathUtils = THREE.Math;
 MW.install( THREE );
 
 const loadMesh = function ( url ) {

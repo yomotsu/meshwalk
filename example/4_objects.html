@@ -26,7 +26,7 @@ canvas{display: block;}
 </div>
 
 <script type="module">
-import * as THREE from 'https://unpkg.com/three@0.120.0/build/three.module.js';
+import * as THREE from 'https://unpkg.com/three@0.148.0/build/three.module.js';
 import * as MW from '../dist/meshwalk.module.js';
 // See demo/2_keyboardInput.html first
 
@@ -56,14 +56,14 @@ scene.add( light );
 
 
 const ground = new THREE.Mesh(
-	new THREE.PlaneBufferGeometry( 100, 100, 10, 10 ),
+	new THREE.PlaneGeometry( 100, 100, 10, 10 ),
 	new THREE.MeshNormalMaterial()
 );
-ground.rotation.x = - 90 * THREE.Math.DEG2RAD;
+ground.rotation.x = - 90 * THREE.MathUtils.DEG2RAD;
 scene.add( ground );
 region.importThreeMesh( ground );
 
-const groundHelper = new THREE.WireframeHelper( ground );
+const groundHelper = new THREE.LineSegments( new THREE.WireframeGeometry( ground.geometry ) );
 groundHelper.rotation.copy( ground.rotation );
 scene.add( groundHelper );
 
@@ -77,7 +77,7 @@ object1.position.set( 0, 2, 0 );
 scene.add( object1 );
 region.importThreeMesh( object1 );
 
-const object1Helper = new THREE.WireframeHelper( object1 );
+const object1Helper = new THREE.LineSegments( new THREE.WireframeGeometry( object1.geometry ) );
 object1Helper.position.copy( object1.position );
 object1Helper.rotation.copy( object1.rotation );
 scene.add( object1Helper );
@@ -88,11 +88,11 @@ const object2 = new THREE.Mesh(
 	new THREE.MeshNormalMaterial()
 );
 object2.position.set( - 15, 0, 0 );
-object2.rotation.set( 20 * THREE.Math.DEG2RAD, 0, 0 );
+object2.rotation.set( 20 * THREE.MathUtils.DEG2RAD, 0, 0 );
 scene.add( object2 );
 region.importThreeMesh( object2 );
 
-const object2Helper = new THREE.WireframeHelper( object2 );
+const object2Helper = new THREE.LineSegments( new THREE.WireframeGeometry( object2.geometry ) );
 object2Helper.position.copy( object2.position );
 object2Helper.rotation.copy( object2.rotation );
 scene.add( object2Helper );
@@ -102,11 +102,11 @@ const object3 = new THREE.Mesh(
 	new THREE.MeshNormalMaterial()
 );
 object3.position.set( - 15, 4.5, - 8 );
-object3.rotation.set( 40 * THREE.Math.DEG2RAD, 0, 0 );
+object3.rotation.set( 40 * THREE.MathUtils.DEG2RAD, 0, 0 );
 scene.add( object3 );
 region.importThreeMesh( object3 );
 
-const object3Helper = new THREE.WireframeHelper( object3 );
+const object3Helper = new THREE.LineSegments( new THREE.WireframeGeometry( object3.geometry ) );
 object3Helper.position.copy( object3.position );
 object3Helper.rotation.copy( object3.rotation );
 scene.add( object3Helper );
@@ -117,11 +117,11 @@ const object4 = new THREE.Mesh(
 	new THREE.MeshNormalMaterial()
 );
 object4.position.set( - 15, 10.5, - 13 );
-object4.rotation.set( 60 * THREE.Math.DEG2RAD, 0, 0 );
+object4.rotation.set( 60 * THREE.MathUtils.DEG2RAD, 0, 0 );
 scene.add( object4 );
 region.importThreeMesh( object4 );
 
-const object4Helper = new THREE.WireframeHelper( object4 );
+const object4Helper = new THREE.LineSegments( new THREE.WireframeGeometry( object4.geometry ) );
 object4Helper.position.copy( object4.position );
 object4Helper.rotation.copy( object4.rotation );
 scene.add( object4Helper );
@@ -135,7 +135,7 @@ object5.position.set( 20, 0, 0 );
 scene.add( object5 );
 region.importThreeMesh( object5 );
 
-const object5Helper = new THREE.WireframeHelper( object5 );
+const object5Helper = new THREE.LineSegments( new THREE.WireframeGeometry( object5.geometry ) );
 object5Helper.position.copy( object5.position );
 scene.add( object5Helper );
 
@@ -156,7 +156,7 @@ const playerController = new MW.CharacterController( playerObjectHolder, playerR
 world.add( playerController );
 window.setMaxSlopeGradient = ( deg ) => {
 
-	playerController.maxSlopeGradient = Math.cos( deg * THREE.Math.DEG2RAD );
+	playerController.maxSlopeGradient = Math.cos( deg * THREE.MathUtils.DEG2RAD );
 
 };
 

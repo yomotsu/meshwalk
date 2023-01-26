@@ -8,15 +8,15 @@
   "jsnext:main": "dist/meshwalk.module.js",
   "module": "dist/meshwalk.module.js",
   "devDependencies": {
-    "@babel/core": "^7.11.1",
-    "@babel/plugin-proposal-object-rest-spread": "^7.11.0",
-    "@babel/plugin-transform-runtime": "^7.11.0",
-    "@babel/preset-env": "^7.11.0",
-    "@babel/runtime": "^7.11.2",
-    "@rollup/plugin-babel": "^5.2.0",
-    "@rollup/plugin-node-resolve": "^9.0.0",
-    "rollup": "^2.26.3",
-    "terser": "^5.2.0"
+    "@babel/core": "^7.20.12",
+    "@babel/plugin-proposal-object-rest-spread": "^7.20.7",
+    "@babel/plugin-transform-runtime": "^7.19.6",
+    "@babel/preset-env": "^7.20.2",
+    "@babel/runtime": "^7.20.13",
+    "@rollup/plugin-babel": "^6.0.3",
+    "@rollup/plugin-node-resolve": "^15.0.1",
+    "rollup": "^3.10.1",
+    "terser": "^5.16.1"
   },
   "scripts": {
     "dev": "rollup --config --watch",
@@ -51,6 +51,6 @@
     "physics"
   ],
   "dependencies": {
-    "camera-controls": "^1.22.1"
+    "camera-controls": "^1.38.0"
   }
 }
