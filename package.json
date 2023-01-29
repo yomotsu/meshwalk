@@ -15,7 +15,7 @@
     "@babel/runtime": "^7.20.13",
     "@rollup/plugin-babel": "^6.0.3",
     "@rollup/plugin-node-resolve": "^15.0.1",
-    "rollup": "^3.10.1",
+    "rollup": "^3.12.0",
     "terser": "^5.16.1"
   },
   "scripts": {
@@ -51,6 +51,6 @@
     "physics"
   ],
   "dependencies": {
-    "camera-controls": "^1.38.0"
+    "camera-controls": "^2.0.1"
   }
 }

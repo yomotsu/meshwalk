@@ -18,7 +18,7 @@ export class TPSCameraControls extends CameraControls {
 		this.polarRotateSpeed   = - 0.2; // negative value to invert rotation direction
 		this.minPolarAngle = 30 * THREE.MathUtils.DEG2RAD;
 		this.maxPolarAngle = 120 * THREE.MathUtils.DEG2RAD;
-		this.draggingDampingFactor = 1;
+		this.draggingSmoothTime = 1e-10;
 
 		this.mouseButtons.right = CameraControls.ACTION.NONE;
 		this.mouseButtons.middle = CameraControls.ACTION.NONE;
