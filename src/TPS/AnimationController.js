@@ -1,3 +1,5 @@
+import { THREE } from '../install.js';
+
 const TURN_DURATION = 200;
 const TAU = 2 * Math.PI;
 const modulo = ( n, d ) => ( ( n % d ) + d ) % d;
