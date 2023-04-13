@@ -16,32 +16,19 @@ canvas{display: block;}
 </head>
 <body>
 
-<script src="https://unpkg.com/three@0.98.0/build/three.min.js"></script>
-<script src="../dist/meshwalk.js"></script>
-<script>
-THREE.Geometry.prototype.applyMatrix4 = THREE.Geometry.prototype.applyMatrix;
-
-THREE.MathUtils = THREE.Math;
-MW.install( THREE );
-
-const loadMesh = function ( url ) {
-
-  return new Promise( function( resolve, reject ) {
-
-    const loader = new THREE.JSONLoader();
-    loader.load( url, function( geometry, materials ) {
-
-      resolve( {
-        geometry: geometry,
-        materials: materials
-      } );
-
-    } );
-
-  } );
-
-};
-
+<script async src="https://unpkg.com/es-module-shims@1.6.3/dist/es-module-shims.js"></script>
+<script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.151.2/build/three.module.js",
+      "three/examples/": "https://unpkg.com/three@0.151.2/examples/"
+    }
+  }
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import * as MW from '../dist/meshwalk.module.js';
 
 var width, height, clock, scene, camera, renderer;
 var ambientLight, terrainMesh, characterMesh, box, sphere;
@@ -119,90 +106,68 @@ tpsCameraControls.addEventListener( 'update', function () {
 } );
 
 
-Promise.all( [
-  loadMesh( 'terrain.json' ),
-  loadMesh( 'model/miku.json' )
-] ).then( function( result ) {
+const [ terrainGltf, characterGltf ] = await Promise.all( [
+  new GLTFLoader().loadAsync( 'terrain.glb' ),
+  new GLTFLoader().loadAsync( 'miku.glb' ),
+] );
 
-  var terrainData   = result[ 0 ];
-  var characterData = result[ 1 ];
 
-  box = new THREE.Mesh(
-    new THREE.BoxGeometry( 14, 1, 5 ),
-    new THREE.MeshNormalMaterial()
+box = new THREE.Mesh(
+  new THREE.BoxGeometry( 14, 1, 5 ),
+  new THREE.MeshNormalMaterial()
+);
+box.position.set( - 3, 7.5, - 13 );
+scene.add( box );
+region.importThreeMesh( box );
+
+const terrain = terrainGltf.scene.children[ 0 ];
+terrain.material = new THREE.MeshNormalMaterial();
+terrain.scale.multiplyScalar( 2 );
+scene.add( terrain );
+region.importThreeMesh( terrain );
+tpsCameraControls.colliderMeshes.push( terrain );
+
+scene.add( characterGltf.scene );
+
+animationController = new MW.AnimationController( characterGltf.scene, characterGltf.animations );
+animationController.motion.jump.setLoop( THREE.LoopOnce, 0 );
+animationController.motion.slide.setLoop( THREE.LoopOnce, 0 );
+animationController.motion.jump.clampWhenFinished = true;
+animationController.motion.slide.clampWhenFinished = true;
+
+
+// player motion
+playerController.addEventListener( 'startIdling',  () => animationController.play( 'idle'  ) );
+playerController.addEventListener( 'startWalking', () => animationController.play( 'run'   ) );
+playerController.addEventListener( 'startJumping', () => animationController.play( 'jump'  ) );
+playerController.addEventListener( 'startSliding', () => animationController.play( 'slide' ) );
+playerController.addEventListener( 'startFalling', () => animationController.play( 'slide' ) );
+
+eventDispatcher.addEventListener( 'beforerender', function () {
+
+  animationController.mesh.position.set(
+    playerController.center.x,
+    playerController.center.y - playerController.radius,
+    playerController.center.z
   );
-  box.position.set( - 3, 7.5, - 13 );
-  scene.add( box );
-  region.importThreeMesh( box );
 
-
-  terrainMesh = new THREE.Mesh(
-    terrainData.geometry,
-    new THREE.MeshNormalMaterial()
-    // new THREE.MeshFaceMaterial( terrainData.materials )
-  );
-  terrainMesh.scale.set( 2, 2, 2 );
-  scene.add( terrainMesh );
-  region.importThreeMesh( terrainMesh );
-  tpsCameraControls.colliderMeshes.push( terrainMesh );
-
-
-  characterData.materials.forEach( function ( material ) {
-
-    material.skinning = true;
-
-  } );
-
-  characterMesh = new THREE.SkinnedMesh(
-    characterData.geometry,
-    new THREE.MeshFaceMaterial( characterData.materials )
-  );
-  scene.add( characterMesh );
-
-  animationController = new MW.AnimationController( characterMesh );
-  animationController.motion.jump.setLoop( THREE.LoopOnce, 0 );
-  animationController.motion.slide.setLoop( THREE.LoopOnce, 0 );
-  animationController.motion.jump.clampWhenFinished = true;
-  animationController.motion.slide.clampWhenFinished = true;
-
-
-  // player motion
-  playerController.addEventListener( 'startIdling',  function () { animationController.play( 'idle'  ); } );
-  playerController.addEventListener( 'startWalking', function () { animationController.play( 'run'   ); } );
-  playerController.addEventListener( 'startJumping', function () { animationController.play( 'jump'  ); } );
-  playerController.addEventListener( 'startSliding', function () { animationController.play( 'slide' ); } );
-  playerController.addEventListener( 'startFalling', function () { animationController.play( 'slide' ); } );
-
-  eventDispatcher.addEventListener( 'beforerender', function () {
-
-    animationController.mesh.position.set(
-      playerController.center.x,
-      playerController.center.y - playerController.radius,
-      playerController.center.z
-    );
-
-    animationController.mesh.rotation.y = playerController.direction + Math.PI;
-
-  } );
-
-
-  ( function update () {
-
-    const delta = clock.getDelta();
-
-    requestAnimationFrame( update );
-    world.step( Math.min( delta, 0.02 ) );
-    tpsCameraControls.update( delta );
-    animationController.update( delta );
-    eventDispatcher.dispatchEvent( { type: 'beforerender' } );
-    renderer.render( scene, camera );
-
-  } )();
+  animationController.mesh.rotation.y = playerController.direction + Math.PI;
 
 } );
 
 
+( function update () {
 
+  const delta = clock.getDelta();
+
+  requestAnimationFrame( update );
+  world.step( Math.min( delta, 0.02 ) );
+  tpsCameraControls.update( delta );
+  animationController.update( delta );
+  eventDispatcher.dispatchEvent( { type: 'beforerender' } );
+  renderer.render( scene, camera );
+
+} )();
 
 </script>
 

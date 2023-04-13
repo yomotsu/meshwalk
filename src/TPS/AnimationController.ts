@@ -1,4 +1,5 @@
 import { Mesh, AnimationMixer } from 'three';
+import type { AnimationClip, AnimationAction } from 'three';
 
 const TURN_DURATION = 200;
 const TAU = 2 * Math.PI;
@@ -12,23 +13,28 @@ const getDeltaTurnAngle = ( current: number, target: number ) => {
 
 };
 
+export type Motion = {
+	[ name: string ]: AnimationAction;
+}
+
 export class AnimationController {
 
 	mesh: Mesh;
-	motion: {};
+	motion: Motion;
 	mixer: AnimationMixer;
 	currentMotionName: string;
+	_targetRotY: number | null = null;
 
-	constructor( mesh: Mesh ) {
+	constructor( mesh: Mesh, animations: AnimationClip[] ) {
 
 		this.mesh   = mesh;
 		this.motion = {};
 		this.mixer  = new AnimationMixer( mesh );
 		this.currentMotionName = '';
 
-		for ( let i = 0, l = this.mesh.geometry.animations.length; i < l; i ++ ) {
+		for ( let i = 0, l = animations.length; i < l; i ++ ) {
 
-			const anim = this.mesh.geometry.animations[ i ];
+			const anim = animations[ i ];
 			this.motion[ anim.name ] = this.mixer.clipAction( anim );
 			this.motion[ anim.name ].setEffectiveWeight( 1 );
 
@@ -48,7 +54,7 @@ export class AnimationController {
 			from.enabled = true;
 			to.enabled = true;
 
-			from.crossFadeTo( to, .3 );
+			from.crossFadeTo( to, .3, false );
 
 		} else {
 
@@ -98,7 +104,7 @@ export class AnimationController {
 				if ( now >= end ) {
 
 					that.mesh.rotation.y = _targetRotY;
-					delete that._targetRotY;
+					that._targetRotY = null;
 					return;
 
 				}

@@ -21,74 +21,69 @@ canvas{display: block;}
   <button onclick="animationController.play( 'jump' );">jump</button>
   <button onclick="animationController.play( 'slide' );">slide</button>
   <br>
-  <button onclick="animationController.turn( 90  * THREE.Math.DEG2RAD );">turn to 90deg</button>
-  <button onclick="animationController.turn( 270 * THREE.Math.DEG2RAD );">turn to 270deg</button>
-  <button onclick="animationController.turn( 180 * THREE.Math.DEG2RAD );">turn to 180deg</button>
-  <button onclick="animationController.turn( 0   * THREE.Math.DEG2RAD );">turn to 0deg</button>
+  <button onclick="animationController.turn( 90  * THREE.MathUtils.DEG2RAD );">turn to 90deg</button>
+  <button onclick="animationController.turn( 270 * THREE.MathUtils.DEG2RAD );">turn to 270deg</button>
+  <button onclick="animationController.turn( 180 * THREE.MathUtils.DEG2RAD );">turn to 180deg</button>
+  <button onclick="animationController.turn( 0   * THREE.MathUtils.DEG2RAD );">turn to 0deg</button>
   <br>
-  <button onclick="animationController.turn( 90  * THREE.Math.DEG2RAD, true );">turn to 90deg immediate</button>
-  <button onclick="animationController.turn( 270 * THREE.Math.DEG2RAD, true );">turn to 270deg immediate</button>
-  <button onclick="animationController.turn( 0   * THREE.Math.DEG2RAD, true );">turn to 0deg immediate</button>
+  <button onclick="animationController.turn( 90  * THREE.MathUtils.DEG2RAD, true );">turn to 90deg immediate</button>
+  <button onclick="animationController.turn( 270 * THREE.MathUtils.DEG2RAD, true );">turn to 270deg immediate</button>
+  <button onclick="animationController.turn( 0   * THREE.MathUtils.DEG2RAD, true );">turn to 0deg immediate</button>
 </div>
 
-<script src="https://unpkg.com/three@0.98.0/build/three.min.js"></script>
-<script src="../dist/meshwalk.js"></script>
-<script>
+<script async src="https://unpkg.com/es-module-shims@1.6.3/dist/es-module-shims.js"></script>
+<script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.151.2/build/three.module.js",
+      "three/examples/": "https://unpkg.com/three@0.151.2/examples/"
+    }
+  }
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import * as MW from '../dist/meshwalk.module.js';
 
-var width, height, clock, scene, camera, renderer;
-var loader = new THREE.JSONLoader();
-var ambientLight, characterMesh;
-var animationController;
+let animationController;
 
-MW.install( THREE );
-
-width = window.innerWidth;
-height = window.innerHeight;
-clock = new THREE.Clock();
-scene = new THREE.Scene();
-camera = new THREE.PerspectiveCamera( 40, width / height, 1, 1000 );
+const width = window.innerWidth;
+const height = window.innerHeight;
+const clock = new THREE.Clock();
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera( 40, width / height, 1, 1000 );
 camera.position.set( 0, 1, 4 );
-renderer = new THREE.WebGLRenderer();
+const renderer = new THREE.WebGLRenderer();
 renderer.setSize( width, height );
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.2;
+renderer.physicallyCorrectLights = true;
+renderer.outputEncoding = THREE.sRGBEncoding;
 document.body.appendChild( renderer.domElement );
 
-ambientLight = new THREE.AmbientLight( 0xffffff )
-scene.add( ambientLight );
+scene.add( new THREE.AmbientLight( 0xffffff ) );
 
+const gltf = await new GLTFLoader().loadAsync( './miku.glb' );
+scene.add( gltf.scene );
+animationController = new MW.AnimationController( gltf.scene, gltf.animations );
+animationController.play( 'idle' );
+animationController.motion.jump.setLoop( THREE.LoopOnce, 0 );
+animationController.motion.slide.setLoop( THREE.LoopOnce, 0 );
+animationController.motion.jump.clampWhenFinished = true;
+animationController.motion.slide.clampWhenFinished = true;
 
-loader.load( './model/miku.json', function( geometry, materials ) {
-
-  materials.forEach( function ( material ) {
-
-    material.skinning = true;
-
-  } );
-
-  characterMesh = new THREE.SkinnedMesh(
-    geometry,
-    new THREE.MeshFaceMaterial( materials )
-  );
-
-  scene.add( characterMesh );
-
-  animationController = new MW.AnimationController( characterMesh );
-  animationController.play( 'idle' );
-  animationController.motion.jump.setLoop( THREE.LoopOnce, 0 );
-  animationController.motion.slide.setLoop( THREE.LoopOnce, 0 );
-  animationController.motion.jump.clampWhenFinished = true;
-  animationController.motion.slide.clampWhenFinished = true;
-
-} );
 
 ( function update () {
 
   requestAnimationFrame( update );
-  var delta = clock.getDelta();
-  if ( animationController ) { animationController.update( delta ); }
+  const delta = clock.getDelta();
+  animationController.update( delta );
   renderer.render( scene, camera );
 
 } )();
 
+globalThis.THREE = THREE;
+globalThis.animationController = animationController;
 </script>
 
 </body>
