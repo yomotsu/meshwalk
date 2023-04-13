@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <title>=^.^=</title>
 <style>
-body{margin: 0; background: #000;}
+body{margin: 0;padding: 0; background: #000;}
 canvas{display: block;}
 .info{
   color: #fff;
@@ -16,41 +16,29 @@ canvas{display: block;}
 </head>
 <body>
 <div class="info">
-  The red sphere as a player character will just fall down to the ground mesh. <button onclick="playerController.center.set( 0, 10, 0 );">retry</button>
+  WASD to move, Space to jump<br>
+  <button onclick="removeBox();">remove box collision</button>
 </div>
 
+<script async src="https://unpkg.com/es-module-shims@1.6.3/dist/es-module-shims.js"></script>
+<script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.151.2/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.151.2/examples/jsm/",
+      "three/examples/": "https://unpkg.com/three@0.151.2/examples/"
+    }
+  }
+</script>
 <script type="module">
-import * as THREE from 'https://unpkg.com/three@0.148.0/build/three.module.js';
+import * as THREE from 'three';
 import * as MW from '../dist/meshwalk.module.js';
+// See demo/1_getstarted.html first
 
-MW.install( THREE );
-
-// make the world,
 const world = new MW.World();
-
-// then make a octree object,
-// which will be the container of rigid objects such as terrain
-const min = new THREE.Vector3( - 15, - 15, - 15 );
+const min = new THREE.Vector3( -15, -15, -15 );
 const max = new THREE.Vector3(  15,  15,  15 );
-const partition = 5;
-// min and max is for the size of the octree box
-// see http://en.wikipedia.org/wiki/Octree
-//
-//                 +------+------+
-//                 |\      \      \
-//                 | +------+------+
-//                 + |\      \      \
-//                 |\| +------+------+ <-coords of max
-//                 | + |      |      |
-// coords of min-> + |\|      |      |
-//                  \| +------+------+
-//                   + |      |      |
-//          y         \|      |      |
-//          |          +------+------+
-//          +--x
-//           \
-//            z
-//
+const partition = 2;
 const region = new MW.Octree( min, max, partition );
 world.add( region );
 
@@ -66,14 +54,25 @@ renderer.setSize( width, height );
 document.body.appendChild( renderer.domElement );
 
 
-// make a terrain in three.js and import it to the octree
 const ground = new THREE.Mesh(
   new THREE.PlaneGeometry( 30, 30, 10, 10 ),
   new THREE.MeshBasicMaterial( { color: 0xffffff,  wireframe: true } )
 );
-ground.rotation.x = - 90 * THREE.MathUtils.DEG2RAD;
+ground.rotation.x =  - 90 * THREE.MathUtils.DEG2RAD;
 scene.add( ground );
 region.importThreeMesh( ground );
+
+
+const wall = new THREE.Mesh(
+  new THREE.BoxGeometry( 5, 6, 10 ),
+  new THREE.MeshNormalMaterial( { wireframe: true } )
+);
+wall.position.set( 0, 3, 0 );
+// wall.rotation.set( 0, 0, 20 * THREE.MathUtils.DEG2RAD );
+scene.add( wall );
+region.importThreeMesh( wall );
+
+window.removeBox = () => region.removeThreeMesh( wall.geometry.uuid );
 
 
 const playerRadius = 1;
@@ -81,16 +80,23 @@ const playerObjectHolder = new THREE.Object3D();
 playerObjectHolder.position.set( 0, 10, 0 );
 scene.add( playerObjectHolder );
 
-// make your player character
 const sphere = new THREE.Mesh(
   new THREE.SphereGeometry( playerRadius, 16, 16 ),
   new THREE.MeshBasicMaterial( { color: 0xff0000,  wireframe: true} )
 );
 playerObjectHolder.add( sphere );
 
-// to apply fake gravity and to be controllable object
 const playerController = new MW.CharacterController( playerObjectHolder, playerRadius );
 world.add( playerController );
+
+// make a keyinput control
+const keyInputControl = new MW.KeyInputControl();
+
+// bind events
+keyInputControl.addEventListener( 'movekeyon',     () => playerController.isRunning = true );
+keyInputControl.addEventListener( 'movekeyoff',    () => playerController.isRunning = false );
+keyInputControl.addEventListener( 'movekeychange', () => playerController.direction = keyInputControl.frontAngle );
+keyInputControl.addEventListener( 'jumpkeypress',  () => playerController.jump() );
 
 
 ( function update () {

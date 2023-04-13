@@ -1,15 +1,11 @@
-import { THREE, onInstallHandlers } from '../install.js';
+import * as THREE from 'three';
 import CameraControls from 'camera-controls';
 
-onInstallHandlers.push( () => {
-
-	CameraControls.install( { THREE } );
-
-} );
+CameraControls.install( { THREE } );
 
 export class TPSCameraControls extends CameraControls {
 
-	constructor( camera, trackObject, domElement ) {
+	constructor( camera: THREE.PerspectiveCamera, trackObject: THREE.Object3D, domElement: HTMLElement ) {
 
 		super( camera, domElement );
 		this.minDistance = 1;
@@ -35,7 +31,7 @@ export class TPSCameraControls extends CameraControls {
 			const y = trackObject.position.y + offset.y;
 			const z = trackObject.position.z + offset.z;
 			this.moveTo( x, y, z, false );
-			super.update( delta );
+			return super.update( delta );
 
 		};
 

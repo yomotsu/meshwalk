@@ -1,37 +1,39 @@
 import pkg from './package.json' assert { type: 'json' };
-import babel from '@rollup/plugin-babel';
-import { nodeResolve } from '@rollup/plugin-node-resolve';
+import rollupReplace from '@rollup/plugin-replace';
+import rollupTypescript from '@rollup/plugin-typescript';
+import nodeResolve from "@rollup/plugin-node-resolve";
+import typescript from 'typescript';
 
 const license = `/*!
-* ${ pkg.name }
+ * ${ pkg.name }
  * https://github.com/${ pkg.repository }
- * (c) 2015 @yomotsu
+ * (c) 2017 @yomotsu
  * Released under the MIT License.
  */`;
 
 export default {
-	input: 'src/index.js',
+	input: 'src/index.ts',
 	output: [
 		{
 			format: 'umd',
-			name: 'MW',
-			file: 'dist/meshwalk.js',
+			name: 'CameraControls',
+			file: pkg.main,
+			banner: license,
 			indent: '\t',
-			banner: license
 		},
 		{
 			format: 'es',
-			file: 'dist/meshwalk.module.js',
+			file: pkg.module,
+			banner: license,
 			indent: '\t',
-			banner: license
 		}
 	],
-	// sourceMap: false,
+	external: [
+		'three',
+	],
 	plugins: [
+		rollupReplace( { preventAssignment: true, __VERSION: pkg.version } ),
+		rollupTypescript( { typescript } ),
 		nodeResolve(),
-		babel( {
-			babelHelpers: 'bundled',
-			exclude: 'node_modules/**'
-		} )
-	]
+	],
 };

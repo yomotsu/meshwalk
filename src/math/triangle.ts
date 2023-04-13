@@ -1,6 +1,9 @@
-export function makeTriangleBoundingBox( triangle ) {
+import { Vector3, Box3, Sphere } from 'three';
+import type { Triangle } from 'three';
 
-	const bb = new THREE.Box3();
+export function makeTriangleBoundingBox( triangle: Triangle ) {
+
+	const bb = new Box3();
 
 	bb.min = bb.min.min( triangle.a );
 	bb.min = bb.min.min( triangle.b );
@@ -14,14 +17,16 @@ export function makeTriangleBoundingBox( triangle ) {
 
 }
 
-export function makeTriangleBoundingSphere( triangle, normal ) {
+const triangleNormal = new Vector3();
 
-	const bs = new THREE.Sphere();
-	const v = new THREE.Vector3();
-	const v0 = new THREE.Vector3();
-	const v1 = new THREE.Vector3();
-	const e0 = new THREE.Vector3();
-	const e1 = new THREE.Vector3();
+export function makeTriangleBoundingSphere( triangle: Triangle, normal: Vector3 ) {
+
+	const bs = new Sphere();
+	const v = new Vector3();
+	const v0 = new Vector3();
+	const v1 = new Vector3();
+	const e0 = new Vector3();
+	const e1 = new Vector3();
 
 	// obtuse triangle
 
@@ -62,7 +67,7 @@ export function makeTriangleBoundingSphere( triangle, normal ) {
 
 	if ( ! normal ) {
 
-		normal = triangle.normal();
+		normal = triangle.getNormal( triangleNormal );
 
 	}
 

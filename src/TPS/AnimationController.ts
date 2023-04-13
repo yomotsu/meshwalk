@@ -1,7 +1,9 @@
+import { Mesh, AnimationMixer } from 'three';
+
 const TURN_DURATION = 200;
 const TAU = 2 * Math.PI;
-const modulo = ( n, d ) => ( ( n % d ) + d ) % d;
-const getDeltaTurnAngle = ( current, target ) => {
+const modulo = ( n: number, d: number ) => ( ( n % d ) + d ) % d;
+const getDeltaTurnAngle = ( current: number, target: number ) => {
 
 	const a = modulo( ( current - target ), TAU );
 	const b = modulo( ( target - current ), TAU );
@@ -12,11 +14,16 @@ const getDeltaTurnAngle = ( current, target ) => {
 
 export class AnimationController {
 
-	constructor( mesh ) {
+	mesh: Mesh;
+	motion: {};
+	mixer: AnimationMixer;
+	currentMotionName: string;
+
+	constructor( mesh: Mesh ) {
 
 		this.mesh   = mesh;
 		this.motion = {};
-		this.mixer  = new THREE.AnimationMixer( mesh );
+		this.mixer  = new AnimationMixer( mesh );
 		this.currentMotionName = '';
 
 		for ( let i = 0, l = this.mesh.geometry.animations.length; i < l; i ++ ) {
@@ -29,7 +36,7 @@ export class AnimationController {
 
 	}
 
-	play( name ) {
+	play( name: string ) {
 
 		if ( this.currentMotionName === name ) return;
 
@@ -54,7 +61,7 @@ export class AnimationController {
 
 	}
 
-	turn( rad, immediate ) {
+	turn( rad: number, immediate: boolean ) {
 
 		const that       = this;
 		const prevRotY   = this.mesh.rotation.y;
@@ -106,9 +113,9 @@ export class AnimationController {
 
 	}
 
-	update( delta ) {
+	update( deltaTime: number ) {
 
-		this.mixer.update( delta );
+		this.mixer.update( deltaTime );
 
 	}
 

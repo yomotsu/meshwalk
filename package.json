@@ -7,41 +7,73 @@
   "repository": "yomotsu/meshwalk.js",
   "jsnext:main": "dist/meshwalk.module.js",
   "module": "dist/meshwalk.module.js",
-  "devDependencies": {
-    "@babel/core": "^7.20.12",
-    "@babel/plugin-proposal-object-rest-spread": "^7.20.7",
-    "@babel/plugin-transform-runtime": "^7.19.6",
-    "@babel/preset-env": "^7.20.2",
-    "@babel/runtime": "^7.20.13",
-    "@rollup/plugin-babel": "^6.0.3",
-    "@rollup/plugin-node-resolve": "^15.0.1",
-    "rollup": "^3.12.0",
-    "terser": "^5.16.1"
-  },
   "scripts": {
     "dev": "rollup --config --watch",
     "build": "rollup --config && terser dist/meshwalk.js -o dist/meshwalk.min.js --comments '/^!/'",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "lint": "eslint src --ext ts"
+  },
+  "devDependencies": {
+    "@rollup/plugin-node-resolve": "^15.0.2",
+    "@rollup/plugin-replace": "^5.0.2",
+    "@rollup/plugin-typescript": "^11.1.0",
+    "@types/three": "^0.150.1",
+    "@typescript-eslint/eslint-plugin": "^5.57.1",
+    "@typescript-eslint/parser": "^5.57.1",
+    "eslint": "^8.37.0",
+    "eslint-config-mdcs": "^5.0.0",
+    "lint-staged": "^13.2.0",
+    "rollup": "^3.20.2",
+    "terser": "^5.16.8",
+    "typescript": "^5.0.3"
+  },
+  "dependencies": {
+    "camera-controls": "^2.3.4"
+  },
+  "peerDependencies": {
+    "three": "^0.151.3"
   },
   "browserslist": [
-    "ie >= 11",
-    "safari >= 9",
-    "ios >= 9",
-    "Android >= 5"
+    "> 1%",
+    "last 3 versions",
+    "not dead"
   ],
-  "babel": {
-    "presets": [
-      [
-        "@babel/preset-env",
-        {
-          "useBuiltIns": false
-        }
-      ]
-    ],
+  "eslintConfig": {
+    "root": true,
+    "parser": "@typescript-eslint/parser",
+    "extends": "mdcs",
     "plugins": [
-      "@babel/plugin-proposal-object-rest-spread"
-    ]
+      "@typescript-eslint"
+    ],
+    "rules": {
+      "no-unused-vars": 0,
+      "@typescript-eslint/no-unused-vars": 1,
+      "indent": 0,
+      "@typescript-eslint/indent": [
+        "error",
+        "tab",
+        {
+          "SwitchCase": 1,
+          "flatTernaryExpressions": true
+        }
+      ],
+      "no-multi-spaces": [
+        0
+      ],
+      "no-trailing-spaces": [
+        "error",
+        {
+          "ignoreComments": true
+        }
+      ],
+      "key-spacing": [
+        0
+      ]
+    }
   },
+  "eslintIgnore": [
+    "/dist/",
+    "/node_modules/"
+  ],
   "keywords": [
     "three",
     "three.js",
@@ -49,8 +81,5 @@
     "game",
     "collision",
     "physics"
-  ],
-  "dependencies": {
-    "camera-controls": "^2.0.1"
-  }
+  ]
 }

@@ -1,5 +1,7 @@
-import { THREE, onInstallHandlers } from '../install.js';
-import EventDispatcher from './EventDispatcher.js';
+import { MathUtils, Sphere, Vector2, Vector3 } from 'three';
+import type { Object3D } from 'three';
+import type { Face } from './Octree';
+import { EventDispatcher } from './EventDispatcher';
 import {
 	testSegmentTriangle,
 	isIntersectionSphereTriangle,
@@ -10,63 +12,60 @@ const JUMP_DURATION = 1000;
 const PI_HALF = Math.PI * 0.5;
 const PI_ONE_HALF = Math.PI * 1.5;
 
-let direction2D;
-let wallNormal2D;
-let groundingHead;
-let groundingTo;
-let point1;
-let point2;
-let direction;
-let translateScoped;
-let translate;
-
-onInstallHandlers.push( () => {
-
-	direction2D = new THREE.Vector2();
-	wallNormal2D = new THREE.Vector2();
-	groundingHead = new THREE.Vector3();
-	groundingTo = new THREE.Vector3();
-	point1 = new THREE.Vector3();
-	point2 = new THREE.Vector3();
-	direction = new THREE.Vector3();
-	translateScoped = new THREE.Vector3();
-	translate = new THREE.Vector3();
-
-} );
+const direction2D = new Vector2();
+const wallNormal2D = new Vector2();
+const groundingHead = new Vector3();
+const groundingTo = new Vector3();
+const point1 = new Vector3();
+const point2 = new Vector3();
+const direction = new Vector3();
+const translateScoped = new Vector3();
+const translate = new Vector3();
+const sphere = new Sphere();
 
 export class CharacterController extends EventDispatcher {
 
-	constructor( object3d, radius ) {
+	isCharacterController = true;
+	object: Object3D;
+	center = new Vector3();
+	radius: number;
+	groundPadding = .5;
+	maxSlopeGradient = Math.cos( 50 * MathUtils.DEG2RAD );
+	isGrounded = false;
+	isOnSlope  = false;
+	isIdling   = false;
+	isRunning  = false;
+	isJumping  = false;
+	direction  = 0; // 0 to 2PI(=360deg) in rad
+	movementSpeed = 10; // Meters Per Second
+	velocity = new Vector3( 0, - 9.8, 0 );
+	currentJumpPower = 0;
+	jumpStartTime = 0;
+	groundHeight = 0;
+	groundNormal = new Vector3();
+	collisionCandidate: Face[] = [];
+	contactInfo: {
+		distance: number;
+		contactPoint: Vector3;
+		face: Face;
+	}[] = [];
+
+	private _events: () => void;
+
+	constructor( object3d: Object3D, radius: number ) {
 
 		super();
 
-		this.isCharacterController = true;
 		this.object = object3d;
-		this.center = this.object.position.clone();
+		this.center.copy( this.object.position.clone() );
 		this.radius = radius;
-		this.groundPadding = .5;
-		this.maxSlopeGradient = Math.cos( 50 * THREE.MathUtils.DEG2RAD );
-		this.isGrounded = false;
-		this.isOnSlope  = false;
-		this.isIdling   = false;
-		this.isRunning  = false;
-		this.isJumping  = false;
-		this.direction  = 0; // 0 to 2PI(=360deg) in rad
-		this.movementSpeed = 10; // Meters Per Second
-		this.velocity = new THREE.Vector3( 0, - 10, 0 );
-		this.currentJumpPower = 0;
-		this.jumpStartTime = 0;
-		this.groundHeight = 0;
-		this.groundNormal = new THREE.Vector3();
-		this.collisionCandidate;
-		this.contactInfo = [];
 
 		let isFirstUpdate = true;
-		let wasGrounded;
-		let wasOnSlope;
-		// let wasIdling;
-		let wasRunning;
-		let wasJumping;
+		let wasGrounded = false;
+		let wasOnSlope = false;
+		// let wasIdling = false;
+		let wasRunning = false;
+		let wasJumping = false;
 
 		this._events = () => {
 
@@ -129,7 +128,7 @@ export class CharacterController extends EventDispatcher {
 
 	}
 
-	update( dt ) {
+	update( deltaTime: number ) {
 
 		// 状態をリセットしておく
 		this.isGrounded = false;
@@ -139,7 +138,7 @@ export class CharacterController extends EventDispatcher {
 
 		this._updateGrounding();
 		this._updateJumping();
-		this._updatePosition( dt );
+		this._updatePosition( deltaTime );
 		this._collisionDetection();
 		this._solvePosition();
 		this._updateVelocity();
@@ -155,9 +154,9 @@ export class CharacterController extends EventDispatcher {
 		let isHittingCeiling = false;
 
 		this.velocity.set(
-			rightDirection * this.movementSpeed * this.isRunning,
+			this.isRunning ? rightDirection * this.movementSpeed : 0,
 			FALL_VELOCITY,
-			frontDirection * this.movementSpeed * this.isRunning
+			this.isRunning ? frontDirection * this.movementSpeed : 0
 		);
 
 		// 急勾配や自由落下など、自動で付与される速度の処理
@@ -236,8 +235,8 @@ export class CharacterController extends EventDispatcher {
 			);
 			direction2D.sub( wallNormal2D );
 
-			this.velocity.x = direction2D.x * this.movementSpeed * this.isRunning;
-			this.velocity.z = direction2D.y * this.movementSpeed * this.isRunning;
+			this.velocity.x = this.isRunning ? direction2D.x * this.movementSpeed : 0;
+			this.velocity.z = this.isRunning ? direction2D.y * this.movementSpeed : 0;
 
 		}
 
@@ -268,8 +267,8 @@ export class CharacterController extends EventDispatcher {
 		//    |
 		//    | segment (player's head to almost -infinity)
 
-		let groundContactInfo;
-		let groundContactInfoTmp;
+		let groundContactInfo: ReturnType<typeof testSegmentTriangle> & { face: Face } | null = null;
+		let groundContactInfoTmp: ReturnType<typeof testSegmentTriangle> | null = null;
 		const faces = this.collisionCandidate;
 
 		groundingHead.set(
@@ -296,16 +295,21 @@ export class CharacterController extends EventDispatcher {
 
 			if ( groundContactInfoTmp && ! groundContactInfo ) {
 
-				groundContactInfo = groundContactInfoTmp;
-				groundContactInfo.face = faces[ i ];
+				groundContactInfo = {
+					...groundContactInfoTmp,
+					face: faces[ i ],
+				};
 
 			} else if (
+				groundContactInfo &&
 				groundContactInfoTmp &&
 				groundContactInfoTmp.contactPoint.y > groundContactInfo.contactPoint.y
 			) {
 
-				groundContactInfo = groundContactInfoTmp;
-				groundContactInfo.face = faces[ i ];
+				groundContactInfo = {
+					...groundContactInfoTmp,
+					face: faces[ i ],
+				};
 
 			}
 
@@ -343,16 +347,16 @@ export class CharacterController extends EventDispatcher {
 
 	}
 
-	_updatePosition( dt ) {
+	_updatePosition( deltaTime: number ) {
 
 		// 壁などを無視してひとまず(速度 * 時間)だけ
 		// centerの座標を進める
 		// 壁との衝突判定はこのこの後のステップで行うのでここではやらない
 		// もしisGrounded状態なら、強制的にyの値を地面に合わせる
 		const groundedY = this.groundHeight + this.radius;
-		const x = this.center.x + this.velocity.x * dt;
-		const y = this.center.y + this.velocity.y * dt;
-		const z = this.center.z + this.velocity.z * dt;
+		const x = this.center.x + this.velocity.x * deltaTime;
+		const y = this.center.y + this.velocity.y * deltaTime;
+		const z = this.center.z + this.velocity.z * deltaTime;
 
 		this.center.set(
 			x,
@@ -364,6 +368,8 @@ export class CharacterController extends EventDispatcher {
 
 	_collisionDetection() {
 
+		sphere.set( this.center, this.radius );
+
 		// 交差していそうなフェイス (collisionCandidate) のリストから、
 		// 実際に交差している壁フェイスを抜き出して
 		// this.contactInfoに追加する
@@ -374,7 +380,7 @@ export class CharacterController extends EventDispatcher {
 		for ( let i = 0, l = faces.length; i < l; i ++ ) {
 
 			const contactInfo = isIntersectionSphereTriangle(
-				this,
+				sphere,
 				faces[ i ].a,
 				faces[ i ].b,
 				faces[ i ].c,
@@ -383,8 +389,10 @@ export class CharacterController extends EventDispatcher {
 
 			if ( ! contactInfo ) continue;
 
-			contactInfo.face = faces[ i ];
-			this.contactInfo.push( contactInfo );
+			this.contactInfo.push( {
+				...contactInfo,
+				face: faces[ i ]
+			} );
 
 		}
 

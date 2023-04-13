@@ -1,80 +1,45 @@
-import { THREE, onInstallHandlers } from '../install.js';
+import { Vector3, Plane } from 'three';
+import type { Octree, OctreeNode } from 'core/Octree';
+import type { Box3, Sphere } from 'three';
 
-let vec3;
-let vec3_0;
-let vec3_1;
+const vec3 = new Vector3();
+const vec3_0 = new Vector3();
+const vec3_1 = new Vector3();
 
-let center;
-let extents;
+const center = new Vector3();
+const extents = new Vector3();
 
-onInstallHandlers.push( () => {
-
-	vec3 = new THREE.Vector3();
-	vec3_0 = new THREE.Vector3();
-	vec3_1 = new THREE.Vector3();
-
-	center = new THREE.Vector3();
-	extents = new THREE.Vector3();
-
-} );
-
-// aabb: <THREE.Box3>
-// Plane: <THREE.Plane>
-export function isIntersectionAABBPlane( aabb, Plane ) {
+export function isIntersectionAABBPlane( aabb: Box3 | OctreeNode, plane: Plane ) {
 
 	center.addVectors( aabb.max, aabb.min ).multiplyScalar( 0.5 );
 	extents.subVectors( aabb.max, center );
 
-	const r = extents.x * Math.abs( Plane.normal.x ) + extents.y * Math.abs( Plane.normal.y ) + extents.z * Math.abs( Plane.normal.z );
-	const s = Plane.normal.dot( center ) - Plane.constant;
+	const r = extents.x * Math.abs( plane.normal.x ) + extents.y * Math.abs( plane.normal.y ) + extents.z * Math.abs( plane.normal.z );
+	const s = plane.normal.dot( center ) - plane.constant;
 
 	return Math.abs( s ) <= r;
 
 }
 
-let v0;
-let v1;
-let v2;
+const v0 = new Vector3();
+const v1 = new Vector3();
+const v2 = new Vector3();
 
-let f0;
-let f1;
-let f2;
+const f0 = new Vector3();
+const f1 = new Vector3();
+const f2 = new Vector3();
 
-let a00;
-let a01;
-let a02;
-let a10;
-let a11;
-let a12;
-let a20;
-let a21;
-let a22;
+const a00 = new Vector3();
+const a01 = new Vector3();
+const a02 = new Vector3();
+const a10 = new Vector3();
+const a11 = new Vector3();
+const a12 = new Vector3();
+const a20 = new Vector3();
+const a21 = new Vector3();
+const a22 = new Vector3();
 
-let plane;
-
-onInstallHandlers.push( () => {
-
-	v0 = new THREE.Vector3();
-	v1 = new THREE.Vector3();
-	v2 = new THREE.Vector3();
-
-	f0 = new THREE.Vector3();
-	f1 = new THREE.Vector3();
-	f2 = new THREE.Vector3();
-
-	a00 = new THREE.Vector3();
-	a01 = new THREE.Vector3();
-	a02 = new THREE.Vector3();
-	a10 = new THREE.Vector3();
-	a11 = new THREE.Vector3();
-	a12 = new THREE.Vector3();
-	a20 = new THREE.Vector3();
-	a21 = new THREE.Vector3();
-	a22 = new THREE.Vector3();
-
-	plane = new THREE.Plane();
-
-} );
+const plane = new Plane();
 
 // based on http://www.gamedev.net/topic/534655-aabb-triangleplane-intersection--distance-to-plane-is-incorrect-i-have-solved-it/
 //
@@ -82,7 +47,7 @@ onInstallHandlers.push( () => {
 // b: <THREE.Vector3>, // vertex of a triangle
 // c: <THREE.Vector3>, // vertex of a triangle
 // aabb: <THREE.Box3>
-export function isIntersectionTriangleAABB( a, b, c, aabb ) {
+export function isIntersectionTriangleAABB( a: Vector3, b: Vector3, c: Vector3, aabb: Box3 | OctreeNode ) {
 
 	let p0, p1, p2, r;
 
@@ -253,7 +218,7 @@ export function isIntersectionTriangleAABB( a, b, c, aabb ) {
 
 // sphere1: <THREE.Sphere>
 // sphere2: <THREE.Sphere>
-export function isIntersectionSphereSphere( sphere1, sphere2 ) {
+export function isIntersectionSphereSphere( sphere1: Sphere, sphere2: Sphere ) {
 
 	const radiusSum = sphere1.radius + sphere2.radius;
 
@@ -265,7 +230,7 @@ export function isIntersectionSphereSphere( sphere1, sphere2 ) {
 // sphere: <THREE.Sphere>
 // aabb: <THREE.Box3>
 
-export function isIntersectionSphereAABB( sphere, aabb ) {
+export function isIntersectionSphereAABB( sphere: Sphere, aabb: Box3 | Octree | OctreeNode ) {
 
 	let sqDist = 0;
 
@@ -282,43 +247,22 @@ export function isIntersectionSphereAABB( sphere, aabb ) {
 
 }
 
-let A;
-let B;
-let C;
-let V;
+const A = new Vector3();
+const B = new Vector3();
+const C = new Vector3();
+const V = new Vector3();
 
-let AB;
-let BC;
-let CA;
-let Q1;
-let Q2;
-let Q3;
-let QC;
-let QA;
-let QB;
+const AB = new Vector3();
+const BC = new Vector3();
+const CA = new Vector3();
+const Q1 = new Vector3();
+const Q2 = new Vector3();
+const Q3 = new Vector3();
+const QC = new Vector3();
+const QA = new Vector3();
+const QB = new Vector3();
 
-let negatedNormal;
-
-onInstallHandlers.push( () => {
-
-	A = new THREE.Vector3();
-	B = new THREE.Vector3();
-	C = new THREE.Vector3();
-	V = new THREE.Vector3();
-
-	AB = new THREE.Vector3();
-	BC = new THREE.Vector3();
-	CA = new THREE.Vector3();
-	Q1 = new THREE.Vector3();
-	Q2 = new THREE.Vector3();
-	Q3 = new THREE.Vector3();
-	QC = new THREE.Vector3();
-	QA = new THREE.Vector3();
-	QB = new THREE.Vector3();
-
-	negatedNormal = new THREE.Vector3();
-
-} );
+const negatedNormal = new Vector3();
 
 //http://clb.demon.fi/MathGeoLib/docs/Triangle.cpp_code.html#459
 
@@ -327,7 +271,7 @@ onInstallHandlers.push( () => {
 // b: <THREE.Vector3>, // vertex of a triangle
 // c: <THREE.Vector3>, // vertex of a triangle
 // normal: <THREE.Vector3>, // normal of a triangle
-export function isIntersectionSphereTriangle( sphere, a, b, c, normal ) {
+export function isIntersectionSphereTriangle( sphere: Sphere, a: Vector3, b: Vector3, c: Vector3, normal: Vector3 ) {
 
 	// http://realtimecollisiondetection.net/blog/?p=103
 
@@ -355,9 +299,9 @@ export function isIntersectionSphereTriangle( sphere, a, b, c, normal ) {
 	const cc = C.dot( C );
 
 	if (
-		( aa > rr ) & ( ab > aa ) & ( ac > aa ) ||
-		( bb > rr ) & ( ab > bb ) & ( bc > bb ) ||
-		( cc > rr ) & ( ac > cc ) & ( bc > cc )
+		( aa > rr ) && ( ab > aa ) && ( ac > aa ) ||
+		( bb > rr ) && ( ab > bb ) && ( bc > bb ) ||
+		( cc > rr ) && ( ac > cc ) && ( bc > cc )
 	) {
 
 		return false;
@@ -424,7 +368,7 @@ export function isIntersectionSphereTriangle( sphere, a, b, c, normal ) {
 
 // }
 
-// export function isIntersectionLineTrianglefunction ( p, q, a, b, c, precisio{
+// export function isIntersectionLineTriangle ( p, q, a, b, c, precision ) {
 
 //   var pq = q.clone().sub( p ),
 //       pa = a.clone().sub( p ),
@@ -461,35 +405,21 @@ export function isIntersectionSphereTriangle( sphere, a, b, c, normal ) {
 // }
 
 
-let ab;
-let ac;
-let qp;
-let n;
 
-let ap;
-let e;
+const ab = new Vector3();
+const ac = new Vector3();
+const qp = new Vector3();
+const n  = new Vector3();
 
-let au;
-let bv;
-let cw;
+const ap = new Vector3();
+const e  = new Vector3();
 
-onInstallHandlers.push( () => {
+const au = new Vector3();
+const bv = new Vector3();
+const cw = new Vector3();
 
-	ab = new THREE.Vector3();
-	ac = new THREE.Vector3();
-	qp = new THREE.Vector3();
-	n  = new THREE.Vector3();
 
-	ap = new THREE.Vector3();
-	e  = new THREE.Vector3();
-
-	au = new THREE.Vector3();
-	bv = new THREE.Vector3();
-	cw = new THREE.Vector3();
-
-} );
-
-export function testSegmentTriangle( p, q, a, b, c ) {
+export function testSegmentTriangle( p: Vector3, q: Vector3, a: Vector3, b: Vector3, c: Vector3 ): null | { contactPoint : Vector3 } {
 
 	ab.subVectors( b, a );
 	ac.subVectors( c, a );
@@ -498,22 +428,22 @@ export function testSegmentTriangle( p, q, a, b, c ) {
 	n.copy( ab ).cross( ac );
 
 	const d = qp.dot( n );
-	if ( d <= 0 ) return false;
+	if ( d <= 0 ) return null;
 
 	ap.subVectors( p, a );
 	let t = ap.dot( n );
 
-	if ( t < 0 ) return 0;
-	if ( t > d ) return 0;
+	if ( t < 0 ) return null;
+	if ( t > d ) return null;
 
 	e.copy( qp ).cross( ap );
 	let v = ac.dot( e );
 
-	if ( v < 0 || v > d ) return 0;
+	if ( v < 0 || v > d ) return null;
 
 	let w = vec3.copy( ab ).dot( e ) * - 1;
 
-	if ( w < 0 || v + w > d ) return 0;
+	if ( w < 0 || v + w > d ) return null;
 
 	const ood = 1 / d;
 	t *= ood;
