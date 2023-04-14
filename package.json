@@ -1,6 +1,6 @@
 {
   "name": "meshwalk",
-  "version": "0.0.1",
+  "version": "0.0.0",
   "author": "Yomotsu",
   "license": "MIT",
   "main": "dist/meshwalk.js",
