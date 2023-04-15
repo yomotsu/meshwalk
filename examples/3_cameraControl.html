@@ -89,6 +89,7 @@ const keyInputControl = new MW.KeyInputControl();
 const tpsCameraControls = new MW.TPSCameraControls(
 	camera, // three.js camera
 	playerObjectHolder, // tracking object
+	world,
 	renderer.domElement
 );
 tpsCameraControls.colliderMeshes = [ ground, wall ];
@@ -123,11 +124,15 @@ tpsCameraControls.addEventListener( 'update', () => {
 	const delta = clock.getDelta();
 
 	requestAnimationFrame( update );
-	world.step( Math.min( delta, 0.02 ) );
 	tpsCameraControls.update( delta );
 	renderer.render( scene, camera );
 
 } )();
+
+// should not relay on requestAnimationFrame. use fixed time loop.
+const steps = 4;
+const stepDeltaTime = 1 / 60 / steps;
+setInterval( () => world.step( stepDeltaTime ), stepDeltaTime * 1000 );
 </script>
 
 </body>

@@ -1,6 +1,7 @@
-import { Vector3, BufferGeometry } from 'three';
-import type { Sphere, Mesh } from 'three';
+import { Vector3, Box3, BufferGeometry } from 'three';
+import type { Line3, Ray, Sphere, Mesh } from 'three';
 import {
+	isIntersectionLineAABB,
 	isIntersectionTriangleAABB,
 	isIntersectionSphereAABB,
 } from '../math/collision';
@@ -44,15 +45,13 @@ import {
 export class Octree {
 
 	isOctree = true;
-	min: Vector3;
-	max: Vector3;
+	box = new Box3();
 	maxDepth: number;
 	nodes: OctreeNode[][] = [];
 
 	constructor( min: Vector3, max: Vector3, maxDepth: number = 5 ) {
 
-		this.min = min;
-		this.max = max;
+		this.box.set( min, max );
 		this.maxDepth = maxDepth;
 		this.nodes = [];
 		this.isOctree = true;
@@ -66,7 +65,7 @@ export class Octree {
 			this.nodes.push( [] );
 			const pow2 = Math.pow( 2, depth );
 			const pow4 = Math.pow( 4, depth );
-			nodeBoxSize.subVectors( this.max, this.min ).divideScalar( pow2 );
+			nodeBoxSize.subVectors( this.box.max, this.box.min ).divideScalar( pow2 );
 
 			for ( let i = 0, length = Math.pow( 8, depth ); i < length; i ++ ) {
 
@@ -75,9 +74,9 @@ export class Octree {
 				const indexZ = ( ( i / pow2 ) | 0 ) % pow2;
 
 				nodeBoxMin.set(
-					this.min.x + indexX * nodeBoxSize.x,
-					this.min.y + indexY * nodeBoxSize.y,
-					this.min.z + indexZ * nodeBoxSize.z
+					this.box.min.x + indexX * nodeBoxSize.x,
+					this.box.min.y + indexY * nodeBoxSize.y,
+					this.box.min.z + indexZ * nodeBoxSize.z
 				);
 				nodeBoxMax.copy( nodeBoxMin ).add( nodeBoxSize );
 
@@ -161,7 +160,7 @@ export class Octree {
 			for ( let ii = 0, ll = targetNodes.length; ii < ll; ii ++ ) {
 
 				const node = targetNodes[ ii ];
-				const isIntersected = isIntersectionTriangleAABB( face.a, face.b, face.c, node );
+				const isIntersected = isIntersectionTriangleAABB( face.a, face.b, face.c, this.box );
 
 				if ( isIntersected ) {
 
@@ -220,7 +219,7 @@ export class Octree {
 
 		let tmp: OctreeNode[] = [];
 		const intersectedNodes = [];
-		const isIntersected = isIntersectionSphereAABB( sphere, this );
+		const isIntersected = isIntersectionSphereAABB( sphere, this.box );
 
 		if ( ! isIntersected ) return [];
 
@@ -231,7 +230,103 @@ export class Octree {
 			for ( let ii = 0, ll = targetNodes.length; ii < ll; ii ++ ) {
 
 				const node = targetNodes[ ii ];
-				const isIntersected = isIntersectionSphereAABB( sphere, node );
+				const isIntersected = isIntersectionSphereAABB( sphere, node.box );
+
+				if ( isIntersected ) {
+
+					const isAtMaxDepth = ( i + 1 === depth );
+
+					if ( isAtMaxDepth ) {
+
+						if ( node.trianglePool.length !== 0 ) {
+
+							intersectedNodes.push( node );
+
+						}
+
+					} else {
+
+						tmp = tmp.concat( node.getChildNodes() );
+
+					}
+
+				}
+
+			}
+
+			targetNodes = tmp.slice( 0 );
+			tmp.length = 0;
+
+		}
+
+		return intersectedNodes;
+
+	}
+
+	getLineIntersectedNodes( line: Line3, depth: number ) {
+
+		let tmp: OctreeNode[] = [];
+		const intersectedNodes = [];
+		const isIntersected = isIntersectionLineAABB( line, this.box );
+
+		if ( ! isIntersected ) return [];
+
+		let targetNodes = this.nodes[ 0 ].slice( 0 );
+
+		for ( let i = 0, l = depth; i < l; i ++ ) {
+
+			for ( let ii = 0, ll = targetNodes.length; ii < ll; ii ++ ) {
+
+				const node = targetNodes[ ii ];
+				const isIntersected = isIntersectionLineAABB( line, node.box );
+
+				if ( isIntersected ) {
+
+					const isAtMaxDepth = ( i + 1 === depth );
+
+					if ( isAtMaxDepth ) {
+
+						if ( node.trianglePool.length !== 0 ) {
+
+							intersectedNodes.push( node );
+
+						}
+
+					} else {
+
+						tmp = tmp.concat( node.getChildNodes() );
+
+					}
+
+				}
+
+			}
+
+			targetNodes = tmp.slice( 0 );
+			tmp.length = 0;
+
+		}
+
+		return intersectedNodes;
+
+	}
+
+	getRayIntersectedNodes( ray: Ray, depth: number ) {
+
+		let tmp: OctreeNode[] = [];
+		const intersectedNodes = [];
+		const isIntersected = ray.intersectsBox( this.box );
+
+		if ( ! isIntersected ) return [];
+
+		let targetNodes = this.nodes[ 0 ].slice( 0 );
+
+		for ( let i = 0, l = depth; i < l; i ++ ) {
+
+			for ( let ii = 0, ll = targetNodes.length; ii < ll; ii ++ ) {
+
+				const node = targetNodes[ ii ];
+				const isIntersected = ray.intersectsBox( node.box );
 
 				if ( isIntersected ) {
 
@@ -330,8 +425,7 @@ export class OctreeNode {
 	tree: Octree;
 	depth: number;
 	mortonNumber: number;
-	min: Vector3;
-	max: Vector3;
+	box = new Box3();
 	trianglePool: Face[] = [];
 
 	constructor( tree: Octree, depth: number, mortonNumber: number, min: Vector3, max: Vector3 ) {
@@ -339,8 +433,7 @@ export class OctreeNode {
 		this.tree = tree;
 		this.depth = depth;
 		this.mortonNumber = mortonNumber;
-		this.min = min.clone();
-		this.max = max.clone();
+		this.box.set( min, max );
 
 	}
 
@@ -402,18 +495,3 @@ export class Face {
 	}
 
 }
-
-// origin   : <THREE.Vector3>
-// direction: <THREE.Vector3>
-// distance : <Float>
-// class Ray{
-
-// 	constructor( origin, direction, distance ) {
-
-// 		this.origin = origin;
-// 		this.direction = direction;
-// 		this.distance = distance;
-
-// 	}
-
-// }

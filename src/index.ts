@@ -1,4 +1,3 @@
-
 export { World } from './core/World';
 export { Octree } from './core/Octree';
 export { CharacterController } from './core/CharacterController';

@@ -18,7 +18,6 @@ export class World {
 		} else if ( ( object as CharacterController ).isCharacterController ) {
 
 			this.characterPool.push( object as CharacterController );
-			// object.world = this;
 
 		}
 
@@ -42,7 +41,7 @@ export class World {
 
 			}
 
-			character.collisionCandidate = faces;
+			character.setNearTriangles( faces );
 			character.update( deltaTime );
 
 		}

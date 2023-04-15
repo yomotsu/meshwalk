@@ -1,18 +1,83 @@
-import { Vector3, Plane } from 'three';
-import type { Octree, OctreeNode } from 'core/Octree';
+import { Vector3, Line3, Plane } from 'three';
 import type { Box3, Sphere } from 'three';
 
 const vec3 = new Vector3();
 const vec3_0 = new Vector3();
 const vec3_1 = new Vector3();
 
+// https://3dkingdoms.com/weekly/weekly.php?a=3
+export function isIntersectionLineAABB( segment: Line3, aabb: Box3, hit?: Vector3 ) {
+
+	if ( segment.end.x < aabb.min.x && segment.start.x < aabb.min.x ) return false;
+	if ( segment.end.x > aabb.max.x && segment.start.x > aabb.max.x ) return false;
+	if ( segment.end.y < aabb.min.y && segment.start.y < aabb.min.y ) return false;
+	if ( segment.end.y > aabb.max.y && segment.start.y > aabb.max.y ) return false;
+	if ( segment.end.z < aabb.min.z && segment.start.z < aabb.min.z ) return false;
+	if ( segment.end.z > aabb.max.z && segment.start.z > aabb.max.z ) return false;
+	if (
+		segment.start.x > aabb.min.x && segment.start.x < aabb.max.x &&
+		segment.start.y > aabb.min.y && segment.start.y < aabb.max.y &&
+		segment.start.z > aabb.min.z && segment.start.z < aabb.max.z
+	) {
+
+		hit && hit.copy( segment.start );
+		return true;
+
+	}
+
+	const _hit = vec3;
+
+	if (
+		( getIntersection( segment.start.x - aabb.min.x, segment.end.x - aabb.min.x, segment.start, segment.end, _hit ) && inBox( _hit, aabb, 1 ) ) ||
+		( getIntersection( segment.start.y - aabb.min.y, segment.end.y - aabb.min.y, segment.start, segment.end, _hit ) && inBox( _hit, aabb, 2 ) ) ||
+		( getIntersection( segment.start.z - aabb.min.z, segment.end.z - aabb.min.z, segment.start, segment.end, _hit ) && inBox( _hit, aabb, 3 ) ) ||
+		( getIntersection( segment.start.x - aabb.max.x, segment.end.x - aabb.max.x, segment.start, segment.end, _hit ) && inBox( _hit, aabb, 1 ) ) ||
+		( getIntersection( segment.start.y - aabb.max.y, segment.end.y - aabb.max.y, segment.start, segment.end, _hit ) && inBox( _hit, aabb, 2 ) ) ||
+		( getIntersection( segment.start.z - aabb.max.z, segment.end.z - aabb.max.z, segment.start, segment.end, _hit ) && inBox( _hit, aabb, 3 ) )
+	) {
+
+		hit && hit.copy( _hit );
+		return true;
+
+	}
+
+	return false;
+
+}
+
+function getIntersection( fDst1: number, fDst2: number, P1: Vector3, P2: Vector3, Hit?: Vector3 ) {
+
+	if ( ( fDst1 * fDst2 ) >= 0 ) return false;
+	if ( fDst1 == fDst2 ) return false;
+
+	if ( Hit ) {
+
+		vec3.subVectors( P2, P1 );
+		vec3.multiplyScalar( - fDst1 / ( fDst2 - fDst1 ) );
+		Hit.addVectors( P1, vec3 );
+
+	}
+
+	return true;
+
+}
+
+function inBox( Hit: Vector3, aabb: Box3, Axis: number ) {
+
+	if ( Axis === 1 && Hit.z > aabb.min.z && Hit.z < aabb.max.z && Hit.y > aabb.min.y && Hit.y < aabb.max.y ) return true;
+	if ( Axis === 2 && Hit.z > aabb.min.z && Hit.z < aabb.max.z && Hit.x > aabb.min.x && Hit.x < aabb.max.x ) return true;
+	if ( Axis === 3 && Hit.x > aabb.min.x && Hit.x < aabb.max.x && Hit.y > aabb.min.y && Hit.y < aabb.max.y ) return true;
+	return false;
+
+}
+
 const center = new Vector3();
 const extents = new Vector3();
 
-export function isIntersectionAABBPlane( aabb: Box3 | OctreeNode, plane: Plane ) {
+export function isIntersectionAABBPlane( box: Box3, plane: Plane ) {
 
-	center.addVectors( aabb.max, aabb.min ).multiplyScalar( 0.5 );
-	extents.subVectors( aabb.max, center );
+	center.addVectors( box.max, box.min ).multiplyScalar( 0.5 );
+	extents.subVectors( box.max, center );
 
 	const r = extents.x * Math.abs( plane.normal.x ) + extents.y * Math.abs( plane.normal.y ) + extents.z * Math.abs( plane.normal.z );
 	const s = plane.normal.dot( center ) - plane.constant;
@@ -47,7 +112,7 @@ const plane = new Plane();
 // b: <THREE.Vector3>, // vertex of a triangle
 // c: <THREE.Vector3>, // vertex of a triangle
 // aabb: <THREE.Box3>
-export function isIntersectionTriangleAABB( a: Vector3, b: Vector3, c: Vector3, aabb: Box3 | OctreeNode ) {
+export function isIntersectionTriangleAABB( a: Vector3, b: Vector3, c: Vector3, aabb: Box3 ) {
 
 	let p0, p1, p2, r;
 
@@ -230,7 +295,7 @@ export function isIntersectionSphereSphere( sphere1: Sphere, sphere2: Sphere ) {
 // sphere: <THREE.Sphere>
 // aabb: <THREE.Box3>
 
-export function isIntersectionSphereAABB( sphere: Sphere, aabb: Box3 | Octree | OctreeNode ) {
+export function isIntersectionSphereAABB( sphere: Sphere, aabb: Box3 ) {
 
 	let sqDist = 0;
 
@@ -419,7 +484,7 @@ const bv = new Vector3();
 const cw = new Vector3();
 
 
-export function testSegmentTriangle( p: Vector3, q: Vector3, a: Vector3, b: Vector3, c: Vector3 ): null | { contactPoint : Vector3 } {
+export function testSegmentTriangle( p: Vector3, q: Vector3, a: Vector3, b: Vector3, c: Vector3, hit: Vector3 ): boolean {
 
 	ab.subVectors( b, a );
 	ac.subVectors( c, a );
@@ -428,22 +493,22 @@ export function testSegmentTriangle( p: Vector3, q: Vector3, a: Vector3, b: Vect
 	n.copy( ab ).cross( ac );
 
 	const d = qp.dot( n );
-	if ( d <= 0 ) return null;
+	if ( d <= 0 ) return false;
 
 	ap.subVectors( p, a );
 	let t = ap.dot( n );
 
-	if ( t < 0 ) return null;
-	if ( t > d ) return null;
+	if ( t < 0 ) return false;
+	if ( t > d ) return false;
 
 	e.copy( qp ).cross( ap );
 	let v = ac.dot( e );
 
-	if ( v < 0 || v > d ) return null;
+	if ( v < 0 || v > d ) return false;
 
 	let w = vec3.copy( ab ).dot( e ) * - 1;
 
-	if ( w < 0 || v + w > d ) return null;
+	if ( w < 0 || v + w > d ) return false;
 
 	const ood = 1 / d;
 	t *= ood;
@@ -454,8 +519,9 @@ export function testSegmentTriangle( p: Vector3, q: Vector3, a: Vector3, b: Vect
 	au.copy( a ).multiplyScalar( u );
 	bv.copy( b ).multiplyScalar( v );
 	cw.copy( c ).multiplyScalar( w );
-	const contactPoint = au.clone().add( bv ).add( cw );
 
-	return { contactPoint };
+	hit.copy( au ).add( bv ).add( cw );
+
+	return true;
 
 }

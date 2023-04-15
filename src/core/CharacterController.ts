@@ -12,6 +12,7 @@ const JUMP_DURATION = 1000;
 const PI_HALF = Math.PI * 0.5;
 const PI_ONE_HALF = Math.PI * 1.5;
 
+const vec3 = new Vector3();
 const direction2D = new Vector2();
 const wallNormal2D = new Vector2();
 const groundingHead = new Vector3();
@@ -43,7 +44,7 @@ export class CharacterController extends EventDispatcher {
 	jumpStartTime = 0;
 	groundHeight = 0;
 	groundNormal = new Vector3();
-	collisionCandidate: Face[] = [];
+	nearTriangles: Face[] = [];
 	contactInfo: {
 		distance: number;
 		contactPoint: Vector3;
@@ -125,6 +126,12 @@ export class CharacterController extends EventDispatcher {
 			wasJumping  = this.isJumping;
 
 		};
+
+	}
+
+	setNearTriangles( nearTriangles: Face[] ) {
+
+		this.nearTriangles = nearTriangles;
 
 	}
 
@@ -267,9 +274,8 @@ export class CharacterController extends EventDispatcher {
 		//    |
 		//    | segment (player's head to almost -infinity)
 
-		let groundContactInfo: ReturnType<typeof testSegmentTriangle> & { face: Face } | null = null;
-		let groundContactInfoTmp: ReturnType<typeof testSegmentTriangle> | null = null;
-		const faces = this.collisionCandidate;
+		let groundContactInfo: { face: Face, contactPoint: Vector3 } | null = null;
+		const faces = this.nearTriangles;
 
 		groundingHead.set(
 			this.center.x,
@@ -285,41 +291,38 @@ export class CharacterController extends EventDispatcher {
 
 		for ( let i = 0, l = faces.length; i < l; i ++ ) {
 
-			groundContactInfoTmp = testSegmentTriangle(
+			const groundContactInfoTmp = new Vector3();
+			const isIntersected = testSegmentTriangle(
 				groundingHead,
 				groundingTo,
 				faces[ i ].a,
 				faces[ i ].b,
-				faces[ i ].c
+				faces[ i ].c,
+				groundContactInfoTmp,
 			);
 
-			if ( groundContactInfoTmp && ! groundContactInfo ) {
+			if ( ! isIntersected ) continue;
+
+			if ( ! groundContactInfo ) {
 
 				groundContactInfo = {
-					...groundContactInfoTmp,
+					contactPoint: groundContactInfoTmp,
 					face: faces[ i ],
 				};
-
-			} else if (
-				groundContactInfo &&
-				groundContactInfoTmp &&
-				groundContactInfoTmp.contactPoint.y > groundContactInfo.contactPoint.y
-			) {
-
-				groundContactInfo = {
-					...groundContactInfoTmp,
-					face: faces[ i ],
-				};
+				continue;
 
 			}
 
+			if ( groundContactInfoTmp.y <= groundContactInfo.contactPoint.y ) continue;
+
+			groundContactInfo = {
+				contactPoint: groundContactInfoTmp,
+				face: faces[ i ],
+			};
+
 		}
 
-		if ( ! groundContactInfo ) {
-
-			return;
-
-		}
+		if ( ! groundContactInfo ) return;
 
 		this.groundHeight = groundContactInfo.contactPoint.y;
 		this.groundNormal.copy( groundContactInfo.face.normal );
@@ -370,11 +373,11 @@ export class CharacterController extends EventDispatcher {
 
 		sphere.set( this.center, this.radius );
 
-		// 交差していそうなフェイス (collisionCandidate) のリストから、
+		// 交差していそうなフェイス (nearTriangles) のリストから、
 		// 実際に交差している壁フェイスを抜き出して
 		// this.contactInfoに追加する
 
-		const faces = this.collisionCandidate;
+		const faces = this.nearTriangles;
 		this.contactInfo.length = 0;
 
 		for ( let i = 0, l = faces.length; i < l; i ++ ) {
