@@ -6,18 +6,18 @@ const vec3_0 = new Vector3();
 const vec3_1 = new Vector3();
 
 // https://3dkingdoms.com/weekly/weekly.php?a=3
-export function isIntersectionLineAABB( segment: Line3, aabb: Box3, hit?: Vector3 ) {
+export function isIntersectionLineBox( segment: Line3, box: Box3, hit?: Vector3 ) {
 
-	if ( segment.end.x < aabb.min.x && segment.start.x < aabb.min.x ) return false;
-	if ( segment.end.x > aabb.max.x && segment.start.x > aabb.max.x ) return false;
-	if ( segment.end.y < aabb.min.y && segment.start.y < aabb.min.y ) return false;
-	if ( segment.end.y > aabb.max.y && segment.start.y > aabb.max.y ) return false;
-	if ( segment.end.z < aabb.min.z && segment.start.z < aabb.min.z ) return false;
-	if ( segment.end.z > aabb.max.z && segment.start.z > aabb.max.z ) return false;
+	if ( segment.end.x < box.min.x && segment.start.x < box.min.x ) return false;
+	if ( segment.end.x > box.max.x && segment.start.x > box.max.x ) return false;
+	if ( segment.end.y < box.min.y && segment.start.y < box.min.y ) return false;
+	if ( segment.end.y > box.max.y && segment.start.y > box.max.y ) return false;
+	if ( segment.end.z < box.min.z && segment.start.z < box.min.z ) return false;
+	if ( segment.end.z > box.max.z && segment.start.z > box.max.z ) return false;
 	if (
-		segment.start.x > aabb.min.x && segment.start.x < aabb.max.x &&
-		segment.start.y > aabb.min.y && segment.start.y < aabb.max.y &&
-		segment.start.z > aabb.min.z && segment.start.z < aabb.max.z
+		segment.start.x > box.min.x && segment.start.x < box.max.x &&
+		segment.start.y > box.min.y && segment.start.y < box.max.y &&
+		segment.start.z > box.min.z && segment.start.z < box.max.z
 	) {
 
 		hit && hit.copy( segment.start );
@@ -28,12 +28,12 @@ export function isIntersectionLineAABB( segment: Line3, aabb: Box3, hit?: Vector
 	const _hit = vec3;
 
 	if (
-		( getIntersection( segment.start.x - aabb.min.x, segment.end.x - aabb.min.x, segment.start, segment.end, _hit ) && inBox( _hit, aabb, 1 ) ) ||
-		( getIntersection( segment.start.y - aabb.min.y, segment.end.y - aabb.min.y, segment.start, segment.end, _hit ) && inBox( _hit, aabb, 2 ) ) ||
-		( getIntersection( segment.start.z - aabb.min.z, segment.end.z - aabb.min.z, segment.start, segment.end, _hit ) && inBox( _hit, aabb, 3 ) ) ||
-		( getIntersection( segment.start.x - aabb.max.x, segment.end.x - aabb.max.x, segment.start, segment.end, _hit ) && inBox( _hit, aabb, 1 ) ) ||
-		( getIntersection( segment.start.y - aabb.max.y, segment.end.y - aabb.max.y, segment.start, segment.end, _hit ) && inBox( _hit, aabb, 2 ) ) ||
-		( getIntersection( segment.start.z - aabb.max.z, segment.end.z - aabb.max.z, segment.start, segment.end, _hit ) && inBox( _hit, aabb, 3 ) )
+		( getIntersection( segment.start.x - box.min.x, segment.end.x - box.min.x, segment.start, segment.end, _hit ) && inBox( _hit, box, 1 ) ) ||
+		( getIntersection( segment.start.y - box.min.y, segment.end.y - box.min.y, segment.start, segment.end, _hit ) && inBox( _hit, box, 2 ) ) ||
+		( getIntersection( segment.start.z - box.min.z, segment.end.z - box.min.z, segment.start, segment.end, _hit ) && inBox( _hit, box, 3 ) ) ||
+		( getIntersection( segment.start.x - box.max.x, segment.end.x - box.max.x, segment.start, segment.end, _hit ) && inBox( _hit, box, 1 ) ) ||
+		( getIntersection( segment.start.y - box.max.y, segment.end.y - box.max.y, segment.start, segment.end, _hit ) && inBox( _hit, box, 2 ) ) ||
+		( getIntersection( segment.start.z - box.max.z, segment.end.z - box.max.z, segment.start, segment.end, _hit ) && inBox( _hit, box, 3 ) )
 	) {
 
 		hit && hit.copy( _hit );
@@ -45,16 +45,16 @@ export function isIntersectionLineAABB( segment: Line3, aabb: Box3, hit?: Vector
 
 }
 
-function getIntersection( fDst1: number, fDst2: number, P1: Vector3, P2: Vector3, Hit?: Vector3 ) {
+function getIntersection( dst1: number, dst2: number, p1: Vector3, p2: Vector3, hit?: Vector3 ) {
 
-	if ( ( fDst1 * fDst2 ) >= 0 ) return false;
-	if ( fDst1 == fDst2 ) return false;
+	if ( ( dst1 * dst2 ) >= 0 ) return false;
+	if ( dst1 == dst2 ) return false;
 
-	if ( Hit ) {
+	if ( hit ) {
 
-		vec3.subVectors( P2, P1 );
-		vec3.multiplyScalar( - fDst1 / ( fDst2 - fDst1 ) );
-		Hit.addVectors( P1, vec3 );
+		vec3.subVectors( p2, p1 );
+		vec3.multiplyScalar( - dst1 / ( dst2 - dst1 ) );
+		hit.addVectors( p1, vec3 );
 
 	}
 
@@ -62,11 +62,11 @@ function getIntersection( fDst1: number, fDst2: number, P1: Vector3, P2: Vector3
 
 }
 
-function inBox( Hit: Vector3, aabb: Box3, Axis: number ) {
+function inBox( hit: Vector3, box: Box3, axis: number ) {
 
-	if ( Axis === 1 && Hit.z > aabb.min.z && Hit.z < aabb.max.z && Hit.y > aabb.min.y && Hit.y < aabb.max.y ) return true;
-	if ( Axis === 2 && Hit.z > aabb.min.z && Hit.z < aabb.max.z && Hit.x > aabb.min.x && Hit.x < aabb.max.x ) return true;
-	if ( Axis === 3 && Hit.x > aabb.min.x && Hit.x < aabb.max.x && Hit.y > aabb.min.y && Hit.y < aabb.max.y ) return true;
+	if ( axis === 1 && hit.z > box.min.z && hit.z < box.max.z && hit.y > box.min.y && hit.y < box.max.y ) return true;
+	if ( axis === 2 && hit.z > box.min.z && hit.z < box.max.z && hit.x > box.min.x && hit.x < box.max.x ) return true;
+	if ( axis === 3 && hit.x > box.min.x && hit.x < box.max.x && hit.y > box.min.y && hit.y < box.max.y ) return true;
 	return false;
 
 }
@@ -74,7 +74,7 @@ function inBox( Hit: Vector3, aabb: Box3, Axis: number ) {
 const center = new Vector3();
 const extents = new Vector3();
 
-export function isIntersectionAABBPlane( box: Box3, plane: Plane ) {
+export function isIntersectionBoxPlane( box: Box3, plane: Plane ) {
 
 	center.addVectors( box.max, box.min ).multiplyScalar( 0.5 );
 	extents.subVectors( box.max, center );
@@ -112,13 +112,13 @@ const plane = new Plane();
 // b: <THREE.Vector3>, // vertex of a triangle
 // c: <THREE.Vector3>, // vertex of a triangle
 // aabb: <THREE.Box3>
-export function isIntersectionTriangleAABB( a: Vector3, b: Vector3, c: Vector3, aabb: Box3 ) {
+export function isIntersectionTriangleBox( a: Vector3, b: Vector3, c: Vector3, box: Box3 ) {
 
 	let p0, p1, p2, r;
 
 	// Compute box center and extents of AABoundingBox (if not already given in that format)
-	center.addVectors( aabb.max, aabb.min ).multiplyScalar( 0.5 );
-	extents.subVectors( aabb.max, center );
+	center.addVectors( box.max, box.min ).multiplyScalar( 0.5 );
+	extents.subVectors( box.max, center );
 
 	// Translate triangle as conceptually moving AABB to origin
 	v0.subVectors( a, center );
@@ -276,7 +276,7 @@ export function isIntersectionTriangleAABB( a: Vector3, b: Vector3, c: Vector3, 
 	plane.normal.copy( f1 ).cross( f0 ).normalize();
 	plane.constant = plane.normal.dot( a );
 
-	return isIntersectionAABBPlane( aabb, plane );
+	return isIntersectionBoxPlane( box, plane );
 
 }
 
@@ -295,18 +295,18 @@ export function isIntersectionSphereSphere( sphere1: Sphere, sphere2: Sphere ) {
 // sphere: <THREE.Sphere>
 // aabb: <THREE.Box3>
 
-export function isIntersectionSphereAABB( sphere: Sphere, aabb: Box3 ) {
+export function isIntersectionSphereBox( sphere: Sphere, box: Box3 ) {
 
 	let sqDist = 0;
 
-	if ( sphere.center.x < aabb.min.x ) sqDist += ( aabb.min.x - sphere.center.x ) * ( aabb.min.x - sphere.center.x );
-	if ( sphere.center.x > aabb.max.x ) sqDist += ( sphere.center.x - aabb.max.x ) * ( sphere.center.x - aabb.max.x );
+	if ( sphere.center.x < box.min.x ) sqDist += ( box.min.x - sphere.center.x ) * ( box.min.x - sphere.center.x );
+	if ( sphere.center.x > box.max.x ) sqDist += ( sphere.center.x - box.max.x ) * ( sphere.center.x - box.max.x );
 
-	if ( sphere.center.y < aabb.min.y ) sqDist += ( aabb.min.y - sphere.center.y ) * ( aabb.min.y - sphere.center.y );
-	if ( sphere.center.y > aabb.max.y ) sqDist += ( sphere.center.y - aabb.max.y ) * ( sphere.center.y - aabb.max.y );
+	if ( sphere.center.y < box.min.y ) sqDist += ( box.min.y - sphere.center.y ) * ( box.min.y - sphere.center.y );
+	if ( sphere.center.y > box.max.y ) sqDist += ( sphere.center.y - box.max.y ) * ( sphere.center.y - box.max.y );
 
-	if ( sphere.center.z < aabb.min.z ) sqDist += ( aabb.min.z - sphere.center.z ) * ( aabb.min.z - sphere.center.z );
-	if ( sphere.center.z > aabb.max.z ) sqDist += ( sphere.center.z - aabb.max.z ) * ( sphere.center.z - aabb.max.z );
+	if ( sphere.center.z < box.min.z ) sqDist += ( box.min.z - sphere.center.z ) * ( box.min.z - sphere.center.z );
+	if ( sphere.center.z > box.max.z ) sqDist += ( sphere.center.z - box.max.z ) * ( sphere.center.z - box.max.z );
 
 	return sqDist <= sphere.radius * sphere.radius;
 
@@ -411,18 +411,61 @@ export function isIntersectionSphereTriangle( sphere: Sphere, a: Vector3, b: Vec
 
 }
 
-// based on Real-Time Collision Detection Section 5.3.4
-// p: <THREE.Vector3>, // line3.start
-// q: <THREE.Vector3>, // line3.end
-// a: <THREE.Vector3>, // triangle.a
-// b: <THREE.Vector3>, // triangle.b
-// c: <THREE.Vector3>, // triangle.c
-// normal: <THREE.Vector3>, // triangle.normal, optional
+// // based on Real-Time Collision Detection Section 5.3.4
+// // p: <THREE.Vector3>, // line3.start
+// // q: <THREE.Vector3>, // line3.end
+// // a: <THREE.Vector3>, // triangle.a
+// // b: <THREE.Vector3>, // triangle.b
+// // c: <THREE.Vector3>, // triangle.c
+// const pq = new Vector3();
+// const pa = new Vector3();
+// const pb = new Vector3();
+// const pc = new Vector3();
+// const au = new Vector3();
+// const bv = new Vector3();
+// const cw = new Vector3();
 
-// var scalarTriple = function ( a, b, c ) {
+// export function testSegmentTriangle( p: Vector3, q: Vector3, a: Vector3, b: Vector3, c: Vector3, hit: Vector3 ) {
 
-//   var m = b.clone().cross( c );
-//   return a.dot( m );
+// 	pq.subVectors( q, p );
+// 	pa.subVectors( a, p );
+// 	pb.subVectors( b, p );
+// 	pc.subVectors( c, p );
+// 	let u: number;
+// 	let v: number;
+// 	let w: number;
+
+// 	u = scalarTriple( pq, pc, pb );
+
+// 	if ( u < 0 ) return false;
+
+// 	v = scalarTriple( pq, pa, pc );
+
+// 	if ( v < 0 ) return false;
+
+// 	w = scalarTriple( pq, pb, pa );
+
+// 	if ( w < 0 ) return false;
+
+// 	const denom = 1 / ( u + v + w );
+// 	u *= denom;
+// 	v *= denom;
+// 	w *= denom;
+
+// 	au.copy( a ).multiplyScalar( u );
+// 	bv.copy( b ).multiplyScalar( v );
+// 	cw.copy( c ).multiplyScalar( w );
+
+// 	hit.copy( au ).add( bv ).add( cw );
+
+// 	return true;
+
+// }
+
+// function scalarTriple( a: Vector3, b: Vector3, c: Vector3 ) {
+
+// 	var m = b.clone().cross( c );
+// 	return a.dot( m );
 
 // }
 
@@ -432,44 +475,6 @@ export function isIntersectionSphereTriangle( sphere: Sphere, a: Vector3, b: Vec
 //   return a.clone().cross( m );
 
 // }
-
-// export function isIntersectionLineTriangle ( p, q, a, b, c, precision ) {
-
-//   var pq = q.clone().sub( p ),
-//       pa = a.clone().sub( p ),
-//       pb = b.clone().sub( p ),
-//       pc = c.clone().sub( p ),
-//       u, v, w;
-
-//   u = scalarTriple( pq, pc, pb );
-
-//   if ( u < 0 ) { return false; }
-
-//   v = scalarTriple( pq, pa, pc );
-
-//   if ( v < 0 ) { return false; }
-
-//   w = scalarTriple( pq, pb, pa );
-
-//   if ( w < 0 ) { return false; }
-
-//   var denom = 1 / ( u + v + w );
-//   u *= denom;
-//   v *= denom;
-//   w *= denom;
-
-//   var au = a.clone().multiplyScalar( u ),
-//       bv = b.clone().multiplyScalar( v ),
-//       cw = c.clone().multiplyScalar( w ),
-//       contactPoint = au.clone().add( bv ).add( cw );
-
-//   return {
-//     contactPoint: contactPoint
-//   }
-
-// }
-
-
 
 const ab = new Vector3();
 const ac = new Vector3();

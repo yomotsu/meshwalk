@@ -1,10 +1,12 @@
-import { Vector3, Triangle, Box3, Sphere } from 'three';
+import { Vector3, Triangle, Line3, Box3, Sphere } from 'three';
 
 export class ComputedTriangle extends Triangle {
 
 	boundingBox: Box3;
 	boundingSphere: Sphere;
 	normal: Vector3;
+	incenter: Vector3; // aka Semiperimeter
+	inradius: number;
 
 	constructor( a: Vector3, b: Vector3, c: Vector3 ) {
 
@@ -14,9 +16,45 @@ export class ComputedTriangle extends Triangle {
 		this.boundingBox = makeTriangleBoundingBox( this );
 		this.boundingSphere = makeTriangleBoundingSphere( this, this.normal );
 
+		const { incenter, inradius } = getInCircle( this );
+		this.incenter = incenter;
+		this.inradius = inradius;
+
+	}
+
+	// https://math.stackexchange.com/questions/1397456/how-to-scale-a-triangle-such-that-the-distance-between-original-edges-and-new-ed
+	scale( amount: number ) {
+
+		this.a.sub( this.incenter ).multiplyScalar( amount ).add( this.incenter );
+		this.b.sub( this.incenter ).multiplyScalar( amount ).add( this.incenter );
+		this.c.sub( this.incenter ).multiplyScalar( amount ).add( this.incenter );
+
 	}
 
 }
+
+function getInCircle( triangle: Triangle ) {
+
+	// https://byjus.com/maths/incenter-of-a-triangle/
+	const a = triangle.a.distanceTo( triangle.b );
+	const b = triangle.b.distanceTo( triangle.c );
+	const c = triangle.c.distanceTo( triangle.a );
+	const p = a + b + c;
+
+	const incenter = new Vector3(
+		( a * triangle.a.x + b * triangle.b.x + c * triangle.c.x ) / p,
+		( a * triangle.a.y + b * triangle.b.y + c * triangle.c.y ) / p,
+		( a * triangle.a.z + b * triangle.b.z + c * triangle.c.z ) / p,
+	);
+
+	const closestPointToEdge = new Vector3();
+	new Line3( triangle.a, triangle.b ).closestPointToPoint( incenter, true, closestPointToEdge );
+	const inradius = incenter.distanceTo( closestPointToEdge );
+
+	return { incenter, inradius };
+
+}
+
 
 export function makeTriangleBoundingBox( triangle: Triangle ) {
 

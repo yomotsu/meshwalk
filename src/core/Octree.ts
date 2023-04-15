@@ -1,28 +1,22 @@
-// import { Vector3, Box3, BufferGeometry } from 'three';
-// import type { Line3, Ray, Sphere, Mesh } from 'three';
-// import {
-// 	isIntersectionLineAABB,
-// 	isIntersectionTriangleAABB,
-// 	isIntersectionSphereAABB,
-// } from '../math/collision';
-
 import { ComputedTriangle } from '../math/triangle';
 
 import {
 	Box3,
-	// Line3,
+	Line3,
 	// Plane,
 	Sphere,
 	Vector3,
 	Mesh,
 } from 'three';
-
 import type {
 	Ray,
 	Object3D,
 } from 'three';
 // import { Capsule } from '../math/Capsule.js';
-
+import {
+	isIntersectionLineBox,
+	testSegmentTriangle,
+} from "../math/collision";
 
 const _v1 = new Vector3();
 const _v2 = new Vector3();
@@ -141,6 +135,33 @@ export class Octree {
 
 	}
 
+	getLineTriangles( line: Line3, result: ComputedTriangle[] ) {
+
+		for ( let i = 0; i < this.subTrees.length; i ++ ) {
+
+			const subTree = this.subTrees[ i ];
+			if ( ! isIntersectionLineBox( line, subTree.box ) ) continue;
+
+			if ( subTree.triangles.length > 0 ) {
+
+				for ( let j = 0; j < subTree.triangles.length; j ++ ) {
+
+					if ( result.indexOf( subTree.triangles[ j ] ) === - 1 ) result.push( subTree.triangles[ j ] );
+
+				}
+
+			} else {
+
+				subTree.getLineTriangles( line, result );
+
+			}
+
+		}
+
+		return result;
+
+	}
+
 	getRayTriangles( ray: Ray, result: ComputedTriangle[] ) {
 
 		for ( let i = 0; i < this.subTrees.length; i ++ ) {
@@ -222,12 +243,46 @@ export class Octree {
 
 	}
 
+	lineIntersect( line: Line3 ) {
+
+		const position = new Vector3();
+		const triangles: ComputedTriangle[] = [];
+		let distanceSquared = Infinity;
+		let triangle: ComputedTriangle | null = null;
+
+		this.getLineTriangles( line, triangles );
+
+		for ( let i = 0; i < triangles.length; i ++ ) {
+
+			const result = _v1;
+			const isIntersected = testSegmentTriangle( line.start, line.end, triangles[ i ].a, triangles[ i ].b, triangles[ i ].c, result );
+
+			if ( isIntersected ) {
+
+				const newDistanceSquared = line.start.distanceToSquared( result );
+
+				if ( distanceSquared > newDistanceSquared ) {
+
+					position.copy( result );
+					distanceSquared = newDistanceSquared;
+					triangle = triangles[ i ];
+
+				}
+
+			}
+
+		}
+
+		return triangle ? { distance: Math.sqrt( distanceSquared ), triangle, position } : false;
+
+	}
+
 	rayIntersect( ray: Ray ) {
 
-		if ( ray.direction.length() === 0 ) return;
+		if ( ray.direction.lengthSq() === 0 ) return;
 
 		const triangles: ComputedTriangle[] = [];
-		let triangle, position, distance = 1e100;
+		let triangle, position, distanceSquared = 1e100;
 
 		this.getRayTriangles( ray, triangles );
 
@@ -237,12 +292,12 @@ export class Octree {
 
 			if ( result ) {
 
-				const newdistance = result.sub( ray.origin ).length();
+				const newDistanceSquared = result.sub( ray.origin ).lengthSq();
 
-				if ( distance > newdistance ) {
+				if ( distanceSquared > newDistanceSquared ) {
 
 					position = result.clone().add( ray.origin );
-					distance = newdistance;
+					distanceSquared = newDistanceSquared;
 					triangle = triangles[ i ];
 
 				}
@@ -251,7 +306,7 @@ export class Octree {
 
 		}
 
-		return distance < 1e100 ? { distance: distance, triangle: triangle, position: position } : false;
+		return distanceSquared < 1e100 ? { distance: Math.sqrt( distanceSquared ), triangle, position } : false;
 
 	}
 
@@ -288,11 +343,9 @@ export class Octree {
 							const vB = new Vector3().fromArray( positions, b * 3 );
 							const vC = new Vector3().fromArray( positions, c * 3 );
 
-							this.addTriangle( new ComputedTriangle(
-								vA,
-								vB,
-								vC,
-							) );
+							const triangle = new ComputedTriangle( vA, vB, vC );
+							triangle.scale( 1.001 ); // to avoid triangle edge errors
+							this.addTriangle( triangle );
 
 						}
 

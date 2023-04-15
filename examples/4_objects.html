@@ -7,36 +7,37 @@
 body{margin: 0;padding: 0; background: #000;}
 canvas{display: block;}
 .info{
-  color: #fff;
-  position: absolute;
-  top: 0;
-  left: 0;
+	color: #fff;
+	position: absolute;
+	top: 0;
+	left: 0;
 }
 </style>
 </head>
 <body>
 <div class="info">
-  `maxSlopeGradient` is changable:
-  <select onchange="setMaxSlopeGradient( this.value * 1 )">
-    <option value="30">30deg</option>
-    <option value="50" selected>50deg</option>
-    <option value="70">70deg</option>
-  </select><br>
-  WASD to move, Space to jump. Plus, mousedrag to rotate, scroll to zoom
+	`maxSlopeGradient` is changable:
+	<select onchange="setMaxSlopeGradient( this.value * 1 )">
+		<option value="30">30deg</option>
+		<option value="50" selected>50deg</option>
+		<option value="70">70deg</option>
+	</select><br>
+	WASD to move, Space to jump. Plus, mousedrag to rotate, scroll to zoom
 </div>
 
 <script async src="https://unpkg.com/es-module-shims@1.6.3/dist/es-module-shims.js"></script>
 <script type="importmap">
-  {
-    "imports": {
-      "three": "https://unpkg.com/three@0.151.2/build/three.module.js",
-      "three/addons/": "https://unpkg.com/three@0.151.2/examples/jsm/",
-      "three/examples/": "https://unpkg.com/three@0.151.2/examples/"
-    }
-  }
+	{
+		"imports": {
+			"three": "https://unpkg.com/three@0.151.2/build/three.module.js",
+			"three/addons/": "https://unpkg.com/three@0.151.2/examples/jsm/",
+			"three/examples/": "https://unpkg.com/three@0.151.2/examples/"
+		}
+	}
 </script>
 <script type="module">
 import * as THREE from 'three';
+// import { OctreeHelper } from 'three/addons/helpers/OctreeHelper.js';
 import * as MW from '../dist/meshwalk.module.js';
 // See demo/2_keyboardInput.html first
 
@@ -211,6 +212,11 @@ tpsCameraControls.addEventListener( 'update', () => {
 } );
 
 
+// const helper = new OctreeHelper( octree );
+// scene.add( helper );
+
+world.start();
+
 ( function update () {
 
 	const delta = clock.getDelta();
@@ -220,11 +226,6 @@ tpsCameraControls.addEventListener( 'update', () => {
 	renderer.render( scene, camera );
 
 } )();
-
-// should not relay on requestAnimationFrame. use fixed time loop.
-const steps = 4;
-const stepDeltaTime = 1 / 60 / steps;
-setInterval( () => world.step( stepDeltaTime ), stepDeltaTime * 1000 );
 </script>
 
 </body>

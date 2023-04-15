@@ -31,7 +31,7 @@ export class CharacterController extends EventDispatcher {
 	radius: number;
 	groundPadding = .5;
 	maxSlopeGradient = Math.cos( 50 * MathUtils.DEG2RAD );
-	isGrounded = false;
+	isOnFloor = false;
 	isOnSlope  = false;
 	isIdling   = false;
 	isRunning  = false;
@@ -61,7 +61,7 @@ export class CharacterController extends EventDispatcher {
 		this.radius = radius;
 
 		let isFirstUpdate = true;
-		let wasGrounded = false;
+		let wasOnFloor = false;
 		let wasOnSlope = false;
 		// let wasIdling = false;
 		let wasRunning = false;
@@ -73,7 +73,7 @@ export class CharacterController extends EventDispatcher {
 			if ( isFirstUpdate ) {
 
 				isFirstUpdate = false;
-				wasGrounded = this.isGrounded;
+				wasOnFloor = this.isOnFloor;
 				wasOnSlope  = this.isOnSlope;
 				// wasIdling   = this.isIdling;
 				wasRunning  = this.isRunning;
@@ -82,15 +82,15 @@ export class CharacterController extends EventDispatcher {
 
 			}
 
-			if ( ! wasRunning && ! this.isRunning && this.isGrounded && ! this.isIdling ) {
+			if ( ! wasRunning && ! this.isRunning && this.isOnFloor && ! this.isIdling ) {
 
 				this.isIdling = true;
 				this.dispatchEvent( { type: 'startIdling' } );
 
 			} else if (
-				( ! wasRunning && this.isRunning && ! this.isJumping && this.isGrounded ) ||
-				( ! wasGrounded && this.isGrounded && this.isRunning ) ||
-				( wasOnSlope && ! this.isOnSlope && this.isRunning && this.isGrounded )
+				( ! wasRunning && this.isRunning && ! this.isJumping && this.isOnFloor ) ||
+				( ! wasOnFloor && this.isOnFloor && this.isRunning ) ||
+				( wasOnSlope && ! this.isOnSlope && this.isRunning && this.isOnFloor )
 			) {
 
 				this.isIdling = false;
@@ -105,20 +105,20 @@ export class CharacterController extends EventDispatcher {
 
 				this.dispatchEvent( { type: 'startSliding' } );
 
-			} else if ( wasGrounded && ! this.isGrounded && ! this.isJumping ) {
+			} else if ( wasOnFloor && ! this.isOnFloor && ! this.isJumping ) {
 
 				this.dispatchEvent( { type: 'startFalling' } );
 
 			}
 
-			if ( ! wasGrounded && this.isGrounded ) {
+			if ( ! wasOnFloor && this.isOnFloor ) {
 				// startIdlingが先に発生している問題がある
 				// TODO このイベントのn秒後にstartIdlingを始めるように変更する
 				// this.dispatchEvent( { type: 'endJumping' } );
 
 			}
 
-			wasGrounded = this.isGrounded;
+			wasOnFloor = this.isOnFloor;
 			wasOnSlope  = this.isOnSlope;
 			// wasIdling   = this.isIdling;
 			wasRunning  = this.isRunning;
@@ -137,7 +137,7 @@ export class CharacterController extends EventDispatcher {
 	update( deltaTime: number ) {
 
 		// 状態をリセットしておく
-		this.isGrounded = false;
+		this.isOnFloor = false;
 		this.isOnSlope  = false;
 		this.groundHeight = - Infinity;
 		this.groundNormal.set( 0, 1, 0 );
@@ -171,7 +171,7 @@ export class CharacterController extends EventDispatcher {
 			// 何とも衝突していないので、自由落下
 			return;
 
-		} else if ( this.isGrounded && ! this.isOnSlope && ! this.isJumping ) {
+		} else if ( this.isOnFloor && ! this.isOnSlope && ! this.isJumping ) {
 
 			// 通常の地面上にいる場合、ただしジャンプ開始時は除く
 			this.velocity.y = 0;
@@ -186,7 +186,7 @@ export class CharacterController extends EventDispatcher {
 			this.velocity.y = FALL_VELOCITY;
 			this.velocity.z = this.groundNormal.z * horizontalSpeed;
 
-		} else if ( ! this.isGrounded && ! this.isOnSlope && this.isJumping ) {
+		} else if ( ! this.isOnFloor && ! this.isOnSlope && this.isJumping ) {
 
 			// ジャンプの処理
 			this.velocity.y = this.currentJumpPower * - FALL_VELOCITY;
@@ -261,7 +261,7 @@ export class CharacterController extends EventDispatcher {
 		// "頭上からほぼ無限に下方向までの線 (segment)" vs "フェイス (triangle)" の
 		// 交差判定を行う
 		// もし、フェイスとの交差点が「頭上」から「下groundPadding」までの間だったら
-		// 地面上 (isGrounded) にいることとみなす
+		// 地面上 (isOnFloor) にいることとみなす
 		//
 		//   ___
 		//  / | \
@@ -325,6 +325,7 @@ export class CharacterController extends EventDispatcher {
 
 		this.groundHeight = groundContactInfo.contactPoint.y;
 		this.groundNormal.copy( groundContactInfo.face.normal );
+		// その他、床の属性を追加で取得する場合はここで
 
 		const top    = groundingHead.y;
 		const bottom = this.center.y - this.radius - this.groundPadding;
@@ -333,15 +334,15 @@ export class CharacterController extends EventDispatcher {
 		if ( this.isJumping && 0 < this.currentJumpPower ) {
 
 			this.isOnSlope  = false;
-			this.isGrounded = false;
+			this.isOnFloor = false;
 			return;
 
 		}
 
-		this.isGrounded = ( bottom <= this.groundHeight && this.groundHeight <= top );
+		this.isOnFloor = ( bottom <= this.groundHeight && this.groundHeight <= top );
 		this.isOnSlope  = ( this.groundNormal.y <= this.maxSlopeGradient );
 
-		if ( this.isGrounded ) {
+		if ( this.isOnFloor ) {
 
 			this.isJumping = false;
 
@@ -354,7 +355,7 @@ export class CharacterController extends EventDispatcher {
 		// 壁などを無視してひとまず(速度 * 時間)だけ
 		// centerの座標を進める
 		// 壁との衝突判定はこのこの後のステップで行うのでここではやらない
-		// もしisGrounded状態なら、強制的にyの値を地面に合わせる
+		// もしisOnFloor状態なら、強制的にyの値を地面に合わせる
 		const groundedY = this.groundHeight + this.radius;
 		const x = this.center.x + this.velocity.x * deltaTime;
 		const y = this.center.y + this.velocity.y * deltaTime;
@@ -362,7 +363,7 @@ export class CharacterController extends EventDispatcher {
 
 		this.center.set(
 			x,
-			( this.isGrounded ? groundedY : y ),
+			( this.isOnFloor ? groundedY : y ),
 			z
 		);
 
@@ -381,19 +382,23 @@ export class CharacterController extends EventDispatcher {
 
 		for ( let i = 0, l = faces.length; i < l; i ++ ) {
 
+			const face = faces[ i ];
+
+			if ( ! sphere.intersectsSphere( face.boundingSphere ) ) continue;
+
 			const contactInfo = isIntersectionSphereTriangle(
 				sphere,
-				faces[ i ].a,
-				faces[ i ].b,
-				faces[ i ].c,
-				faces[ i ].normal
+				face.a,
+				face.b,
+				face.c,
+				face.normal
 			);
 
 			if ( ! contactInfo ) continue;
 
 			this.contactInfo.push( {
 				...contactInfo,
-				face: faces[ i ]
+				face: face,
 			} );
 
 		}
@@ -452,12 +457,12 @@ export class CharacterController extends EventDispatcher {
 			if ( this.isJumping && 0 >= this.currentJumpPower && isSlopeFace ) {
 
 				this.isJumping = false;
-				this.isGrounded = true;
+				this.isOnFloor = true;
 			  // console.log( 'jump end' );
 
 			}
 
-			if ( this.isGrounded || this.isOnSlope ) {
+			if ( this.isOnFloor || this.isOnSlope ) {
 
 			  // 地面の上にいる場合はy(縦)方向は同一のまま
 			  // x, z (横) 方向だけを変更して押し出す
@@ -497,7 +502,7 @@ export class CharacterController extends EventDispatcher {
 
 	jump() {
 
-		if ( this.isJumping || ! this.isGrounded || this.isOnSlope ) return;
+		if ( this.isJumping || ! this.isOnFloor || this.isOnSlope ) return;
 
 		this.jumpStartTime = performance.now();
 		this.currentJumpPower = 1;
