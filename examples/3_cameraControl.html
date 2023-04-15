@@ -35,11 +35,8 @@ import * as MW from '../dist/meshwalk.module.js';
 // See demo/2_keyboardInput.html first
 
 const world = new MW.World();
-const min = new THREE.Vector3( - 15, - 15, - 15 );
-const max = new THREE.Vector3(  15,  15,  15 );
-const partition = 5;
-const region = new MW.Octree( min, max, partition );
-world.add( region );
+const octree = new MW.Octree();
+world.add( octree );
 
 
 const width = window.innerWidth;
@@ -59,7 +56,7 @@ const ground = new THREE.Mesh(
 );
 ground.rotation.x = - 90 * THREE.MathUtils.DEG2RAD;
 scene.add( ground );
-region.importThreeMesh( ground );
+octree.addGraphNode( ground );
 
 
 const wall = new THREE.Mesh(
@@ -68,7 +65,7 @@ const wall = new THREE.Mesh(
 );
 wall.position.set( 0, 3, 0 );
 scene.add( wall );
-region.importThreeMesh( wall );
+octree.addGraphNode( wall );
 
 const playerRadius = 1;
 const playerObjectHolder = new THREE.Object3D();
@@ -92,7 +89,6 @@ const tpsCameraControls = new MW.TPSCameraControls(
 	world,
 	renderer.domElement
 );
-tpsCameraControls.colliderMeshes = [ ground, wall ];
 
 
 // bind events

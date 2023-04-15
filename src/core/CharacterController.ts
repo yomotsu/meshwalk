@@ -1,18 +1,17 @@
 import { MathUtils, Sphere, Vector2, Vector3 } from 'three';
 import type { Object3D } from 'three';
-import type { Face } from './Octree';
 import { EventDispatcher } from './EventDispatcher';
 import {
 	testSegmentTriangle,
 	isIntersectionSphereTriangle,
 } from '../math/collision.js';
+import type { ComputedTriangle } from '../math/triangle';
 
 const FALL_VELOCITY = - 20;
 const JUMP_DURATION = 1000;
 const PI_HALF = Math.PI * 0.5;
 const PI_ONE_HALF = Math.PI * 1.5;
 
-const vec3 = new Vector3();
 const direction2D = new Vector2();
 const wallNormal2D = new Vector2();
 const groundingHead = new Vector3();
@@ -44,11 +43,11 @@ export class CharacterController extends EventDispatcher {
 	jumpStartTime = 0;
 	groundHeight = 0;
 	groundNormal = new Vector3();
-	nearTriangles: Face[] = [];
+	nearTriangles: ComputedTriangle[] = [];
 	contactInfo: {
 		distance: number;
 		contactPoint: Vector3;
-		face: Face;
+		face: ComputedTriangle;
 	}[] = [];
 
 	private _events: () => void;
@@ -129,7 +128,7 @@ export class CharacterController extends EventDispatcher {
 
 	}
 
-	setNearTriangles( nearTriangles: Face[] ) {
+	setNearTriangles( nearTriangles: ComputedTriangle[] ) {
 
 		this.nearTriangles = nearTriangles;
 
@@ -274,7 +273,7 @@ export class CharacterController extends EventDispatcher {
 		//    |
 		//    | segment (player's head to almost -infinity)
 
-		let groundContactInfo: { face: Face, contactPoint: Vector3 } | null = null;
+		let groundContactInfo: { face: ComputedTriangle, contactPoint: Vector3 } | null = null;
 		const faces = this.nearTriangles;
 
 		groundingHead.set(

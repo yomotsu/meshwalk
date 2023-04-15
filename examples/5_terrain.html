@@ -36,11 +36,8 @@ import * as MW from '../dist/meshwalk.module.js';
 // See demo/3_cameraControl.html first
 
 const world = new MW.World();
-const min = new THREE.Vector3( - 15, - 15, - 15 );
-const max = new THREE.Vector3(  15,  15,  15 );
-const partition = 5;
-const region = new MW.Octree( min, max, partition );
-world.add( region );
+const octree = new MW.Octree();
+world.add( octree );
 
 
 const width = window.innerWidth;
@@ -115,7 +112,7 @@ loader.load( 'terrain.glb', ( gltf ) => {
 	const boxHelper = new THREE.LineSegments( new THREE.WireframeGeometry( box.geometry ) );
 	boxHelper.position.copy( box.position );
 	scene.add( boxHelper );
-	region.importThreeMesh( box );
+	octree.addGraphNode( box );
 
 	const terrain = gltf.scene.children[ 0 ];
 	terrain.material = new THREE.MeshNormalMaterial();
@@ -125,8 +122,7 @@ loader.load( 'terrain.glb', ( gltf ) => {
 	const terrainHelper = new THREE.LineSegments( new THREE.WireframeGeometry( terrain.geometry ) );
 	terrainHelper.scale.copy( terrain.scale );
 	scene.add( terrainHelper );
-	region.importThreeMesh( terrain );
-	tpsCameraControls.colliderMeshes.push( terrain );
+	octree.addGraphNode( terrain );
 
 
 	( function update () {

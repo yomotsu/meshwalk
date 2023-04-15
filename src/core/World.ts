@@ -1,6 +1,7 @@
 import { Sphere } from 'three';
-import { Octree, Face } from './Octree';
-import type { CharacterController } from './CharacterController';
+import { ComputedTriangle } from '../math/triangle';
+import { Octree } from './Octree';
+import { CharacterController } from './CharacterController';
 
 const sphere = new Sphere();
 
@@ -11,13 +12,33 @@ export class World {
 
 	add( object: Octree | CharacterController ) {
 
-		if ( ( object as Octree ).isOctree ) {
+		if ( object instanceof Octree ) {
 
-			this.colliderPool.push( object as Octree );
+			this.colliderPool.push( object );
 
-		} else if ( ( object as CharacterController ).isCharacterController ) {
+		}
 
-			this.characterPool.push( object as CharacterController );
+		if ( object instanceof CharacterController ) {
+
+			this.characterPool.push( object );
+
+		}
+
+	}
+
+	remove( object: Octree | CharacterController ) {
+
+		if ( object instanceof Octree ) {
+
+			const index = this.colliderPool.indexOf( object );
+			if ( index !== - 1 ) this.colliderPool.splice( index, 1 );
+
+		}
+
+		if ( object instanceof CharacterController ) {
+
+			const index = this.characterPool.indexOf( object );
+			if ( index !== - 1 ) this.characterPool.splice( index, 1 );
 
 		}
 
@@ -28,7 +49,7 @@ export class World {
 		for ( let i = 0, l = this.characterPool.length; i < l; i ++ ) {
 
 			const character = this.characterPool[ i ];
-			let faces: Face[] = [];
+			let triangles: ComputedTriangle[] = [];
 
 			// octree で絞られた node に含まれる face だけを
 			// character に渡して判定する
@@ -36,12 +57,11 @@ export class World {
 
 				const octree = this.colliderPool[ ii ];
 				sphere.set( character.center, character.radius + character.groundPadding );
-				const intersectedNodes = octree.getIntersectedNodes( sphere, octree.maxDepth );
-				faces.push( ...Octree.uniqTrianglesFromNodes( intersectedNodes ) );
+				triangles.push( ...octree.getSphereTriangles( sphere, [] ) );
 
 			}
 
-			character.setNearTriangles( faces );
+			character.setNearTriangles( triangles );
 			character.update( deltaTime );
 
 		}

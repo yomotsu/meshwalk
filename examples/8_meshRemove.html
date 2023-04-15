@@ -36,11 +36,10 @@ import * as MW from '../dist/meshwalk.module.js';
 // See demo/1_getstarted.html first
 
 const world = new MW.World();
-const min = new THREE.Vector3( -15, -15, -15 );
-const max = new THREE.Vector3(  15,  15,  15 );
-const partition = 2;
-const region = new MW.Octree( min, max, partition );
-world.add( region );
+const octree1 = new MW.Octree();
+world.add( octree1 );
+const octree2 = new MW.Octree();
+world.add( octree2 );
 
 
 const width = window.innerWidth;
@@ -59,7 +58,7 @@ const ground = new THREE.Mesh(
 );
 ground.rotation.x =  - 90 * THREE.MathUtils.DEG2RAD;
 scene.add( ground );
-region.importThreeMesh( ground );
+octree1.addGraphNode( ground );
 
 
 const wall = new THREE.Mesh(
@@ -69,9 +68,14 @@ const wall = new THREE.Mesh(
 wall.position.set( 0, 3, 0 );
 // wall.rotation.set( 0, 0, 20 * THREE.MathUtils.DEG2RAD );
 scene.add( wall );
-region.importThreeMesh( wall );
+octree2.addGraphNode( wall );
 
-window.removeBox = () => region.removeThreeMesh( wall.geometry.uuid );
+window.removeBox = () => {
+
+  scene.remove( wall );
+  world.remove( octree2 );
+
+}
 
 
 const playerRadius = 1;

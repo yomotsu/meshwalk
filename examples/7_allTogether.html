@@ -33,11 +33,8 @@ import * as MW from '../dist/meshwalk.module.js';
 const eventDispatcher = new THREE.EventDispatcher();
 
 const world = new MW.World();
-const min = new THREE.Vector3( -15, -15, -15 );
-const max = new THREE.Vector3(  15,  15,  15 );
-const partition = 5;
-const region = new MW.Octree( min, max, partition );
-world.add( region );
+const octree = new MW.Octree();
+world.add( octree );
 
 
 const width = window.innerWidth;
@@ -110,14 +107,13 @@ const box = new THREE.Mesh(
 );
 box.position.set( - 3, 7.5, - 13 );
 scene.add( box );
-region.importThreeMesh( box );
+octree.addGraphNode( box );
 
 const terrain = terrainGltf.scene.children[ 0 ];
 terrain.material = new THREE.MeshNormalMaterial();
 terrain.scale.multiplyScalar( 2 );
 scene.add( terrain );
-region.importThreeMesh( terrain );
-tpsCameraControls.colliderMeshes.push( terrain );
+octree.addGraphNode( terrain );
 
 scene.add( characterGltf.scene );
 

@@ -41,11 +41,8 @@ import * as MW from '../dist/meshwalk.module.js';
 // See demo/2_keyboardInput.html first
 
 const world = new MW.World();
-const min = new THREE.Vector3( - 50, - 50, - 50 );
-const max = new THREE.Vector3(  50,  50,  50 );
-const partition = 5;
-const region = new MW.Octree( min, max, partition );
-world.add( region );
+const octree = new MW.Octree();
+world.add( octree );
 
 
 const width = window.innerWidth;
@@ -69,7 +66,7 @@ const ground = new THREE.Mesh(
 );
 ground.rotation.x = - 90 * THREE.MathUtils.DEG2RAD;
 scene.add( ground );
-region.importThreeMesh( ground );
+octree.addGraphNode( ground );
 
 const groundHelper = new THREE.LineSegments( new THREE.WireframeGeometry( ground.geometry ) );
 groundHelper.rotation.copy( ground.rotation );
@@ -78,12 +75,12 @@ scene.add( groundHelper );
 
 
 const object1 = new THREE.Mesh(
-	new THREE.CylinderGeometry( 5, 5, 4, 32 ),
+	new THREE.CylinderGeometry( 5, 5, 5, 16 ),
 	new THREE.MeshNormalMaterial()
 );
 object1.position.set( 0, 2, 0 );
 scene.add( object1 );
-region.importThreeMesh( object1 );
+octree.addGraphNode( object1 );
 
 const object1Helper = new THREE.LineSegments( new THREE.WireframeGeometry( object1.geometry ) );
 object1Helper.position.copy( object1.position );
@@ -98,7 +95,7 @@ const object2 = new THREE.Mesh(
 object2.position.set( - 15, 0, 0 );
 object2.rotation.set( 20 * THREE.MathUtils.DEG2RAD, 0, 0 );
 scene.add( object2 );
-region.importThreeMesh( object2 );
+octree.addGraphNode( object2 );
 
 const object2Helper = new THREE.LineSegments( new THREE.WireframeGeometry( object2.geometry ) );
 object2Helper.position.copy( object2.position );
@@ -112,7 +109,7 @@ const object3 = new THREE.Mesh(
 object3.position.set( - 15, 4.5, - 8 );
 object3.rotation.set( 40 * THREE.MathUtils.DEG2RAD, 0, 0 );
 scene.add( object3 );
-region.importThreeMesh( object3 );
+octree.addGraphNode( object3 );
 
 const object3Helper = new THREE.LineSegments( new THREE.WireframeGeometry( object3.geometry ) );
 object3Helper.position.copy( object3.position );
@@ -127,7 +124,7 @@ const object4 = new THREE.Mesh(
 object4.position.set( - 15, 10.5, - 13 );
 object4.rotation.set( 60 * THREE.MathUtils.DEG2RAD, 0, 0 );
 scene.add( object4 );
-region.importThreeMesh( object4 );
+octree.addGraphNode( object4 );
 
 const object4Helper = new THREE.LineSegments( new THREE.WireframeGeometry( object4.geometry ) );
 object4Helper.position.copy( object4.position );
@@ -136,16 +133,29 @@ scene.add( object4Helper );
 
 
 const object5 = new THREE.Mesh(
-	new THREE.SphereGeometry( 10, 8, 8 ),
+	new THREE.SphereGeometry( 10, 16, 16 ),
 	new THREE.MeshNormalMaterial()
 );
 object5.position.set( 20, 0, 0 );
 scene.add( object5 );
-region.importThreeMesh( object5 );
+octree.addGraphNode( object5 );
 
 const object5Helper = new THREE.LineSegments( new THREE.WireframeGeometry( object5.geometry ) );
 object5Helper.position.copy( object5.position );
 scene.add( object5Helper );
+
+
+const object6 = new THREE.Mesh(
+	new THREE.BoxGeometry( 5, 1, 4 ),
+	new THREE.MeshNormalMaterial()
+);
+object6.position.set( 8, 7, 0 );
+scene.add( object6 );
+octree.addGraphNode( object6 );
+
+const object6Helper = new THREE.LineSegments( new THREE.WireframeGeometry( object6.geometry ) );
+object6Helper.position.copy( object6.position );
+scene.add( object6Helper );
 
 
 
@@ -176,7 +186,6 @@ const tpsCameraControls = new MW.TPSCameraControls(
 	world,
 	renderer.domElement
 );
-tpsCameraControls.colliderMeshes = [ ground, object1, object2, object3, object4, object5 ];
 
 // bind events
 keyInputControl.addEventListener( 'movekeyon',    () => playerController.isRunning = true );

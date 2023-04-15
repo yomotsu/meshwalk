@@ -9,6 +9,9 @@ import {
 	Box3,
 	Spherical,
 	Raycaster,
+
+	Ray,
+	Object3D,
 } from 'three';
 import CameraControls from 'camera-controls';
 import { World } from 'core/World';
@@ -26,6 +29,13 @@ const subsetOfTHREE = {
 };
 
 CameraControls.install( { THREE: subsetOfTHREE } );
+
+const _ORIGIN = new Vector3( 0, 0, 0 );
+const _v3A = new Vector3();
+const _v3B = new Vector3();
+const _v3C = new Vector3();
+const _ray = new Ray();
+const _rotationMatrix = new Matrix4();
 
 export class TPSCameraControls extends CameraControls {
 
@@ -48,6 +58,7 @@ export class TPSCameraControls extends CameraControls {
 		this.touches.three = CameraControls.ACTION.TOUCH_DOLLY;
 
 		this.world = world;
+		this.colliderMeshes = [ new Object3D() ];
 
 		// this._trackObject = trackObject;
 		// this.offset = new Vector3( 0, 1, 0 );
@@ -71,5 +82,40 @@ export class TPSCameraControls extends CameraControls {
 
 	}
 
+	_collisionTest() {
+
+		let distance = Infinity;
+
+		if ( ! this.world ) return distance;
+
+		for ( let i = 0, l = this.world.colliderPool.length; i < l; i ++ ) {
+
+			const octree = this.world.colliderPool[ i ];
+			const direction = _v3A.setFromSpherical( this._spherical ).divideScalar( this._spherical.radius );
+			_rotationMatrix.lookAt( _ORIGIN, direction, this._camera.up );
+
+			for ( let i = 0; i < 4; i ++ ) {
+
+				const nearPlaneCorner = _v3B.copy( this._nearPlaneCorners[ i ] );
+				nearPlaneCorner.applyMatrix4( _rotationMatrix );
+
+				const origin = _v3C.addVectors( this._target, nearPlaneCorner );
+				_ray.set( origin, direction );
+
+				const intersect = octree.rayIntersect( _ray );
+
+				if ( intersect && intersect.distance < distance ) {
+
+					distance = intersect.distance;
+
+				}
+
+			}
+
+		}
+
+		return distance;
+
+	}
 
 }

@@ -1,87 +1,130 @@
-import { Vector3, Box3, BufferGeometry } from 'three';
-import type { Line3, Ray, Sphere, Mesh } from 'three';
+// import { Vector3, Box3, BufferGeometry } from 'three';
+// import type { Line3, Ray, Sphere, Mesh } from 'three';
+// import {
+// 	isIntersectionLineAABB,
+// 	isIntersectionTriangleAABB,
+// 	isIntersectionSphereAABB,
+// } from '../math/collision';
+
+import { ComputedTriangle } from '../math/triangle';
+
 import {
-	isIntersectionLineAABB,
-	isIntersectionTriangleAABB,
-	isIntersectionSphereAABB,
-} from '../math/collision';
+	Box3,
+	// Line3,
+	// Plane,
+	Sphere,
+	Vector3,
+	Mesh,
+} from 'three';
 
-// OcTree with Morton Order
-// based on http://marupeke296.com/COL_3D_No15_Octree.html
-//
-//       +------+------+
-//       |\   2  \   3  \
-//       | +------+------+
-//       + |\      \      \
-//       |\| +------+------+
-//       | + |      |      |
-//       +0|\|   6  |   7  |
-//        \| +------+------+
-//         + |      |      |
-//    y     \|   4  |   5  |
-//    |      +------+------+
-//    +--x
-//     \
-//      z
-//
-//
-//       +------+------+
-//       |\   6  \   7  \
-//       | +------+------+
-//       + |\      \      \
-//       |\| +------+------+
-//       | + |      |      |
-//       +4|\|   2  |   3  |
-//        \| +------+------+
-//         + |      |      |
-//  z y     \|   0  |   1  |
-//   \|      +------+------+
-//    +--x
-//
+import type {
+	Ray,
+	Object3D,
+} from 'three';
+// import { Capsule } from '../math/Capsule.js';
 
-// min: <THREE.Vector3>
-// max: <THREE.Vector3>
-// maxDepth: <Number>
+
+const _v1 = new Vector3();
+const _v2 = new Vector3();
+// const _plane = new Plane();
+// const _line1 = new Line3();
+// const _line2 = new Line3();
+// const _sphere = new Sphere();
+// const _capsule = new Capsule();
+
 export class Octree {
 
-	isOctree = true;
-	box = new Box3();
-	maxDepth: number;
-	nodes: OctreeNode[][] = [];
+	box: Box3;
+	bounds = new Box3();
+	triangles: ComputedTriangle[] = [];
+	subTrees: Octree[] = [];
 
-	constructor( min: Vector3, max: Vector3, maxDepth: number = 5 ) {
+	constructor( box: Box3 = new Box3() ) {
 
-		this.box.set( min, max );
-		this.maxDepth = maxDepth;
-		this.nodes = [];
-		this.isOctree = true;
+		this.box = box;
 
-		const nodeBoxSize = new Vector3();
-		const nodeBoxMin = new Vector3();
-		const nodeBoxMax = new Vector3();
+	}
 
-		for ( let depth = 0; depth < this.maxDepth; depth ++ ) {
+	addTriangle( triangle: ComputedTriangle ) {
 
-			this.nodes.push( [] );
-			const pow2 = Math.pow( 2, depth );
-			const pow4 = Math.pow( 4, depth );
-			nodeBoxSize.subVectors( this.box.max, this.box.min ).divideScalar( pow2 );
+		this.bounds.min.x = Math.min( this.bounds.min.x, triangle.a.x, triangle.b.x, triangle.c.x );
+		this.bounds.min.y = Math.min( this.bounds.min.y, triangle.a.y, triangle.b.y, triangle.c.y );
+		this.bounds.min.z = Math.min( this.bounds.min.z, triangle.a.z, triangle.b.z, triangle.c.z );
+		this.bounds.max.x = Math.max( this.bounds.max.x, triangle.a.x, triangle.b.x, triangle.c.x );
+		this.bounds.max.y = Math.max( this.bounds.max.y, triangle.a.y, triangle.b.y, triangle.c.y );
+		this.bounds.max.z = Math.max( this.bounds.max.z, triangle.a.z, triangle.b.z, triangle.c.z );
 
-			for ( let i = 0, length = Math.pow( 8, depth ); i < length; i ++ ) {
+		this.triangles.push( triangle );
 
-				const indexX = i % pow2;
-				const indexY = ( i / pow4 ) | 0;
-				const indexZ = ( ( i / pow2 ) | 0 ) % pow2;
+	}
 
-				nodeBoxMin.set(
-					this.box.min.x + indexX * nodeBoxSize.x,
-					this.box.min.y + indexY * nodeBoxSize.y,
-					this.box.min.z + indexZ * nodeBoxSize.z
-				);
-				nodeBoxMax.copy( nodeBoxMin ).add( nodeBoxSize );
+	calcBox() {
 
-				const mortonNumber = Octree.getMortonNumber( indexX, indexY, indexZ );
-				this.nodes[ depth ][ mortonNumber ] = new OctreeNode( this, depth, mortonNumber, nodeBoxMin, nodeBoxMax );
+		this.box.set( this.bounds.min, this.bounds.max );
+
+		// offset small amount to account for regular grid
+		this.box.min.x -= 0.01;
+		this.box.min.y -= 0.01;
+		this.box.min.z -= 0.01;
+
+		return this;
+
+	}
+
+	split( level: number ) {
+
+		const subTrees = [];
+		const halfSize = _v2.copy( this.box.max ).sub( this.box.min ).multiplyScalar( 0.5 );
+
+		for ( let x = 0; x < 2; x ++ ) {
+
+			for ( let y = 0; y < 2; y ++ ) {
+
+				for ( let z = 0; z < 2; z ++ ) {
+
+					const box = new Box3();
+					const v = _v1.set( x, y, z );
+
+					box.min.copy( this.box.min ).add( v.multiply( halfSize ) );
+					box.max.copy( box.min ).add( halfSize );
+
+					subTrees.push( new Octree( box ) );
+
+				}
+
+			}
+
+		}
+
+		let triangle;
+
+		while ( triangle = this.triangles.pop() ) {
+
+			for ( let i = 0; i < subTrees.length; i ++ ) {
+
+				if ( subTrees[ i ].box.intersectsTriangle( triangle ) ) {
+
+					subTrees[ i ].triangles.push( triangle );
+
+				}
+
+			}
+
+		}
+
+		for ( let i = 0; i < subTrees.length; i ++ ) {
+
+			const len = subTrees[ i ].triangles.length;
+
+			if ( len > 8 && level < 16 ) {
+
+				subTrees[ i ].split( level + 1 );
+
+			}
+
+			if ( len !== 0 ) {
+
+				this.subTrees.push( subTrees[ i ] );
 
 			}
 
@@ -89,408 +132,179 @@ export class Octree {
 
 	}
 
-	importThreeMesh( threeMesh: Mesh ) {
+	build() {
 
-		threeMesh.updateMatrix();
+		this.calcBox();
+		this.split( 0 );
 
-		const geometryId = threeMesh.geometry.uuid;
-		const geometry   = threeMesh.geometry.clone();
-		geometry.applyMatrix4( threeMesh.matrix );
-		geometry.computeVertexNormals();
+		return this;
 
-		if ( geometry instanceof BufferGeometry ) {
+	}
 
-			if ( !! geometry.index ) {
+	getRayTriangles( ray: Ray, result: ComputedTriangle[] ) {
 
-				const indices   = geometry.index.array;
-				const positions = geometry.attributes.position.array;
-				// const normals   = geometry.attributes.normal.array;
-				const groups   = ( geometry.groups.length !== 0 ) ? geometry.groups : [ { start: 0, count: indices.length, materialIndex: 0 } ];
+		for ( let i = 0; i < this.subTrees.length; i ++ ) {
 
-				for ( let i = 0, l = groups.length; i < l; ++ i ) {
+			const subTree = this.subTrees[ i ];
+			if ( ! ray.intersectsBox( subTree.box ) ) continue;
 
-					const start  = groups[ i ].start;
-					const count  = groups[ i ].count;
+			if ( subTree.triangles.length > 0 ) {
 
-					for ( let ii = start, ll = start + count; ii < ll; ii += 3 ) {
+				for ( let j = 0; j < subTree.triangles.length; j ++ ) {
 
-						const a = indices[ ii ];
-						const b = indices[ ii + 1 ];
-						const c = indices[ ii + 2 ];
+					if ( result.indexOf( subTree.triangles[ j ] ) === - 1 ) result.push( subTree.triangles[ j ] );
 
-						const vA = new Vector3().fromArray( positions, a * 3 );
-						const vB = new Vector3().fromArray( positions, b * 3 );
-						const vC = new Vector3().fromArray( positions, c * 3 );
+				}
 
-						// https://github.com/mrdoob/three.js/issues/4691
-						// make face normal
-						const cb = new Vector3().subVectors( vC, vB );
-						const ab = new Vector3().subVectors( vA, vB );
-						const faceNormal = cb.cross( ab ).normalize().clone();
+			} else {
 
-						const face = new Face(
-							vA,
-							vB,
-							vC,
-							faceNormal,
-							geometryId
-						);
+				subTree.getRayTriangles( ray, result );
 
-						this.addFace( face );
+			}
+
+		}
+
+		return result;
+
+	}
+
+	getSphereTriangles( sphere:Sphere, result: ComputedTriangle[] ) {
+
+		for ( let i = 0; i < this.subTrees.length; i ++ ) {
+
+			const subTree = this.subTrees[ i ];
+
+			if ( ! sphere.intersectsBox( subTree.box ) ) continue;
+
+			if ( subTree.triangles.length > 0 ) {
+
+				for ( let j = 0; j < subTree.triangles.length; j ++ ) {
+
+					if ( result.indexOf( subTree.triangles[ j ] ) === - 1 ) result.push( subTree.triangles[ j ] );
+
+				}
+
+			} else {
+
+				subTree.getSphereTriangles( sphere, result );
+
+			}
+
+		}
+
+		return result;
+
+	}
+
+	getCapsuleTriangles( capsule: Sphere, result: ComputedTriangle[] ) {
+
+		for ( let i = 0; i < this.subTrees.length; i ++ ) {
+
+			const subTree = this.subTrees[ i ];
+
+			if ( ! capsule.intersectsBox( subTree.box ) ) continue;
+
+			if ( subTree.triangles.length > 0 ) {
+
+				for ( let j = 0; j < subTree.triangles.length; j ++ ) {
+
+					if ( result.indexOf( subTree.triangles[ j ] ) === - 1 ) result.push( subTree.triangles[ j ] );
+
+				}
+
+			} else {
+
+				subTree.getCapsuleTriangles( capsule, result );
+
+			}
+
+		}
+
+	}
+
+	rayIntersect( ray: Ray ) {
+
+		if ( ray.direction.length() === 0 ) return;
+
+		const triangles: ComputedTriangle[] = [];
+		let triangle, position, distance = 1e100;
+
+		this.getRayTriangles( ray, triangles );
+
+		for ( let i = 0; i < triangles.length; i ++ ) {
+
+			const result = ray.intersectTriangle( triangles[ i ].a, triangles[ i ].b, triangles[ i ].c, true, _v1 );
+
+			if ( result ) {
+
+				const newdistance = result.sub( ray.origin ).length();
+
+				if ( distance > newdistance ) {
+
+					position = result.clone().add( ray.origin );
+					distance = newdistance;
+					triangle = triangles[ i ];
+
+				}
+
+			}
+
+		}
+
+		return distance < 1e100 ? { distance: distance, triangle: triangle, position: position } : false;
+
+	}
+
+	addGraphNode( object: Object3D ) {
+
+		object.updateWorldMatrix( true, true );
+		object.traverse( ( childObject ) => {
+
+			if ( childObject instanceof Mesh ) {
+
+				const mesh = childObject;
+				const geometry   = mesh.geometry.clone();
+				geometry.applyMatrix4( mesh.matrix );
+				geometry.computeVertexNormals();
+
+				if ( !! geometry.index ) {
+
+					const indices   = geometry.index.array;
+					const positions = geometry.attributes.position.array;
+					const groups   = ( geometry.groups.length !== 0 ) ? geometry.groups : [ { start: 0, count: indices.length, materialIndex: 0 } ];
+
+					for ( let i = 0, l = groups.length; i < l; ++ i ) {
+
+						const start  = groups[ i ].start;
+						const count  = groups[ i ].count;
+
+						for ( let ii = start, ll = start + count; ii < ll; ii += 3 ) {
+
+							const a = indices[ ii ];
+							const b = indices[ ii + 1 ];
+							const c = indices[ ii + 2 ];
+
+							const vA = new Vector3().fromArray( positions, a * 3 );
+							const vB = new Vector3().fromArray( positions, b * 3 );
+							const vC = new Vector3().fromArray( positions, c * 3 );
+
+							this.addTriangle( new ComputedTriangle(
+								vA,
+								vB,
+								vC,
+							) );
+
+						}
 
 					}
 
 				}
 
 			}
-
-			return;
-
-		}
-
-	}
-
-	addFace( face: Face ) {
-
-		let tmp: OctreeNode[] = [];
-		let targetNodes = this.nodes[ 0 ].slice( 0 );
-
-		for ( let i = 0, l = this.maxDepth; i < l; i ++ ) {
-
-			for ( let ii = 0, ll = targetNodes.length; ii < ll; ii ++ ) {
-
-				const node = targetNodes[ ii ];
-				const isIntersected = isIntersectionTriangleAABB( face.a, face.b, face.c, this.box );
-
-				if ( isIntersected ) {
-
-					node.trianglePool.push( face );
-
-					if ( i + 1 !== this.maxDepth ) {
-
-						tmp = tmp.concat( node.getChildNodes() );
-
-					}
-
-				}
-
-			}
-
-			if ( tmp.length === 0 ) {
-
-				break;
-
-			}
-
-			targetNodes = tmp.slice( 0 );
-			tmp.length = 0;
-
-		}
-
-	}
-
-	removeThreeMesh( meshID: string ) {
-
-		this.nodes.forEach( ( nodeDepth ) => {
-
-			nodeDepth.forEach( ( node ) => {
-
-				const newTrianglePool: Face[] = [];
-
-				node.trianglePool.forEach( ( face ) => {
-
-					if ( face.meshID !== meshID ) {
-
-						newTrianglePool.push( face );
-
-					}
-
-				} );
-
-				node.trianglePool = newTrianglePool;
-
-			} );
 
 		} );
 
-	}
-
-	getIntersectedNodes( sphere: Sphere, depth: number ) {
-
-		let tmp: OctreeNode[] = [];
-		const intersectedNodes = [];
-		const isIntersected = isIntersectionSphereAABB( sphere, this.box );
-
-		if ( ! isIntersected ) return [];
-
-		let targetNodes = this.nodes[ 0 ].slice( 0 );
-
-		for ( let i = 0, l = depth; i < l; i ++ ) {
-
-			for ( let ii = 0, ll = targetNodes.length; ii < ll; ii ++ ) {
-
-				const node = targetNodes[ ii ];
-				const isIntersected = isIntersectionSphereAABB( sphere, node.box );
-
-				if ( isIntersected ) {
-
-					const isAtMaxDepth = ( i + 1 === depth );
-
-					if ( isAtMaxDepth ) {
-
-						if ( node.trianglePool.length !== 0 ) {
-
-							intersectedNodes.push( node );
-
-						}
-
-					} else {
-
-						tmp = tmp.concat( node.getChildNodes() );
-
-					}
-
-				}
-
-			}
-
-			targetNodes = tmp.slice( 0 );
-			tmp.length = 0;
-
-		}
-
-		return intersectedNodes;
-
-	}
-
-	getLineIntersectedNodes( line: Line3, depth: number ) {
-
-		let tmp: OctreeNode[] = [];
-		const intersectedNodes = [];
-		const isIntersected = isIntersectionLineAABB( line, this.box );
-
-		if ( ! isIntersected ) return [];
-
-		let targetNodes = this.nodes[ 0 ].slice( 0 );
-
-		for ( let i = 0, l = depth; i < l; i ++ ) {
-
-			for ( let ii = 0, ll = targetNodes.length; ii < ll; ii ++ ) {
-
-				const node = targetNodes[ ii ];
-				const isIntersected = isIntersectionLineAABB( line, node.box );
-
-				if ( isIntersected ) {
-
-					const isAtMaxDepth = ( i + 1 === depth );
-
-					if ( isAtMaxDepth ) {
-
-						if ( node.trianglePool.length !== 0 ) {
-
-							intersectedNodes.push( node );
-
-						}
-
-					} else {
-
-						tmp = tmp.concat( node.getChildNodes() );
-
-					}
-
-				}
-
-			}
-
-			targetNodes = tmp.slice( 0 );
-			tmp.length = 0;
-
-		}
-
-		return intersectedNodes;
-
-	}
-
-	getRayIntersectedNodes( ray: Ray, depth: number ) {
-
-		let tmp: OctreeNode[] = [];
-		const intersectedNodes = [];
-		const isIntersected = ray.intersectsBox( this.box );
-
-		if ( ! isIntersected ) return [];
-
-		let targetNodes = this.nodes[ 0 ].slice( 0 );
-
-		for ( let i = 0, l = depth; i < l; i ++ ) {
-
-			for ( let ii = 0, ll = targetNodes.length; ii < ll; ii ++ ) {
-
-				const node = targetNodes[ ii ];
-				const isIntersected = ray.intersectsBox( node.box );
-
-				if ( isIntersected ) {
-
-					const isAtMaxDepth = ( i + 1 === depth );
-
-					if ( isAtMaxDepth ) {
-
-						if ( node.trianglePool.length !== 0 ) {
-
-							intersectedNodes.push( node );
-
-						}
-
-					} else {
-
-						tmp = tmp.concat( node.getChildNodes() );
-
-					}
-
-				}
-
-			}
-
-			targetNodes = tmp.slice( 0 );
-			tmp.length = 0;
-
-		}
-
-		return intersectedNodes;
-
-	}
-
-	static separate3Bit( n: number ) {
-
-		n = ( n | n << 8 ) & 0x0000f00f;
-		n = ( n | n << 4 ) & 0x000c30c3;
-		n = ( n | n << 2 ) & 0x00249249;
-		return n;
-
-	}
-
-	static getMortonNumber( x: number, y: number, z: number ) {
-
-		return (
-			Octree.separate3Bit( x ) |
-			Octree.separate3Bit( y ) << 1 |
-			Octree.separate3Bit( z ) << 2
-		);
-
-	}
-
-	static uniqTrianglesFromNodes( nodes: OctreeNode[] ) {
-
-		const uniq = [];
-		let isContained = false;
-
-		if ( nodes.length === 0 ) return [];
-		if ( nodes.length === 1 ) return nodes[ 0 ].trianglePool.slice( 0 );
-
-		for ( let i = 0, l = nodes.length; i < l; i ++ ) {
-
-			for ( let ii = 0, ll = nodes[ i ].trianglePool.length; ii < ll; ii ++ ) {
-
-				for ( let iii = 0, lll = uniq.length; iii < lll; iii ++ ) {
-
-					if ( nodes[ i ].trianglePool[ ii ] === uniq[ iii ] ) {
-
-						isContained = true;
-
-					}
-
-				}
-
-				if ( ! isContained ) {
-
-					uniq.push( nodes[ i ].trianglePool[ ii ] );
-
-				}
-
-				isContained = false;
-
-			}
-
-		}
-
-		return uniq;
-
-	}
-
-}
-
-//
-
-export class OctreeNode {
-
-	tree: Octree;
-	depth: number;
-	mortonNumber: number;
-	box = new Box3();
-	trianglePool: Face[] = [];
-
-	constructor( tree: Octree, depth: number, mortonNumber: number, min: Vector3, max: Vector3 ) {
-
-		this.tree = tree;
-		this.depth = depth;
-		this.mortonNumber = mortonNumber;
-		this.box.set( min, max );
-
-	}
-
-	// getParentNode() {
-
-	// 	if ( this.depth === 0 ) return null;
-	// 	this.tree.nodes[ this.depth ][ this.mortonNumber >> 3 ];
-
-	// }
-
-	getChildNodes() {
-
-		if ( this.tree.maxDepth === this.depth ) {
-
-			return [];
-
-		}
-
-		const firstChild = this.mortonNumber << 3;
-
-		return [
-			this.tree.nodes[ this.depth + 1 ][ firstChild ],
-			this.tree.nodes[ this.depth + 1 ][ firstChild + 1 ],
-			this.tree.nodes[ this.depth + 1 ][ firstChild + 2 ],
-			this.tree.nodes[ this.depth + 1 ][ firstChild + 3 ],
-			this.tree.nodes[ this.depth + 1 ][ firstChild + 4 ],
-			this.tree.nodes[ this.depth + 1 ][ firstChild + 5 ],
-			this.tree.nodes[ this.depth + 1 ][ firstChild + 6 ],
-			this.tree.nodes[ this.depth + 1 ][ firstChild + 7 ]
-		];
-
-	}
-
-}
-
-//
-
-// a: <THREE.Vector3>
-// b: <THREE.Vector3>
-// c: <THREE.Vector3>
-// normal: <THREE.Vector3>
-// meshID: <String>
-export class Face {
-
-	a: Vector3;
-	b: Vector3;
-	c: Vector3;
-	normal: Vector3;
-	meshID: string;
-
-	constructor( a: Vector3, b: Vector3, c: Vector3, normal: Vector3, meshID: string ) {
-
-		this.a = a.clone();
-		this.b = b.clone();
-		this.c = c.clone();
-		this.normal = normal.clone();
-		this.meshID = meshID;
+		this.build();
 
 	}
 

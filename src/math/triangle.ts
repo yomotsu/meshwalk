@@ -1,5 +1,22 @@
-import { Vector3, Box3, Sphere } from 'three';
-import type { Triangle } from 'three';
+import { Vector3, Triangle, Box3, Sphere } from 'three';
+
+export class ComputedTriangle extends Triangle {
+
+	boundingBox: Box3;
+	boundingSphere: Sphere;
+	normal: Vector3;
+
+	constructor( a: Vector3, b: Vector3, c: Vector3 ) {
+
+		super( a, b, c );
+
+		this.normal = this.getNormal( new Vector3() );
+		this.boundingBox = makeTriangleBoundingBox( this );
+		this.boundingSphere = makeTriangleBoundingSphere( this, this.normal );
+
+	}
+
+}
 
 export function makeTriangleBoundingBox( triangle: Triangle ) {
 

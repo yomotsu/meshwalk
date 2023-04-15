@@ -35,32 +35,8 @@ import * as MW from '../dist/meshwalk.module.js';
 
 // make the world,
 const world = new MW.World();
-
-// then make a octree object,
-// which will be the container of rigid objects such as terrain
-const min = new THREE.Vector3( - 15, - 15, - 15 );
-const max = new THREE.Vector3(  15,  15,  15 );
-const partition = 5;
-// min and max is for the size of the octree box
-// see http://en.wikipedia.org/wiki/Octree
-//
-//                 +------+------+
-//                 |\      \      \
-//                 | +------+------+
-//                 + |\      \      \
-//                 |\| +------+------+ <-coords of max
-//                 | + |      |      |
-// coords of min-> + |\|      |      |
-//                  \| +------+------+
-//                   + |      |      |
-//          y         \|      |      |
-//          |          +------+------+
-//          +--x
-//           \
-//            z
-//
-const region = new MW.Octree( min, max, partition );
-world.add( region );
+const octree = new MW.Octree();
+world.add( octree );
 
 
 const width = window.innerWidth;
@@ -80,7 +56,7 @@ const ground = new THREE.Mesh(
 );
 ground.rotation.x = - 90 * THREE.MathUtils.DEG2RAD;
 scene.add( ground );
-region.importThreeMesh( ground );
+octree.addGraphNode( ground );
 
 
 const playerRadius = 1;
@@ -99,10 +75,7 @@ playerObjectHolder.add( sphere );
 const playerController = new MW.CharacterController( playerObjectHolder, playerRadius );
 world.add( playerController );
 
-
 ( function update () {
-
-  const delta = clock.getDelta();
 
   requestAnimationFrame( update );
   renderer.render( scene, camera );
