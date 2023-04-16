@@ -1,8 +1,11 @@
 import { MathUtils, Sphere, Vector2, Vector3 } from 'three';
+// import { Capsule } from 'three/examples/jsm/math/Capsule.js';
 import type { Object3D } from 'three';
 import { EventDispatcher } from './EventDispatcher';
 import {
-	testSegmentTriangle,
+	Intersection,
+	testLineTriangle,
+	// testTriangleCapsule,
 	isIntersectionSphereTriangle,
 } from '../math/collision.js';
 import type { ComputedTriangle } from '../math/triangle';
@@ -24,6 +27,8 @@ const direction = new Vector3();
 const translateScoped = new Vector3();
 const translate = new Vector3();
 const sphere = new Sphere();
+
+const intersection = new Intersection();
 
 export class CharacterController extends EventDispatcher {
 
@@ -47,9 +52,9 @@ export class CharacterController extends EventDispatcher {
 	groundNormal = new Vector3();
 	nearTriangles: ComputedTriangle[] = [];
 	contactInfo: {
-		distance: number;
-		contactPoint: Vector3;
-		face: ComputedTriangle;
+		depth: number;
+		point: Vector3;
+		triangle: ComputedTriangle;
 	}[] = [];
 
 	private _events: () => void;
@@ -204,7 +209,7 @@ export class CharacterController extends EventDispatcher {
 
 		for ( let i = 0, l = this.contactInfo.length; i < l; i ++ ) {
 
-			const normal = this.contactInfo[ i ].face.normal;
+			const normal = this.contactInfo[ i ].triangle.normal;
 			// var distance = this.contactInfo[ i ].distance;
 
 			if ( this.maxSlopeGradient < normal.y || this.isOnSlope ) {
@@ -275,8 +280,8 @@ export class CharacterController extends EventDispatcher {
 		//    |
 		//    | segment (player's head to almost -infinity)
 
-		let groundContactInfo: { face: ComputedTriangle, contactPoint: Vector3 } | null = null;
-		const faces = this.nearTriangles;
+		let groundContact: { ground: ComputedTriangle, point: Vector3 } | null = null;
+		const triangles = this.nearTriangles;
 
 		groundingHead.set(
 			this.center.x,
@@ -290,44 +295,49 @@ export class CharacterController extends EventDispatcher {
 			this.center.z
 		);
 
-		for ( let i = 0, l = faces.length; i < l; i ++ ) {
+		for ( let i = 0, l = triangles.length; i < l; i ++ ) {
 
-			const isIntersected = testSegmentTriangle(
+			const triangle = triangles[ i ];
+
+			// 壁・天井は設置処理では無視
+			if ( triangle.normal.y < 0 ) continue;
+
+			const isIntersected = testLineTriangle(
 				groundingHead,
 				groundingTo,
-				faces[ i ].a,
-				faces[ i ].b,
-				faces[ i ].c,
+				triangle.a,
+				triangle.b,
+				triangle.c,
 				groundContactPointTmp,
 			);
 
 			if ( ! isIntersected ) continue;
 
-			if ( ! groundContactInfo ) {
+			if ( ! groundContact ) {
 
 				groundContactPoint.copy( groundContactPointTmp );
-				groundContactInfo = {
-					contactPoint: groundContactPoint,
-					face: faces[ i ],
+				groundContact = {
+					point: groundContactPoint,
+					ground: triangle,
 				};
 				continue;
 
 			}
 
-			if ( groundContactPointTmp.y <= groundContactInfo.contactPoint.y ) continue;
+			if ( groundContactPointTmp.y <= groundContact.point.y ) continue;
 
 			groundContactPoint.copy( groundContactPointTmp );
-			groundContactInfo = {
-				contactPoint: groundContactPoint,
-				face: faces[ i ],
+			groundContact = {
+				point: groundContactPoint,
+				ground: triangle,
 			};
 
 		}
 
-		if ( ! groundContactInfo ) return;
+		if ( ! groundContact ) return;
 
-		this.groundHeight = groundContactInfo.contactPoint.y;
-		this.groundNormal.copy( groundContactInfo.face.normal );
+		this.groundHeight = groundContact.point.y;
+		this.groundNormal.copy( groundContact.ground.normal );
 		// その他、床の属性を追加で取得する場合はここで
 
 		const top    = groundingHead.y;
@@ -380,29 +390,31 @@ export class CharacterController extends EventDispatcher {
 		// 実際に交差している壁フェイスを抜き出して
 		// this.contactInfoに追加する
 
-		const faces = this.nearTriangles;
+		const triangles = this.nearTriangles;
 		this.contactInfo.length = 0;
 
-		for ( let i = 0, l = faces.length; i < l; i ++ ) {
+		for ( let i = 0, l = triangles.length; i < l; i ++ ) {
 
-			const face = faces[ i ];
+			const triangle = triangles[ i ];
 
-			if ( ! face.boundingSphere ) face.computeBoundingSphere();
-			if ( ! sphere.intersectsSphere( face.boundingSphere! ) ) continue;
+			if ( ! triangle.boundingSphere ) triangle.computeBoundingSphere();
+			if ( ! sphere.intersectsSphere( triangle.boundingSphere! ) ) continue;
 
-			const contactInfo = isIntersectionSphereTriangle(
+			const isIntersected = isIntersectionSphereTriangle(
 				sphere,
-				face.a,
-				face.b,
-				face.c,
-				face.normal
+				triangle.a,
+				triangle.b,
+				triangle.c,
+				triangle.normal,
+				intersection,
 			);
 
-			if ( ! contactInfo ) continue;
+			if ( ! isIntersected ) continue;
 
 			this.contactInfo.push( {
-				...contactInfo,
-				face: face,
+				point: intersection.point.clone(),
+				depth: intersection.depth,
+				triangle,
 			} );
 
 		}
@@ -415,7 +427,7 @@ export class CharacterController extends EventDispatcher {
 		// 壁と衝突し食い込んでいる場合、
 		// ここで壁の外への押し出しをする
 
-		let face;
+		let triangle;
 		let normal;
 		// let distance;
 
@@ -433,8 +445,8 @@ export class CharacterController extends EventDispatcher {
 		translate.set( 0, 0, 0 );
 		for ( let i = 0, l = this.contactInfo.length; i < l; i ++ ) {
 
-			face = this.contactInfo[ i ].face;
-			normal = this.contactInfo[ i ].face.normal;
+			triangle = this.contactInfo[ i ].triangle;
+			normal = this.contactInfo[ i ].triangle.normal;
 			// distance = this.contactInfo[ i ].distance;
 
 			// if ( 0 <= distance ) {
@@ -455,7 +467,7 @@ export class CharacterController extends EventDispatcher {
 			}
 
 			// フェイスは急勾配な坂か否か
-			const isSlopeFace = ( this.maxSlopeGradient <= face.normal.y && face.normal.y < 1 );
+			const isSlopeFace = ( this.maxSlopeGradient <= normal.y && normal.y < 1 );
 
 			// ジャンプ降下中に、急勾配な坂に衝突したらジャンプ終わり
 			if ( this.isJumping && 0 >= this.currentJumpPower && isSlopeFace ) {
@@ -473,7 +485,7 @@ export class CharacterController extends EventDispatcher {
 			  // http://gamedev.stackexchange.com/questions/80293/how-do-i-resolve-a-sphere-triangle-collision-in-a-given-direction
 				point1.copy( normal ).multiplyScalar( - this.radius ).add( this.center );
 				direction.set( normal.x, 0, normal.z ).normalize();
-				const plainD = face.a.dot( normal );
+				const plainD = triangle.a.dot( normal );
 				const t = ( plainD - ( normal.x * point1.x + normal.y * point1.y + normal.z * point1.z ) ) / ( normal.x * direction.x + normal.y * direction.y + normal.z * direction.z );
 				point2.copy( direction ).multiplyScalar( t ).add( point1 );
 				translateScoped.subVectors( point2, point1 );

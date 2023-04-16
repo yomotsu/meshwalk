@@ -127,7 +127,7 @@ octree.addGraphNode( terrain );
 	const delta = clock.getDelta();
 
 	requestAnimationFrame( update );
-	world.update();
+	world.fixedUpdate();
 	tpsCameraControls.update( delta );
 	renderer.render( scene, camera );
 

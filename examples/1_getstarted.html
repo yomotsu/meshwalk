@@ -79,7 +79,7 @@ world.add( playerController );
 ( function update () {
 
 	requestAnimationFrame( update );
-	world.update();
+	world.fixedUpdate();
 	renderer.render( scene, camera );
 
 } )();

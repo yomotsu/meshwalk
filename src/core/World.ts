@@ -55,7 +55,7 @@ export class World {
 
 	}
 
-	update() {
+	fixedUpdate() {
 
 		const deltaTime = 1 / this._fps;
 		const stepDeltaTime = deltaTime / this._stepsPerFrame;

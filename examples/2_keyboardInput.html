@@ -97,7 +97,7 @@ keyInputControl.addEventListener( 'jumpkeypress',  () => playerController.jump()
 ( function update () {
 
 	requestAnimationFrame( update );
-	world.update();
+	world.fixedUpdate();
 	renderer.render( scene, camera );
 
 } )();

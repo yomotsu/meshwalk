@@ -15,7 +15,7 @@ import type {
 // import { Capsule } from '../math/Capsule.js';
 import {
 	isIntersectionLineBox,
-	testSegmentTriangle,
+	testLineTriangle,
 } from "../math/collision";
 
 const _v1 = new Vector3();
@@ -255,7 +255,7 @@ export class Octree {
 		for ( let i = 0; i < triangles.length; i ++ ) {
 
 			const result = _v1;
-			const isIntersected = testSegmentTriangle( line.start, line.end, triangles[ i ].a, triangles[ i ].b, triangles[ i ].c, result );
+			const isIntersected = testLineTriangle( line.start, line.end, triangles[ i ].a, triangles[ i ].b, triangles[ i ].c, result );
 
 			if ( isIntersected ) {
 
