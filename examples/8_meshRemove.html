@@ -101,11 +101,11 @@ keyInputControl.addEventListener( 'movekeyoff',    () => playerController.isRunn
 keyInputControl.addEventListener( 'movekeychange', () => playerController.direction = keyInputControl.frontAngle );
 keyInputControl.addEventListener( 'jumpkeypress',  () => playerController.jump() );
 
-world.start();
 
 ( function update () {
 
 	requestAnimationFrame( update );
+	world.update();
 	renderer.render( scene, camera );
 
 } )();

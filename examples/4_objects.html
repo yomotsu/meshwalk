@@ -215,13 +215,12 @@ tpsCameraControls.addEventListener( 'update', () => {
 // const helper = new OctreeHelper( octree );
 // scene.add( helper );
 
-world.start();
-
 ( function update () {
 
 	const delta = clock.getDelta();
 
 	requestAnimationFrame( update );
+	world.update();
 	tpsCameraControls.update( delta );
 	renderer.render( scene, camera );
 

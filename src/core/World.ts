@@ -55,38 +55,20 @@ export class World {
 
 	}
 
-	start() {
+	update() {
 
-		if ( this._running ) return;
+		const deltaTime = 1 / this._fps;
+		const stepDeltaTime = deltaTime / this._stepsPerFrame;
 
-		this._running = true;
-		const stepDeltaTime = 1 / this._fps / this._stepsPerFrame;
-
-		const step = () => {
-
-			if ( ! this._running ) return;
+		for ( let i = 0; i < this._stepsPerFrame; i ++ ) {
 
 			this.step( stepDeltaTime );
-			// should not relay on requestAnimationFrame. use fixed time loop.
-			this._intervalId = window.setTimeout( step, stepDeltaTime * 1000 );
 
-		};
-
-		this.step( 0 );
-		this._intervalId = window.setTimeout( step, stepDeltaTime * 1000 );
+		}
 
 	}
 
-	stop() {
-
-		this._running = false;
-		if ( this._intervalId === null ) return;
-		clearTimeout( this._intervalId );
-		this._intervalId = null;
-
-	}
-
-	step( deltaTime: number ) {
+	step( stepDeltaTime: number ) {
 
 		for ( let i = 0, l = this.characterPool.length; i < l; i ++ ) {
 
@@ -104,7 +86,7 @@ export class World {
 			}
 
 			character.setNearTriangles( triangles );
-			character.update( deltaTime );
+			character.update( stepDeltaTime );
 
 		}
 

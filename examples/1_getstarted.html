@@ -75,11 +75,11 @@ playerObjectHolder.add( sphere );
 const playerController = new MW.CharacterController( playerObjectHolder, playerRadius );
 world.add( playerController );
 
-world.start();
 
 ( function update () {
 
 	requestAnimationFrame( update );
+	world.update();
 	renderer.render( scene, camera );
 
 } )();

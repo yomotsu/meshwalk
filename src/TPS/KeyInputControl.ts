@@ -196,6 +196,7 @@ export class KeyInputControl extends EventDispatcher {
 		window.addEventListener( 'keydown', this._keydownListener );
 		window.addEventListener( 'keyup',   this._keyupListener );
 		window.addEventListener( 'blur',    this._blurListener );
+		window.addEventListener( 'contextmenu', this._blurListener );
 
 	}
 
@@ -220,6 +221,15 @@ export class KeyInputControl extends EventDispatcher {
 		else if ( ! up && ! left &&   down &&   right ) this.frontAngle = DEG_225;
 		else if ( ! up && ! left && ! down &&   right ) this.frontAngle = DEG_270;
 		else if (   up && ! left && ! down &&   right ) this.frontAngle = DEG_315;
+
+	}
+
+	dispose() {
+
+		window.removeEventListener( 'keydown', this._keydownListener );
+		window.removeEventListener( 'keyup',   this._keyupListener );
+		window.removeEventListener( 'blur',    this._blurListener );
+		this._blurListener();
 
 	}
 

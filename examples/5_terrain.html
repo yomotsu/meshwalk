@@ -110,7 +110,7 @@ boxHelper.position.copy( box.position );
 scene.add( boxHelper );
 octree.addGraphNode( box );
 
-const gltf = new GLTFLoader().loadAsync( 'terrain.glb' );
+const gltf = await new GLTFLoader().loadAsync( 'terrain.glb' );
 const terrain = gltf.scene.children[ 0 ];
 terrain.material = new THREE.MeshNormalMaterial();
 terrain.scale.multiplyScalar( 2 );
@@ -121,13 +121,13 @@ terrainHelper.scale.copy( terrain.scale );
 scene.add( terrainHelper );
 octree.addGraphNode( terrain );
 
-world.start();
 
 ( function update () {
 
 	const delta = clock.getDelta();
 
 	requestAnimationFrame( update );
+	world.update();
 	tpsCameraControls.update( delta );
 	renderer.render( scene, camera );
 

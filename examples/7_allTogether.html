@@ -143,13 +143,13 @@ eventDispatcher.addEventListener( 'beforerender', function () {
 
 } );
 
-world.start();
 
 ( function update () {
 
 	const delta = clock.getDelta();
 
 	requestAnimationFrame( update );
+	world.update();
 	tpsCameraControls.update( delta );
 	animationController.update( delta );
 	eventDispatcher.dispatchEvent( { type: 'beforerender' } );

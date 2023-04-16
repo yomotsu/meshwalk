@@ -345,7 +345,7 @@ export class Octree {
 
 							const triangle = new ComputedTriangle( vA, vB, vC );
 							// ポリゴンの継ぎ目の辺で raycast が交差しない可能性があるので、わずかに拡大する
-							triangle.extend( 0.001 );
+							triangle.extend( 1e-10 );
 							triangle.computeBoundingSphere();
 							this.addTriangle( triangle );
 

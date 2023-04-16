@@ -114,13 +114,13 @@ tpsCameraControls.addEventListener( 'update', () => {
 
 } );
 
-world.start();
 
 ( function update () {
 
 	const delta = clock.getDelta();
 
 	requestAnimationFrame( update );
+	world.update();
 	tpsCameraControls.update( delta );
 	renderer.render( scene, camera );
 
