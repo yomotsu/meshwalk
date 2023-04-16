@@ -60,10 +60,10 @@ octree.addGraphNode( ground );
 
 
 const wall = new THREE.Mesh(
-	new THREE.BoxGeometry( 5, 6, 10 ),
+	new THREE.BoxGeometry( 5, 5, 10 ),
 	new THREE.MeshNormalMaterial( { wireframe: true } )
 );
-wall.position.set( 0, 3, 0 );
+wall.position.set( 0, 2.5, 0 );
 scene.add( wall );
 octree.addGraphNode( wall );
 

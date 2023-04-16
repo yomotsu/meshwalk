@@ -1,39 +1,59 @@
-import { Vector3, Triangle, Line3, Box3, Sphere } from 'three';
+import { Vector3, Triangle, Sphere } from 'three';
 
+const vec3 = new Vector3();
 export class ComputedTriangle extends Triangle {
 
-	boundingBox: Box3;
-	boundingSphere: Sphere;
+	boundingSphere: Sphere | undefined;
 	normal: Vector3;
-	incenter: Vector3; // aka Semiperimeter
-	inradius: number;
 
 	constructor( a: Vector3, b: Vector3, c: Vector3 ) {
 
 		super( a, b, c );
 
 		this.normal = this.getNormal( new Vector3() );
-		this.boundingBox = makeTriangleBoundingBox( this );
-		this.boundingSphere = makeTriangleBoundingSphere( this, this.normal );
 
-		const { incenter, inradius } = getInCircle( this );
-		this.incenter = incenter;
-		this.inradius = inradius;
+	}
+
+	computeBoundingSphere() {
+
+		this.boundingSphere = makeTriangleBoundingSphere( this, this.normal );
 
 	}
 
 	// https://math.stackexchange.com/questions/1397456/how-to-scale-a-triangle-such-that-the-distance-between-original-edges-and-new-ed
-	scale( amount: number ) {
+	// scale( amount: number ) {
 
-		this.a.sub( this.incenter ).multiplyScalar( amount ).add( this.incenter );
-		this.b.sub( this.incenter ).multiplyScalar( amount ).add( this.incenter );
-		this.c.sub( this.incenter ).multiplyScalar( amount ).add( this.incenter );
+	// 	const incenter = getIncenter( this, vec3 );
+
+	// 	this.a.sub( incenter ).multiplyScalar( amount ).add( incenter );
+	// 	this.b.sub( incenter ).multiplyScalar( amount ).add( incenter );
+	// 	this.c.sub( incenter ).multiplyScalar( amount ).add( incenter );
+
+	// 	拡張したら、過去の boundingSphere はすでに大きさが違うものとなる。破棄する。
+	// 	this.boundingSphere = undefined;
+
+	// }
+
+	extend( amount: number ) {
+
+		const incenter = getIncenter( this, vec3 );
+
+		const a = incenter.distanceTo( this.a );
+		const b = incenter.distanceTo( this.b );
+		const c = incenter.distanceTo( this.c );
+		this.a.sub( incenter ).normalize().multiplyScalar( a + amount ).add( incenter );
+		this.b.sub( incenter ).normalize().multiplyScalar( b + amount ).add( incenter );
+		this.c.sub( incenter ).normalize().multiplyScalar( c + amount ).add( incenter );
+
+		// 拡張したら、過去の boundingSphere はすでに大きさが違うものとなる。破棄する。
+		this.boundingSphere = undefined;
 
 	}
 
 }
 
-function getInCircle( triangle: Triangle ) {
+// aka Semiperimeter
+function getIncenter( triangle: Triangle, out: Vector3 ) {
 
 	// https://byjus.com/maths/incenter-of-a-triangle/
 	const a = triangle.a.distanceTo( triangle.b );
@@ -41,47 +61,54 @@ function getInCircle( triangle: Triangle ) {
 	const c = triangle.c.distanceTo( triangle.a );
 	const p = a + b + c;
 
-	const incenter = new Vector3(
+	out.set(
 		( a * triangle.a.x + b * triangle.b.x + c * triangle.c.x ) / p,
 		( a * triangle.a.y + b * triangle.b.y + c * triangle.c.y ) / p,
 		( a * triangle.a.z + b * triangle.b.z + c * triangle.c.z ) / p,
 	);
 
-	const closestPointToEdge = new Vector3();
-	new Line3( triangle.a, triangle.b ).closestPointToPoint( incenter, true, closestPointToEdge );
-	const inradius = incenter.distanceTo( closestPointToEdge );
-
-	return { incenter, inradius };
+	return out;
 
 }
 
+// const edge = new Line3();
+// function getInradius( triangle: Triangle ) {
 
-export function makeTriangleBoundingBox( triangle: Triangle ) {
+// 	const incenter = getIncenter( triangle, vec3 );
+// 	const closestPointToEdge = new Vector3();
+// 	edge.start = triangle.a;
+// 	edge.end = triangle.b;
+// 	edge.closestPointToPoint( incenter, true, closestPointToEdge );
+// 	return incenter.distanceTo( closestPointToEdge );
 
-	const bb = new Box3();
+// }
 
-	bb.min = bb.min.min( triangle.a );
-	bb.min = bb.min.min( triangle.b );
-	bb.min = bb.min.min( triangle.c );
+// function makeTriangleBoundingBox( triangle: Triangle ) {
 
-	bb.max = bb.max.max( triangle.a );
-	bb.max = bb.max.max( triangle.b );
-	bb.max = bb.max.max( triangle.c );
+// 	const bb = new Box3();
 
-	return bb;
+// 	bb.min = bb.min.min( triangle.a );
+// 	bb.min = bb.min.min( triangle.b );
+// 	bb.min = bb.min.min( triangle.c );
 
-}
+// 	bb.max = bb.max.max( triangle.a );
+// 	bb.max = bb.max.max( triangle.b );
+// 	bb.max = bb.max.max( triangle.c );
 
+// 	return bb;
+
+// }
+
+const v = new Vector3();
+const v0 = new Vector3();
+const v1 = new Vector3();
+const e0 = new Vector3();
+const e1 = new Vector3();
 const triangleNormal = new Vector3();
 
-export function makeTriangleBoundingSphere( triangle: Triangle, normal: Vector3 ) {
+function makeTriangleBoundingSphere( triangle: Triangle, normal: Vector3 ) {
 
 	const bs = new Sphere();
-	const v = new Vector3();
-	const v0 = new Vector3();
-	const v1 = new Vector3();
-	const e0 = new Vector3();
-	const e1 = new Vector3();
 
 	// obtuse triangle
 

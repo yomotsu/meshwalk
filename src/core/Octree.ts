@@ -344,7 +344,9 @@ export class Octree {
 							const vC = new Vector3().fromArray( positions, c * 3 );
 
 							const triangle = new ComputedTriangle( vA, vB, vC );
-							triangle.scale( 1.001 ); // to avoid triangle edge errors
+							// ポリゴンの継ぎ目の辺で raycast が交差しない可能性があるので、わずかに拡大する
+							triangle.extend( 0.001 );
+							triangle.computeBoundingSphere();
 							this.addTriangle( triangle );
 
 						}

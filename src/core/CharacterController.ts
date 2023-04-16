@@ -384,7 +384,8 @@ export class CharacterController extends EventDispatcher {
 
 			const face = faces[ i ];
 
-			if ( ! sphere.intersectsSphere( face.boundingSphere ) ) continue;
+			if ( ! face.boundingSphere ) face.computeBoundingSphere();
+			if ( ! sphere.intersectsSphere( face.boundingSphere! ) ) continue;
 
 			const contactInfo = isIntersectionSphereTriangle(
 				sphere,
