@@ -3,13 +3,16 @@
   "version": "0.0.0",
   "author": "Yomotsu",
   "license": "MIT",
+  "type": "module",
   "main": "dist/meshwalk.js",
-  "repository": "yomotsu/meshwalk",
-  "jsnext:main": "dist/meshwalk.module.js",
   "module": "dist/meshwalk.module.js",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yomotsu/meshwalk"
+  },
   "scripts": {
     "dev": "rollup --config --watch",
-    "build": "rollup --config && terser dist/meshwalk.js -o dist/meshwalk.min.js --comments '/^!/' && terser dist/meshwalk.module.js -o dist/meshwalk.module.js --comments '/^!/'",
+    "build": "rollup --config && terser dist/meshwalk.js -o dist/meshwalk.min.js --comments '/^!/' && terser dist/meshwalk.module.js -o dist/meshwalk.module.min.js --comments '/^!/'",
     "lint": "eslint src --ext ts"
   },
   "devDependencies": {
