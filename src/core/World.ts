@@ -11,8 +11,6 @@ export class World {
 	characterPool: CharacterController[] = [];
 	private _fps: number;
 	private _stepsPerFrame: number;
-	private _intervalId: number | null = null;
-	private _running = false;
 
 	constructor( { fps = 60, stepsPerFrame = 4 } = {} ) {
 

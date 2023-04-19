@@ -299,8 +299,8 @@ export class CharacterController extends EventDispatcher {
 
 			const triangle = triangles[ i ];
 
-			// 壁・天井は設置処理では無視
-			if ( triangle.normal.y < 0 ) continue;
+			// 壁・天井は接地処理では無視
+			if ( triangle.normal.y <= 0 ) continue;
 
 			const isIntersected = testLineTriangle(
 				groundingHead,
@@ -533,6 +533,13 @@ export class CharacterController extends EventDispatcher {
 		const elapsed = performance.now() - this.jumpStartTime;
 		const progress = elapsed / JUMP_DURATION;
 		this.currentJumpPower = Math.cos( Math.min( progress, 1 ) * Math.PI );
+
+	}
+
+	teleport( x: number, y: number, z: number ) {
+
+		this.center.set( x, y, z );
+		this.object.position.copy( this.center );
 
 	}
 

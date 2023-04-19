@@ -587,7 +587,6 @@ export function testTriangleCapsule( capsule: Capsule, triangle: Triangle, out: 
 	}
 
 	const r2 = capsule.radius * capsule.radius;
-
 	const line1 = _line1.set( capsule.start, capsule.end );
 
 	const lines = [
@@ -599,7 +598,6 @@ export function testTriangleCapsule( capsule: Capsule, triangle: Triangle, out: 
 	for ( let i = 0; i < lines.length; i ++ ) {
 
 		const line2 = _line2.set( lines[ i ][ 0 ], lines[ i ][ 1 ] );
-
 		const [ point1, point2 ] = capsule.lineLineMinimumPoints( line1, line2 );
 
 		if ( point1.distanceToSquared( point2 ) < r2 ) {
@@ -619,3 +617,12 @@ export function testTriangleCapsule( capsule: Capsule, triangle: Triangle, out: 
 	return false;
 
 }
+
+
+
+// 1 Check if the line intersects the plane, if so thats your start.
+// 2 Otherwise figure out which point is closest. If they’re equal than the capsule is parallel and you will have to test both points.
+// 3 Get the nearest point on the triangle to the plane intersection point.
+// 4 Get the nearest point on the line to the nearest triangle point.
+// 5 Check if the distance between the points is in the capsule radius and calculate the normal.
+

@@ -113,7 +113,6 @@ octree.addGraphNode( box );
 const gltf = await new GLTFLoader().loadAsync( 'terrain.glb' );
 const terrain = gltf.scene.children[ 0 ];
 terrain.material = new THREE.MeshNormalMaterial();
-terrain.scale.multiplyScalar( 2 );
 scene.add( terrain );
 
 const terrainHelper = new THREE.LineSegments( new THREE.WireframeGeometry( terrain.geometry ) );
