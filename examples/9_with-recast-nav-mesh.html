@@ -1,0 +1,229 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>=^.^=</title>
+<style>
+body{margin: 0;padding: 0; background: #000;}
+canvas{display: block;}
+.info{
+	color: #fff;
+	position: absolute;
+	top: 0;
+	left: 0;
+}
+</style>
+</head>
+<body>
+<div class="info">
+	W,A,S,D key to move
+</div>
+
+<script async src="https://unpkg.com/es-module-shims@1.6.3/dist/es-module-shims.js"></script>
+<script type="importmap">
+	{
+		"imports": {
+			"three": "https://unpkg.com/three@0.151.2/build/three.module.js",
+			"three/examples/": "https://unpkg.com/three@0.151.2/examples/",
+			"@recast-navigation/core": "https://unpkg.com/@recast-navigation/core@0.0.4/dist/index.es.js",
+			"@recast-navigation/three": "https://unpkg.com/@recast-navigation/three@0.0.4/dist/index.es.js"
+		}
+	}
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { init, NavMesh, Crowd } from "@recast-navigation/core";
+import { threeToNavMesh, NavMeshHelper, CrowdHelper } from "@recast-navigation/three";
+import * as MW from '../dist/meshwalk.module.js';
+
+await init();
+
+const eventDispatcher = new THREE.EventDispatcher();
+
+const world = new MW.World();
+const octree = new MW.Octree();
+world.add( octree );
+
+
+const width = window.innerWidth;
+const height = window.innerHeight;
+const clock = new THREE.Clock();
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera( 40, width / height, 1, 1000 );
+camera.position.set( 0, 0, 8 );
+const renderer = new THREE.WebGLRenderer();
+renderer.setSize( width, height );
+document.body.appendChild( renderer.domElement );
+
+scene.add( new THREE.AmbientLight( 0xffffff ) );
+
+const playerObjectHolder = new THREE.Object3D();
+playerObjectHolder.position.set( 0, 10, 0 );
+scene.add( playerObjectHolder );
+
+const playerRadius = 1;
+// const sphere = new THREE.Mesh(
+// 	new THREE.SphereGeometry( playerRadius, 8, 8 ),
+// 	new THREE.MeshBasicMaterial( { color: 0xff0000,  wireframe: true} )
+// );
+// playerObjectHolder.add( sphere );
+
+const playerController = new MW.CharacterController( playerObjectHolder, playerRadius );
+world.add( playerController );
+
+const tpsCameraControls = new MW.TPSCameraControls(
+	camera, // three.js camera
+	playerObjectHolder, // tracking object
+	world,
+	renderer.domElement
+);
+
+// bind events
+const keyInputControl = new MW.KeyInputControl();
+keyInputControl.addEventListener( 'movekeyon', () => { playerController.isRunning = true; } );
+keyInputControl.addEventListener( 'movekeyoff', () => { playerController.isRunning = false; } );
+keyInputControl.addEventListener( 'jumpkeypress', () => { playerController.jump(); } );
+
+// synk with keybord input and camera control input
+keyInputControl.addEventListener( 'movekeychange', () => {
+
+	var cameraFrontAngle = tpsCameraControls.frontAngle;
+	var characterFrontAngle = keyInputControl.frontAngle;
+	playerController.direction = cameraFrontAngle + characterFrontAngle;
+
+} );
+
+// 'updated' event is fired by `tpsCameraControls.update()`
+tpsCameraControls.addEventListener( 'update', () => {
+
+	var cameraFrontAngle = tpsCameraControls.frontAngle;
+	var characterFrontAngle = keyInputControl.frontAngle;
+	playerController.direction = cameraFrontAngle + characterFrontAngle;
+
+} );
+
+
+const [ terrainGltf, navGltf, characterGltf ] = await Promise.all( [
+	new GLTFLoader().loadAsync( './terrain.glb' ),
+	new GLTFLoader().loadAsync( './nav.glb' ),
+	new GLTFLoader().loadAsync( './miku.glb' ),
+] );
+
+
+const box = new THREE.Mesh(
+	new THREE.BoxGeometry( 14, 1, 5 ),
+	new THREE.MeshNormalMaterial()
+);
+box.position.set( - 3, 7.5, - 13 );
+scene.add( box );
+octree.addGraphNode( box );
+
+const terrain = terrainGltf.scene.children[ 0 ];
+terrain.material = new THREE.MeshNormalMaterial();
+scene.add( terrain );
+octree.addGraphNode( terrain );
+
+scene.add( characterGltf.scene );
+
+const animationController = new MW.AnimationController( characterGltf.scene, characterGltf.animations );
+animationController.motion.jump.setLoop( THREE.LoopOnce, 0 );
+animationController.motion.slide.setLoop( THREE.LoopOnce, 0 );
+animationController.motion.jump.clampWhenFinished = true;
+animationController.motion.slide.clampWhenFinished = true;
+
+// player motion
+playerController.addEventListener( 'startIdling',  () => animationController.play( 'idle'  ) );
+playerController.addEventListener( 'startWalking', () => animationController.play( 'run'   ) );
+playerController.addEventListener( 'startJumping', () => animationController.play( 'jump'  ) );
+playerController.addEventListener( 'startSliding', () => animationController.play( 'slide' ) );
+playerController.addEventListener( 'startFalling', () => animationController.play( 'slide' ) );
+
+eventDispatcher.addEventListener( 'beforerender', function () {
+
+	animationController.mesh.position.set(
+		playerController.center.x,
+		playerController.center.y - playerController.radius,
+		playerController.center.z
+	);
+
+	animationController.mesh.rotation.y = playerController.direction + Math.PI;
+
+} );
+
+
+// nav mesh and agents
+const navMesh = threeToNavMesh( [ navGltf.scene.children[ 0 ] ] );
+const navMeshHelper = new NavMeshHelper( { navMesh } );
+scene.add( navMeshHelper.navMesh );
+
+const maxAgents = 4;
+const crowd = new Crowd( { navMesh, maxAgents, maxAgentRadius: .5 } );
+const agentMaterial = new THREE.MeshBasicMaterial( { color: 0xff0000 } );
+const crowdHelper = new CrowdHelper( { crowd, agentMaterial } );
+scene.add( crowdHelper.agents );
+
+for ( let i = 0; i < maxAgents; i ++ ) {
+
+	const initialAgentPosition = navMesh.getRandomPointAround( { x: 0, y: 0, z: 0 }, 2 );
+	const agentIndex = crowd.addAgent( initialAgentPosition, {
+		radius: 0.2,
+		height: 1,
+		maxAcceleration: 4.0,
+		maxSpeed: 4.0,
+		collisionQueryRange: 0.5,
+		pathOptimizationRange: 0.0,
+		separationWeight: 1.0,
+	} );
+
+}
+
+const lastTargetPosition = { x: 0, y: 0, z: 0 };
+
+setInterval( () => {
+
+	const targetPosition = {
+		x: playerController.center.x,
+		y: playerController.center.y - playerController.radius,
+		z: playerController.center.z };
+
+	if (
+		lastTargetPosition.x === targetPosition.x &&
+		lastTargetPosition.y === targetPosition.y &&
+		lastTargetPosition.z === targetPosition.z
+	) return;
+
+	crowd.agents.forEach( ( agentIndex ) => {
+
+		crowd.goto(
+			agentIndex,
+			navMesh.getRandomPointAround( targetPosition, 2 )
+		);
+
+	} );
+
+}, 1000 );
+
+
+( function update () {
+
+	const delta = clock.getDelta();
+
+	requestAnimationFrame( update );
+	world.fixedUpdate();
+	tpsCameraControls.update( delta );
+	animationController.update( delta );
+
+	crowd.update( delta );
+	crowdHelper.update();
+
+	eventDispatcher.dispatchEvent( { type: 'beforerender' } );
+	renderer.render( scene, camera );
+
+} )();
+
+</script>
+
+</body>
+</html>
