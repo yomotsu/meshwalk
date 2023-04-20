@@ -87,8 +87,10 @@ keyInputControl.addEventListener( 'movekeychange',  () => {
 // 'updated' event is fired by `tpsCameraControls.update()`
 tpsCameraControls.addEventListener( 'update', () => {
 
-	var cameraFrontAngle = tpsCameraControls.frontAngle;
-	var characterFrontAngle = keyInputControl.frontAngle;
+	if ( ! playerController.isRunning ) return;
+
+	const cameraFrontAngle = tpsCameraControls.frontAngle;
+	const characterFrontAngle = keyInputControl.frontAngle;
 	playerController.direction = cameraFrontAngle + characterFrontAngle;
 
 } );

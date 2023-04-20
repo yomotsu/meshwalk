@@ -187,6 +187,7 @@ export class KeyInputControl extends EventDispatcher {
 				target.tagName === 'INPUT' ||
 				target.tagName === 'SELECT' ||
 				target.tagName === 'TEXTAREA' ||
+				target.tagName === 'BUTTON' ||
 				target.isContentEditable
 			);
 
