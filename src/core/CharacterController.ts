@@ -36,14 +36,14 @@ export class CharacterController extends EventDispatcher {
 	object: Object3D;
 	center = new Vector3();
 	radius: number;
-	groundPadding = .2;
+	groundCheckDepth = .2;
 	maxSlopeGradient = Math.cos( 50 * MathUtils.DEG2RAD );
 	isGrounded = false;
 	isOnSlope  = false;
 	isIdling   = false;
 	isRunning  = false;
 	isJumping  = false;
-	direction  = 0; // 0 to 2PI(=360deg) in rad
+	direction  = 0; // 0 to 2PI (= 360deg) in rad
 	movementSpeed = 10; // Meters Per Second
 	velocity = new Vector3( 0, - 9.8, 0 );
 	currentJumpPower = 0;
@@ -267,7 +267,7 @@ export class CharacterController extends EventDispatcher {
 
 		// "頭上からほぼ無限に下方向までの線 (segment)" vs "フェイス (triangle)" の
 		// 交差判定を行う
-		// もし、フェイスとの交差点が「頭上」から「下groundPadding」までの間だったら
+		// もし、フェイスとの交差点が「頭上」から「下 groundCheckDepth」までの間だったら
 		// 地面上 (isGrounded) にいることとみなす
 		//
 		//   ___
@@ -341,7 +341,7 @@ export class CharacterController extends EventDispatcher {
 		// その他、床の属性を追加で取得する場合はここで
 
 		const top    = groundingHead.y;
-		const bottom = this.center.y - this.radius - this.groundPadding;
+		const bottom = this.center.y - this.radius - this.groundCheckDepth;
 
 		// ジャンプ中、かつ上方向に移動中だったら、強制接地しない
 		if ( this.isJumping && 0 < this.currentJumpPower ) {
@@ -366,9 +366,9 @@ export class CharacterController extends EventDispatcher {
 	_updatePosition( deltaTime: number ) {
 
 		// 壁などを無視してひとまず(速度 * 時間)だけ
-		// centerの座標を進める
+		// center の座標を進める
 		// 壁との衝突判定はこのこの後のステップで行うのでここではやらない
-		// もしisGrounded状態なら、強制的にyの値を地面に合わせる
+		// もし isGrounded 状態なら、強制的に y の値を地面に合わせる
 		const groundedY = this.groundHeight + this.radius;
 		const x = this.center.x + this.velocity.x * deltaTime;
 		const y = this.center.y + this.velocity.y * deltaTime;
@@ -388,7 +388,7 @@ export class CharacterController extends EventDispatcher {
 
 		// 交差していそうなフェイス (nearTriangles) のリストから、
 		// 実際に交差している壁フェイスを抜き出して
-		// this.contactInfoに追加する
+		// this.contactInfo に追加する
 
 		const triangles = this.nearTriangles;
 		this.contactInfo.length = 0;
@@ -434,7 +434,7 @@ export class CharacterController extends EventDispatcher {
 		if ( this.contactInfo.length === 0 ) {
 
 			// 何とも衝突していない
-			// centerの値をそのままつかって終了
+			// center の値をそのままつかって終了
 			this.object.position.copy( this.center );
 			return;
 

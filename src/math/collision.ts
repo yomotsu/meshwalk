@@ -5,6 +5,7 @@ import type { Capsule } from 'three/examples/jsm/math/Capsule.js';
 const vec3 = new Vector3();
 const vec3_0 = new Vector3();
 const vec3_1 = new Vector3();
+const line = new Line3();
 
 export class Intersection {
 
@@ -20,7 +21,18 @@ export class Intersection {
 
 	}
 
-};
+}
+
+// https://arrowinmyknee.com/2021/03/15/some-math-about-capsule-collision/
+export function isIntersectionCapsuleSphere( capsule: Capsule, sphere: Sphere ) {
+
+	line.start.copy( capsule.start );
+	line.end.copy( capsule.end );
+	line.closestPointToPoint( sphere.center, true, vec3 );
+	const r = capsule.radius + sphere.radius;
+	return vec3.distanceToSquared( sphere.center ) <= r * r;
+
+}
 
 // https://3dkingdoms.com/weekly/weekly.php?a=3
 export function isIntersectionLineBox( segment: Line3, box: Box3, hit?: Vector3 ) {
@@ -554,30 +566,45 @@ export function testLineTriangle( p: Vector3, q: Vector3, a: Vector3, b: Vector3
 //
 // based on https://github.com/mrdoob/three.js/blob/master/examples/jsm/math/Octree.js
 
+
+// https://wickedengine.net/2020/04/26/capsule-collision-detection/
+// we select the closest point on the capsule line to the triangle,
+// place a sphere on that point and then perform the sphere – triangle test.
+// also
+// 5.1.10
+
+
 const _v1 = new Vector3();
 const _plane = new Plane();
 const _line1 = new Line3();
 const _line2 = new Line3();
+
+const capsuleNormal = new Vector3();
+const lineEndOffset = new Vector3();
+const capsuleTip = new Vector3();
+const capsuleBase = new Vector3();
+
 export function testTriangleCapsule( capsule: Capsule, triangle: Triangle, out: Intersection ) {
 
+	capsuleNormal.subVectors( capsule.start, capsule.end ).normalize();
+	lineEndOffset.copy( capsuleNormal ).multiplyScalar( capsule.radius );
+
+	// top
+	capsuleTip.addVectors( capsule.start, lineEndOffset );
+	// bottom
+	capsuleBase.subVectors( capsule.end, lineEndOffset );
+
 	triangle.getPlane( _plane );
+	_line1.set( capsuleTip, capsuleBase );
 
-	const d1 = _plane.distanceToPoint( capsule.start ) - capsule.radius;
-	const d2 = _plane.distanceToPoint( capsule.end ) - capsule.radius;
+	// ラインセグメントが貫通しているでの、交差している。
+	if ( _plane.intersectLine( _line1, _v1 ) && triangle.containsPoint( _v1 ) ) {
 
-	if ( ( d1 > 0 && d2 > 0 ) || ( d1 < - capsule.radius && d2 < - capsule.radius ) ) {
-
-		return false;
-
-	}
-
-	const delta = Math.abs( d1 / ( Math.abs( d1 ) + Math.abs( d2 ) ) );
-	const intersectPoint = _v1.copy( capsule.start ).lerp( capsule.end, delta );
-
-	if ( triangle.containsPoint( intersectPoint ) ) {
+		const d1 = _plane.distanceToPoint( capsuleTip );
+		const d2 = _plane.distanceToPoint( capsuleBase );
 
 		out.set(
-			intersectPoint,
+			_v1,
 			_plane.normal,
 			Math.abs( Math.min( d1, d2 ) ),
 		);
@@ -588,7 +615,6 @@ export function testTriangleCapsule( capsule: Capsule, triangle: Triangle, out: 
 
 	const r2 = capsule.radius * capsule.radius;
 	const line1 = _line1.set( capsule.start, capsule.end );
-
 	const lines = [
 		[ triangle.a, triangle.b ],
 		[ triangle.b, triangle.c ],
@@ -617,6 +643,73 @@ export function testTriangleCapsule( capsule: Capsule, triangle: Triangle, out: 
 	return false;
 
 }
+
+
+
+// const _v1 = new Vector3();
+// const _plane = new Plane();
+// const _line1 = new Line3();
+// const _line2 = new Line3();
+// export function testTriangleCapsule( capsule: Capsule, triangle: Triangle, out: Intersection ) {
+
+// 	out.point.set( 0, 0, 0 );
+// 	triangle.getPlane( _plane );
+
+// 	const d1 = _plane.distanceToPoint( capsule.start ) - capsule.radius;
+// 	const d2 = _plane.distanceToPoint( capsule.end ) - capsule.radius;
+
+// 	if ( ( d1 > 0 && d2 > 0 ) || ( d1 < - capsule.radius && d2 < - capsule.radius ) ) {
+
+// 		return false;
+
+// 	}
+
+// 	const delta = Math.abs( d1 / ( Math.abs( d1 ) + Math.abs( d2 ) ) );
+// 	const intersectPoint = _v1.copy( capsule.start ).lerp( capsule.end, delta );
+
+// 	if ( triangle.containsPoint( intersectPoint ) ) {
+
+// 		out.set(
+// 			intersectPoint,
+// 			_plane.normal,
+// 			Math.abs( Math.min( d1, d2 ) ),
+// 		);
+
+// 		return true;
+
+// 	}
+
+// 	const r2 = capsule.radius * capsule.radius;
+// 	const line1 = _line1.set( capsule.start, capsule.end );
+
+// 	const lines = [
+// 		[ triangle.a, triangle.b ],
+// 		[ triangle.b, triangle.c ],
+// 		[ triangle.c, triangle.a ]
+// 	];
+
+// 	for ( let i = 0; i < lines.length; i ++ ) {
+
+// 		const line2 = _line2.set( lines[ i ][ 0 ], lines[ i ][ 1 ] );
+// 		const [ point1, point2 ] = capsule.lineLineMinimumPoints( line1, line2 );
+
+// 		if ( point1.distanceToSquared( point2 ) < r2 ) {
+
+// 			out.set(
+// 				point2,
+// 				point1.clone().sub( point2 ).normalize(),
+// 				capsule.radius - point1.distanceTo( point2 ),
+// 			);
+
+// 			return true;
+
+// 		}
+
+// 	}
+
+// 	return false;
+
+// }
 
 
 
