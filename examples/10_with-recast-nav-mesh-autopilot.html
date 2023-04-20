@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html>
 <head>
@@ -43,8 +42,6 @@ import * as MW from '../dist/meshwalk.module.js';
 
 await init();
 
-const eventDispatcher = new THREE.EventDispatcher();
-
 const world = new MW.World();
 const octree = new MW.Octree();
 world.add( octree );
@@ -66,14 +63,16 @@ const playerObjectHolder = new THREE.Object3D();
 playerObjectHolder.position.set( 0, 10, 0 );
 scene.add( playerObjectHolder );
 
-const playerRadius = 1;
+const playerRadius = .75;
 // const sphere = new THREE.Mesh(
 // 	new THREE.SphereGeometry( playerRadius, 8, 8 ),
 // 	new THREE.MeshBasicMaterial( { color: 0xff0000,  wireframe: true} )
 // );
+// sphere.position.y = playerRadius;
 // playerObjectHolder.add( sphere );
 
 const playerController = new MW.CharacterController( playerObjectHolder, playerRadius );
+playerController.teleport( 0, 10, 0 );
 world.add( playerController );
 
 const tpsCameraControls = new MW.TPSCameraControls(
@@ -128,7 +127,7 @@ terrain.material = new THREE.MeshNormalMaterial();
 scene.add( terrain );
 octree.addGraphNode( terrain );
 
-scene.add( characterGltf.scene );
+playerObjectHolder.add( characterGltf.scene );
 
 const animationController = new MW.AnimationController( characterGltf.scene, characterGltf.animations );
 animationController.motion.jump.setLoop( THREE.LoopOnce, 0 );
@@ -142,18 +141,7 @@ playerController.addEventListener( 'startWalking', () => animationController.pla
 playerController.addEventListener( 'startJumping', () => animationController.play( 'jump'  ) );
 playerController.addEventListener( 'startSliding', () => animationController.play( 'slide' ) );
 playerController.addEventListener( 'startFalling', () => animationController.play( 'slide' ) );
-
-eventDispatcher.addEventListener( 'beforerender', function () {
-
-	animationController.mesh.position.set(
-		playerController.center.x,
-		playerController.center.y - playerController.radius,
-		playerController.center.z
-	);
-
-	animationController.mesh.rotation.y = playerController.direction + Math.PI;
-
-} );
+animationController.play( 'slide'  );
 
 const points = [
 	new THREE.Vector3( 14, 9, 14 ),
@@ -209,9 +197,9 @@ const guideTo = ( x, y, z ) => {
 	}
 
 	const currentPosition = navMesh.getClosestPoint( {
-		x: playerController.center.x,
-		y: playerController.center.y - playerController.radius,
-		z: playerController.center.z,
+		x: playerController.position.x,
+		y: playerController.position.y,
+		z: playerController.position.z,
 	} );
 	const targetPosition = navMesh.getClosestPoint( { x, y, z } );
 	goalPosition.copy( targetPosition );
@@ -244,7 +232,7 @@ const checkAutoPilotState = () => {
 		const agentVelocity = crowd.getAgentVelocity( agentIndex )
 		direction.set( - agentVelocity.z, - agentVelocity.x ).normalize();
 		if ( Math.abs( agentVelocity.x ) > 1e-10 || Math.abs( agentVelocity.y ) > 1e-10 ) playerController.direction = direction.angle();
-		playerController.teleport( agentPosition.x, agentPosition.y + playerController.radius - 0.25, agentPosition.z )
+		playerController.teleport( agentPosition.x, agentPosition.y - 0.25, agentPosition.z );
 
 	}
 
@@ -277,7 +265,6 @@ const guideToBlue   = () => guideTo( points[ 2 ].x, points[ 2 ].y, points[ 2 ].z
 	crowdHelper.update();
 	checkAutoPilotState();
 
-	eventDispatcher.dispatchEvent( { type: 'beforerender' } );
 	renderer.render( scene, camera );
 
 } )();

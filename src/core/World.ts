@@ -78,7 +78,8 @@ export class World {
 			for ( let ii = 0, ll = this.colliderPool.length; ii < ll; ii ++ ) {
 
 				const octree = this.colliderPool[ ii ];
-				sphere.set( character.center, character.radius + character.groundCheckDepth );
+				sphere.center.set( 0, character.radius, 0 ).add( character.position );
+				sphere.radius = character.radius + character.groundCheckDepth;
 				triangles.push( ...octree.getSphereTriangles( sphere, [] ) );
 
 			}

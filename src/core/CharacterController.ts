@@ -21,11 +21,12 @@ const groundingHead = new Vector3();
 const groundingTo = new Vector3();
 const groundContactPointTmp = new Vector3();
 const groundContactPoint = new Vector3();
-const point1 = new Vector3();
-const point2 = new Vector3();
-const direction = new Vector3();
-const translateScoped = new Vector3();
+// const point1 = new Vector3();
+// const point2 = new Vector3();
+// const direction = new Vector3();
+// const translateScoped = new Vector3();
 const translate = new Vector3();
+const sphereCenter = new Vector3();
 const sphere = new Sphere();
 
 const intersection = new Intersection();
@@ -34,8 +35,8 @@ export class CharacterController extends EventDispatcher {
 
 	isCharacterController = true;
 	object: Object3D;
-	center = new Vector3();
 	radius: number;
+	position = new Vector3();
 	groundCheckDepth = .2;
 	maxSlopeGradient = Math.cos( 50 * MathUtils.DEG2RAD );
 	isGrounded = false;
@@ -64,8 +65,8 @@ export class CharacterController extends EventDispatcher {
 		super();
 
 		this.object = object3d;
-		this.center.copy( this.object.position.clone() );
 		this.radius = radius;
+		this.position.set( 0, 0, 0 );
 
 		let isFirstUpdate = true;
 		let wasGrounded = false;
@@ -284,15 +285,15 @@ export class CharacterController extends EventDispatcher {
 		const triangles = this.nearTriangles;
 
 		groundingHead.set(
-			this.center.x,
-			this.center.y + this.radius,
-			this.center.z
+			this.position.x,
+			this.position.y + this.radius * 2,
+			this.position.z
 		);
 
 		groundingTo.set(
-			this.center.x,
-			this.center.y - 1e1,
-			this.center.z
+			this.position.x,
+			this.position.y - 1e1,
+			this.position.z
 		);
 
 		for ( let i = 0, l = triangles.length; i < l; i ++ ) {
@@ -341,7 +342,7 @@ export class CharacterController extends EventDispatcher {
 		// その他、床の属性を追加で取得する場合はここで
 
 		const top    = groundingHead.y;
-		const bottom = this.center.y - this.radius - this.groundCheckDepth;
+		const bottom = this.position.y - this.groundCheckDepth;
 
 		// ジャンプ中、かつ上方向に移動中だったら、強制接地しない
 		if ( this.isJumping && 0 < this.currentJumpPower ) {
@@ -366,25 +367,21 @@ export class CharacterController extends EventDispatcher {
 	_updatePosition( deltaTime: number ) {
 
 		// 壁などを無視してひとまず(速度 * 時間)だけ
-		// center の座標を進める
+		// position の座標を進める
 		// 壁との衝突判定はこのこの後のステップで行うのでここではやらない
 		// もし isGrounded 状態なら、強制的に y の値を地面に合わせる
-		const groundedY = this.groundHeight + this.radius;
-		const x = this.center.x + this.velocity.x * deltaTime;
-		const y = this.center.y + this.velocity.y * deltaTime;
-		const z = this.center.z + this.velocity.z * deltaTime;
-
-		this.center.set(
-			x,
-			( this.isGrounded ? groundedY : y ),
-			z
+		this.position.set(
+			this.position.x + this.velocity.x * deltaTime,
+			this.isGrounded ? this.groundHeight : this.position.y + this.velocity.y * deltaTime,
+			this.position.z + this.velocity.z * deltaTime,
 		);
 
 	}
 
 	_collisionDetection() {
 
-		sphere.set( this.center, this.radius );
+		sphereCenter.set( 0, this.radius, 0 ).add( this.position );
+		sphere.set( sphereCenter, this.radius );
 
 		// 交差していそうなフェイス (nearTriangles) のリストから、
 		// 実際に交差している壁フェイスを抜き出して
@@ -423,19 +420,20 @@ export class CharacterController extends EventDispatcher {
 
 	_solvePosition() {
 
-		// updatePosition() で center を動かした後
+		// updatePosition() で position を動かした後
 		// 壁と衝突し食い込んでいる場合、
 		// ここで壁の外への押し出しをする
 
-		let triangle;
+		// let triangle;
 		let normal;
 		// let distance;
 
 		if ( this.contactInfo.length === 0 ) {
 
 			// 何とも衝突していない
-			// center の値をそのままつかって終了
-			this.object.position.copy( this.center );
+			// position の値をそのままつかって終了
+			this.object.position.copy( this.position );
+			this.object.rotation.y = this.direction + Math.PI;
 			return;
 
 		}
@@ -445,7 +443,7 @@ export class CharacterController extends EventDispatcher {
 		translate.set( 0, 0, 0 );
 		for ( let i = 0, l = this.contactInfo.length; i < l; i ++ ) {
 
-			triangle = this.contactInfo[ i ].triangle;
+			// triangle = this.contactInfo[ i ].triangle;
 			normal = this.contactInfo[ i ].triangle.normal;
 			// distance = this.contactInfo[ i ].distance;
 
@@ -478,39 +476,35 @@ export class CharacterController extends EventDispatcher {
 
 			}
 
-			if ( this.isGrounded || this.isOnSlope ) {
+			// if ( this.isGrounded || this.isOnSlope ) {
 
-			  // 地面の上にいる場合はy(縦)方向は同一のまま
-			  // x, z (横) 方向だけを変更して押し出す
-			  // http://gamedev.stackexchange.com/questions/80293/how-do-i-resolve-a-sphere-triangle-collision-in-a-given-direction
-				point1.copy( normal ).multiplyScalar( - this.radius ).add( this.center );
-				direction.set( normal.x, 0, normal.z ).normalize();
-				const plainD = triangle.a.dot( normal );
-				const t = ( plainD - ( normal.x * point1.x + normal.y * point1.y + normal.z * point1.z ) ) / ( normal.x * direction.x + normal.y * direction.y + normal.z * direction.z );
-				point2.copy( direction ).multiplyScalar( t ).add( point1 );
-				translateScoped.subVectors( point2, point1 );
+			//   // 地面の上にいる場合はy(縦)方向は同一のまま
+			//   // x, z (横) 方向だけを変更して押し出す
+			//   // http://gamedev.stackexchange.com/questions/80293/how-do-i-resolve-a-sphere-triangle-collision-in-a-given-direction
+			// 	sphereCenter.set( 0, this.radius, 0 ).add( this.position );
+			// 	point1.copy( normal ).multiplyScalar( - this.radius ).add( sphereCenter );
+			// 	direction.set( normal.x, 0, normal.z ).normalize();
+			// 	const plainD = triangle.a.dot( normal );
+			// 	const t = ( plainD - ( normal.x * point1.x + normal.y * point1.y + normal.z * point1.z ) ) / ( normal.x * direction.x + normal.y * direction.y + normal.z * direction.z );
+			// 	point2.copy( direction ).multiplyScalar( t ).add( point1 );
+			// 	translateScoped.subVectors( point2, point1 );
 
-				if ( Math.abs( translate.x ) > Math.abs( translateScoped.x ) ) {
+			// 	if ( translate.lengthSq() < translateScoped.lengthSq() ) {
 
-					translate.x += translateScoped.x;
+			// 		translate.copy( translateScoped );
 
-				}
+			// 	}
 
-				if ( Math.abs( translate.z ) > Math.abs( translateScoped.z ) ) {
+			// 	// break;
+			// 	continue;
 
-					translate.z += translateScoped.z;
-
-				}
-
-				// break;
-				continue;
-
-			}
+			// }
 
 		}
 
-		this.center.add( translate );
-		this.object.position.copy( this.center );
+		this.position.add( translate );
+		this.object.position.copy( this.position );
+		this.object.rotation.y = this.direction + Math.PI;
 
 	}
 
@@ -538,8 +532,8 @@ export class CharacterController extends EventDispatcher {
 
 	teleport( x: number, y: number, z: number ) {
 
-		this.center.set( x, y, z );
-		this.object.position.copy( this.center );
+		this.position.set( x, y, z );
+		this.object.position.copy( this.position );
 
 	}
 

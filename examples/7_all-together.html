@@ -30,8 +30,6 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import * as MW from '../dist/meshwalk.module.js';
 
-const eventDispatcher = new THREE.EventDispatcher();
-
 const world = new MW.World();
 const octree = new MW.Octree();
 world.add( octree );
@@ -50,17 +48,18 @@ document.body.appendChild( renderer.domElement );
 scene.add( new THREE.AmbientLight( 0xffffff ) );
 
 const playerObjectHolder = new THREE.Object3D();
-playerObjectHolder.position.set( 0, 10, 0 );
 scene.add( playerObjectHolder );
 
-const playerRadius = 1;
+const playerRadius = .75;
 const sphere = new THREE.Mesh(
 	new THREE.SphereGeometry( playerRadius, 8, 8 ),
 	new THREE.MeshBasicMaterial( { color: 0xff0000,  wireframe: true} )
 );
+sphere.position.y = playerRadius;
 playerObjectHolder.add( sphere );
 
 const playerController = new MW.CharacterController( playerObjectHolder, playerRadius );
+playerController.teleport( 0, 10, 0 );
 world.add( playerController );
 
 const tpsCameraControls = new MW.TPSCameraControls(
@@ -114,7 +113,7 @@ terrain.material = new THREE.MeshNormalMaterial();
 scene.add( terrain );
 octree.addGraphNode( terrain );
 
-scene.add( characterGltf.scene );
+playerObjectHolder.add( characterGltf.scene );
 
 const animationController = new MW.AnimationController( characterGltf.scene, characterGltf.animations );
 animationController.motion.jump.setLoop( THREE.LoopOnce, 0 );
@@ -129,19 +128,7 @@ playerController.addEventListener( 'startWalking', () => animationController.pla
 playerController.addEventListener( 'startJumping', () => animationController.play( 'jump'  ) );
 playerController.addEventListener( 'startSliding', () => animationController.play( 'slide' ) );
 playerController.addEventListener( 'startFalling', () => animationController.play( 'slide' ) );
-
-eventDispatcher.addEventListener( 'beforerender', () => {
-
-	animationController.mesh.position.set(
-		playerController.center.x,
-		playerController.center.y - playerController.radius,
-		playerController.center.z
-	);
-
-	animationController.mesh.rotation.y = playerController.direction + Math.PI;
-
-} );
-
+animationController.play( 'slide'  );
 
 ( function update () {
 
@@ -151,7 +138,6 @@ eventDispatcher.addEventListener( 'beforerender', () => {
 	world.fixedUpdate();
 	tpsCameraControls.update( delta );
 	animationController.update( delta );
-	eventDispatcher.dispatchEvent( { type: 'beforerender' } );
 	renderer.render( scene, camera );
 
 } )();

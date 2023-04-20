@@ -62,7 +62,7 @@ export class TPSCameraControls extends CameraControls {
 
 		// this._trackObject = trackObject;
 		// this.offset = new Vector3( 0, 1, 0 );
-		const offset = new Vector3( 0, 1, 0 );
+		const offset = new Vector3( 0, 2, 0 );
 
 		this.update = ( delta ) => {
 
