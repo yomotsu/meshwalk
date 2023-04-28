@@ -17,9 +17,9 @@ canvas{display: block;}
 <body>
 <div class="info">
 	W,A,S,D key to move<br>
-	<button type="button" onClick="guideToRed(); this.blur();">guide to red</button><br>
-	<button type="button" onClick="guideToYellow(); this.blur();">guide to yellow</button><br>
-	<button type="button" onClick="guideToBlue(); this.blur();">guide to blue</button>
+	<button type="button" onClick="navigateToRed(); this.blur();">navigate to red</button><br>
+	<button type="button" onClick="navigateToYellow(); this.blur();">navigate to yellow</button><br>
+	<button type="button" onClick="navigateToBlue(); this.blur();">navigate to blue</button>
 </div>
 
 <script async src="https://unpkg.com/es-module-shims@1.6.3/dist/es-module-shims.js"></script>
@@ -180,7 +180,7 @@ const initialAgentPosition = navMesh.getClosestPoint( { x: 0, y: 0, z: 0 } );
 let agentIndex = null;
 let isAutoPilotActive = false;
 const goalPosition = new THREE.Vector3();
-const guideTo = ( x, y, z ) => {
+const navigateTo = ( x, y, z ) => {
 
 	isAutoPilotActive = true;
 
@@ -254,9 +254,9 @@ const cancelAutoPilot = () => {
 keyInputControl.addEventListener( 'movekeyon', cancelAutoPilot );
 keyInputControl.addEventListener( 'jumpkeypress', cancelAutoPilot );
 
-const guideToRed    = () => guideTo( points[ 0 ].x, points[ 0 ].y, points[ 0 ].z );
-const guideToYellow = () => guideTo( points[ 1 ].x, points[ 1 ].y, points[ 1 ].z );
-const guideToBlue   = () => guideTo( points[ 2 ].x, points[ 2 ].y, points[ 2 ].z );
+const navigateToRed    = () => navigateTo( points[ 0 ].x, points[ 0 ].y, points[ 0 ].z );
+const navigateToYellow = () => navigateTo( points[ 1 ].x, points[ 1 ].y, points[ 1 ].z );
+const navigateToBlue   = () => navigateTo( points[ 2 ].x, points[ 2 ].y, points[ 2 ].z );
 
 ( function update () {
 
@@ -275,9 +275,9 @@ const guideToBlue   = () => guideTo( points[ 2 ].x, points[ 2 ].y, points[ 2 ].z
 
 } )();
 
-globalThis.guideToRed = guideToRed;
-globalThis.guideToYellow = guideToYellow;
-globalThis.guideToBlue = guideToBlue;
+globalThis.navigateToRed = navigateToRed;
+globalThis.navigateToYellow = navigateToYellow;
+globalThis.navigateToBlue = navigateToBlue;
 globalThis.crowd = crowd;
 </script>
 
