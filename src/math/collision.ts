@@ -1,10 +1,13 @@
-import { Vector3, Line3, Plane } from 'three';
-import type { Box3, Sphere, Triangle } from 'three';
+import { Vector3, Line3, Plane, Sphere, MathUtils } from 'three';
+import type { Box3 } from 'three';
 import type { Capsule } from 'three/examples/jsm/math/Capsule.js';
+import type { ComputedTriangle } from './triangle';
 
+const EPSILON = 1e-10;
 const vec3 = new Vector3();
 const vec3_0 = new Vector3();
 const vec3_1 = new Vector3();
+const sphere = new Sphere();
 const line = new Line3();
 
 export class Intersection {
@@ -35,21 +38,21 @@ export function isIntersectionCapsuleSphere( capsule: Capsule, sphere: Sphere ) 
 }
 
 // https://3dkingdoms.com/weekly/weekly.php?a=3
-export function isIntersectionLineBox( segment: Line3, box: Box3, hit?: Vector3 ) {
+export function isIntersectionLineBox( line: Line3, box: Box3, hit?: Vector3 ) {
 
-	if ( segment.end.x < box.min.x && segment.start.x < box.min.x ) return false;
-	if ( segment.end.x > box.max.x && segment.start.x > box.max.x ) return false;
-	if ( segment.end.y < box.min.y && segment.start.y < box.min.y ) return false;
-	if ( segment.end.y > box.max.y && segment.start.y > box.max.y ) return false;
-	if ( segment.end.z < box.min.z && segment.start.z < box.min.z ) return false;
-	if ( segment.end.z > box.max.z && segment.start.z > box.max.z ) return false;
+	if ( line.end.x < box.min.x && line.start.x < box.min.x ) return false;
+	if ( line.end.x > box.max.x && line.start.x > box.max.x ) return false;
+	if ( line.end.y < box.min.y && line.start.y < box.min.y ) return false;
+	if ( line.end.y > box.max.y && line.start.y > box.max.y ) return false;
+	if ( line.end.z < box.min.z && line.start.z < box.min.z ) return false;
+	if ( line.end.z > box.max.z && line.start.z > box.max.z ) return false;
 	if (
-		segment.start.x > box.min.x && segment.start.x < box.max.x &&
-		segment.start.y > box.min.y && segment.start.y < box.max.y &&
-		segment.start.z > box.min.z && segment.start.z < box.max.z
+		line.start.x > box.min.x && line.start.x < box.max.x &&
+		line.start.y > box.min.y && line.start.y < box.max.y &&
+		line.start.z > box.min.z && line.start.z < box.max.z
 	) {
 
-		hit && hit.copy( segment.start );
+		hit && hit.copy( line.start );
 		return true;
 
 	}
@@ -57,12 +60,12 @@ export function isIntersectionLineBox( segment: Line3, box: Box3, hit?: Vector3 
 	const _hit = vec3;
 
 	if (
-		( getIntersection( segment.start.x - box.min.x, segment.end.x - box.min.x, segment.start, segment.end, _hit ) && inBox( _hit, box, 1 ) ) ||
-		( getIntersection( segment.start.y - box.min.y, segment.end.y - box.min.y, segment.start, segment.end, _hit ) && inBox( _hit, box, 2 ) ) ||
-		( getIntersection( segment.start.z - box.min.z, segment.end.z - box.min.z, segment.start, segment.end, _hit ) && inBox( _hit, box, 3 ) ) ||
-		( getIntersection( segment.start.x - box.max.x, segment.end.x - box.max.x, segment.start, segment.end, _hit ) && inBox( _hit, box, 1 ) ) ||
-		( getIntersection( segment.start.y - box.max.y, segment.end.y - box.max.y, segment.start, segment.end, _hit ) && inBox( _hit, box, 2 ) ) ||
-		( getIntersection( segment.start.z - box.max.z, segment.end.z - box.max.z, segment.start, segment.end, _hit ) && inBox( _hit, box, 3 ) )
+		( getIntersection( line.start.x - box.min.x, line.end.x - box.min.x, line.start, line.end, _hit ) && inBox( _hit, box, 1 ) ) ||
+		( getIntersection( line.start.y - box.min.y, line.end.y - box.min.y, line.start, line.end, _hit ) && inBox( _hit, box, 2 ) ) ||
+		( getIntersection( line.start.z - box.min.z, line.end.z - box.min.z, line.start, line.end, _hit ) && inBox( _hit, box, 3 ) ) ||
+		( getIntersection( line.start.x - box.max.x, line.end.x - box.max.x, line.start, line.end, _hit ) && inBox( _hit, box, 1 ) ) ||
+		( getIntersection( line.start.y - box.max.y, line.end.y - box.max.y, line.start, line.end, _hit ) && inBox( _hit, box, 2 ) ) ||
+		( getIntersection( line.start.z - box.max.z, line.end.z - box.max.z, line.start, line.end, _hit ) && inBox( _hit, box, 3 ) )
 	) {
 
 		hit && hit.copy( _hit );
@@ -358,8 +361,6 @@ const QB = new Vector3();
 
 const negatedNormal = new Vector3();
 
-//http://clb.demon.fi/MathGeoLib/docs/Triangle.cpp_code.html#459
-
 // sphere: <THREE.Sphere>
 // a: <THREE.Vector3>, // vertex of a triangle
 // b: <THREE.Vector3>, // vertex of a triangle
@@ -573,7 +574,6 @@ export function testLineTriangle( p: Vector3, q: Vector3, a: Vector3, b: Vector3
 // also
 // 5.1.10
 
-
 const _v1 = new Vector3();
 const _plane = new Plane();
 const _line1 = new Line3();
@@ -583,8 +583,10 @@ const capsuleNormal = new Vector3();
 const lineEndOffset = new Vector3();
 const capsuleTip = new Vector3();
 const capsuleBase = new Vector3();
+const point1 = new Vector3();
+const point2 = new Vector3();
 
-export function testTriangleCapsule( capsule: Capsule, triangle: Triangle, out: Intersection ) {
+export function testTriangleCapsule( capsule: Capsule, triangle: ComputedTriangle, out: Intersection ) {
 
 	capsuleNormal.subVectors( capsule.start, capsule.end ).normalize();
 	lineEndOffset.copy( capsuleNormal ).multiplyScalar( capsule.radius );
@@ -613,7 +615,7 @@ export function testTriangleCapsule( capsule: Capsule, triangle: Triangle, out: 
 
 	}
 
-	const r2 = capsule.radius * capsule.radius;
+	// カプセルの中心線と三角形の辺を検証し、カプセルの中心線内で一番近い点を探す
 	const line1 = _line1.set( capsule.start, capsule.end );
 	const lines = [
 		[ triangle.a, triangle.b ],
@@ -621,22 +623,29 @@ export function testTriangleCapsule( capsule: Capsule, triangle: Triangle, out: 
 		[ triangle.c, triangle.a ]
 	];
 
+	const closestPoint = _v1;
+	let minimumDistanceSquared = Infinity;
 	for ( let i = 0; i < lines.length; i ++ ) {
 
 		const line2 = _line2.set( lines[ i ][ 0 ], lines[ i ][ 1 ] );
-		const [ point1, point2 ] = capsule.lineLineMinimumPoints( line1, line2 );
+		nearestPointsOnLineSegments( line1.start, line1.end, line2.start, line2.end, point1, point2 );
+		const distanceSquared = point1.distanceToSquared( point2 );
 
-		if ( point1.distanceToSquared( point2 ) < r2 ) {
+		if ( distanceSquared < minimumDistanceSquared ) {
 
-			out.set(
-				point2,
-				point1.clone().sub( point2 ).normalize(),
-				capsule.radius - point1.distanceTo( point2 ),
-			);
-
-			return true;
+			closestPoint.copy( point1 );
+			minimumDistanceSquared = distanceSquared;
 
 		}
+
+	}
+
+	if ( minimumDistanceSquared <= capsule.radius * capsule.radius ) {
+
+		// 残りは、球と三角形の交差テストと同様
+		sphere.center.copy( closestPoint );
+		sphere.radius = capsule.radius;
+		return isIntersectionSphereTriangle( sphere, triangle.a, triangle.b, triangle.c, triangle.normal, out );
 
 	}
 
@@ -644,78 +653,39 @@ export function testTriangleCapsule( capsule: Capsule, triangle: Triangle, out: 
 
 }
 
+// https://stackoverflow.com/a/67102941/1512272
+function nearestPointsOnLineSegments( a0: Vector3, a1: Vector3, b0: Vector3, b1: Vector3, out0: Vector3, out1: Vector3 ) {
 
+	const r = vec3.subVectors( b0, a0 );
+	const u = vec3_0.subVectors( a1, a0 );
+	const v = vec3_1.subVectors( b1, b0 );
 
-// const _v1 = new Vector3();
-// const _plane = new Plane();
-// const _line1 = new Line3();
-// const _line2 = new Line3();
-// export function testTriangleCapsule( capsule: Capsule, triangle: Triangle, out: Intersection ) {
+	const ru = r.dot( u );
+	const rv = r.dot( v );
+	const uu = u.dot( u );
+	const uv = u.dot( v );
+	const vv = v.dot( v );
 
-// 	out.point.set( 0, 0, 0 );
-// 	triangle.getPlane( _plane );
+	const det = uu * vv - uv * uv;
+	let s, t;
 
-// 	const d1 = _plane.distanceToPoint( capsule.start ) - capsule.radius;
-// 	const d2 = _plane.distanceToPoint( capsule.end ) - capsule.radius;
+	if ( det < EPSILON * uu * vv ) {
 
-// 	if ( ( d1 > 0 && d2 > 0 ) || ( d1 < - capsule.radius && d2 < - capsule.radius ) ) {
+		s = MathUtils.clamp( ru / uu, 0, 1 );
+		t = 0;
 
-// 		return false;
+	} else {
 
-// 	}
+		s = MathUtils.clamp( ( ru * vv - rv * uv ) / det, 0, 1 );
+		t = MathUtils.clamp( ( ru * uv - rv * uu ) / det, 0, 1 );
 
-// 	const delta = Math.abs( d1 / ( Math.abs( d1 ) + Math.abs( d2 ) ) );
-// 	const intersectPoint = _v1.copy( capsule.start ).lerp( capsule.end, delta );
+	}
 
-// 	if ( triangle.containsPoint( intersectPoint ) ) {
+	const S = MathUtils.clamp( ( t * uv + ru ) / uu, 0, 1 );
+	const T = MathUtils.clamp( ( s * uv - rv ) / vv, 0, 1 );
 
-// 		out.set(
-// 			intersectPoint,
-// 			_plane.normal,
-// 			Math.abs( Math.min( d1, d2 ) ),
-// 		);
+	const A = out0.addVectors( a0, u.multiplyScalar( S ) );
+	const B = out1.addVectors( b0, v.multiplyScalar( T ) );
+	return [ A, B ];
 
-// 		return true;
-
-// 	}
-
-// 	const r2 = capsule.radius * capsule.radius;
-// 	const line1 = _line1.set( capsule.start, capsule.end );
-
-// 	const lines = [
-// 		[ triangle.a, triangle.b ],
-// 		[ triangle.b, triangle.c ],
-// 		[ triangle.c, triangle.a ]
-// 	];
-
-// 	for ( let i = 0; i < lines.length; i ++ ) {
-
-// 		const line2 = _line2.set( lines[ i ][ 0 ], lines[ i ][ 1 ] );
-// 		const [ point1, point2 ] = capsule.lineLineMinimumPoints( line1, line2 );
-
-// 		if ( point1.distanceToSquared( point2 ) < r2 ) {
-
-// 			out.set(
-// 				point2,
-// 				point1.clone().sub( point2 ).normalize(),
-// 				capsule.radius - point1.distanceTo( point2 ),
-// 			);
-
-// 			return true;
-
-// 		}
-
-// 	}
-
-// 	return false;
-
-// }
-
-
-
-// 1 Check if the line intersects the plane, if so thats your start.
-// 2 Otherwise figure out which point is closest. If they’re equal than the capsule is parallel and you will have to test both points.
-// 3 Get the nearest point on the triangle to the plane intersection point.
-// 4 Get the nearest point on the line to the nearest triangle point.
-// 5 Check if the distance between the points is in the capsule radius and calculate the normal.
-
+}
