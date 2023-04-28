@@ -1,7 +1,10 @@
+import { Mesh, AnimationMixer } from 'three';
+import type { AnimationClip, AnimationAction } from 'three';
+
 const TURN_DURATION = 200;
 const TAU = 2 * Math.PI;
-const modulo = ( n, d ) => ( ( n % d ) + d ) % d;
-const getDeltaTurnAngle = ( current, target ) => {
+const modulo = ( n: number, d: number ) => ( ( n % d ) + d ) % d;
+const getDeltaTurnAngle = ( current: number, target: number ) => {
 
 	const a = modulo( ( current - target ), TAU );
 	const b = modulo( ( target - current ), TAU );
@@ -10,18 +13,28 @@ const getDeltaTurnAngle = ( current, target ) => {
 
 };
 
+export type Motion = {
+	[ name: string ]: AnimationAction;
+}
+
 export class AnimationController {
 
-	constructor( mesh ) {
+	mesh: Mesh;
+	motion: Motion;
+	mixer: AnimationMixer;
+	currentMotionName: string;
+	_targetRotY: number | null = null;
+
+	constructor( mesh: Mesh, animations: AnimationClip[] ) {
 
 		this.mesh   = mesh;
 		this.motion = {};
-		this.mixer  = new THREE.AnimationMixer( mesh );
+		this.mixer  = new AnimationMixer( mesh );
 		this.currentMotionName = '';
 
-		for ( let i = 0, l = this.mesh.geometry.animations.length; i < l; i ++ ) {
+		for ( let i = 0, l = animations.length; i < l; i ++ ) {
 
-			const anim = this.mesh.geometry.animations[ i ];
+			const anim = animations[ i ];
 			this.motion[ anim.name ] = this.mixer.clipAction( anim );
 			this.motion[ anim.name ].setEffectiveWeight( 1 );
 
@@ -29,7 +42,7 @@ export class AnimationController {
 
 	}
 
-	play( name ) {
+	play( name: string ) {
 
 		if ( this.currentMotionName === name ) return;
 
@@ -41,7 +54,7 @@ export class AnimationController {
 			from.enabled = true;
 			to.enabled = true;
 
-			from.crossFadeTo( to, .3 );
+			from.crossFadeTo( to, .3, false );
 
 		} else {
 
@@ -54,7 +67,7 @@ export class AnimationController {
 
 	}
 
-	turn( rad, immediate ) {
+	turn( rad: number, immediate: boolean ) {
 
 		const that       = this;
 		const prevRotY   = this.mesh.rotation.y;
@@ -91,7 +104,7 @@ export class AnimationController {
 				if ( now >= end ) {
 
 					that.mesh.rotation.y = _targetRotY;
-					delete that._targetRotY;
+					that._targetRotY = null;
 					return;
 
 				}
@@ -106,9 +119,9 @@ export class AnimationController {
 
 	}
 
-	update( delta ) {
+	update( deltaTime: number ) {
 
-		this.mixer.update( delta );
+		this.mixer.update( deltaTime );
 
 	}
 

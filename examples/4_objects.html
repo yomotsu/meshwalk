@@ -7,37 +7,43 @@
 body{margin: 0;padding: 0; background: #000;}
 canvas{display: block;}
 .info{
-  color: #fff;
-  position: absolute;
-  top: 0;
-  left: 0;
+	color: #fff;
+	position: absolute;
+	top: 0;
+	left: 0;
 }
 </style>
 </head>
 <body>
 <div class="info">
-  `maxSlopeGradient` is changable:
-  <select onchange="setMaxSlopeGradient( this.value * 1 )">
-    <option value="30">30deg</option>
-    <option value="50" selected>50deg</option>
-    <option value="70">70deg</option>
-  </select><br>
-  WASD to move, Space to jump. Plus, mousedrag to rotate, scroll to zoom
+	`maxSlopeGradient` is changable:
+	<select onchange="setMaxSlopeGradient( this.value * 1 )">
+		<option value="30">30deg</option>
+		<option value="50" selected>50deg</option>
+		<option value="70">70deg</option>
+	</select><br>
+	WASD to move, Space to jump. Plus, mousedrag to rotate, scroll to zoom
 </div>
 
+<script async src="https://unpkg.com/es-module-shims@1.6.3/dist/es-module-shims.js"></script>
+<script type="importmap">
+	{
+		"imports": {
+			"three": "https://unpkg.com/three@0.151.2/build/three.module.js",
+			"three/addons/": "https://unpkg.com/three@0.151.2/examples/jsm/",
+			"three/examples/": "https://unpkg.com/three@0.151.2/examples/"
+		}
+	}
+</script>
 <script type="module">
-import * as THREE from 'https://unpkg.com/three@0.148.0/build/three.module.js';
+import * as THREE from 'three';
+// import { OctreeHelper } from 'three/addons/helpers/OctreeHelper.js';
 import * as MW from '../dist/meshwalk.module.js';
 // See demo/2_keyboardInput.html first
 
-MW.install( THREE );
-
 const world = new MW.World();
-const min = new THREE.Vector3( - 50, - 50, - 50 );
-const max = new THREE.Vector3(  50,  50,  50 );
-const partition = 5;
-const region = new MW.Octree( min, max, partition );
-world.add( region );
+const octree = new MW.Octree();
+world.add( octree );
 
 
 const width = window.innerWidth;
@@ -61,7 +67,7 @@ const ground = new THREE.Mesh(
 );
 ground.rotation.x = - 90 * THREE.MathUtils.DEG2RAD;
 scene.add( ground );
-region.importThreeMesh( ground );
+octree.addGraphNode( ground );
 
 const groundHelper = new THREE.LineSegments( new THREE.WireframeGeometry( ground.geometry ) );
 groundHelper.rotation.copy( ground.rotation );
@@ -75,7 +81,7 @@ const object1 = new THREE.Mesh(
 );
 object1.position.set( 0, 2, 0 );
 scene.add( object1 );
-region.importThreeMesh( object1 );
+octree.addGraphNode( object1 );
 
 const object1Helper = new THREE.LineSegments( new THREE.WireframeGeometry( object1.geometry ) );
 object1Helper.position.copy( object1.position );
@@ -90,7 +96,7 @@ const object2 = new THREE.Mesh(
 object2.position.set( - 15, 0, 0 );
 object2.rotation.set( 20 * THREE.MathUtils.DEG2RAD, 0, 0 );
 scene.add( object2 );
-region.importThreeMesh( object2 );
+octree.addGraphNode( object2 );
 
 const object2Helper = new THREE.LineSegments( new THREE.WireframeGeometry( object2.geometry ) );
 object2Helper.position.copy( object2.position );
@@ -104,7 +110,7 @@ const object3 = new THREE.Mesh(
 object3.position.set( - 15, 4.5, - 8 );
 object3.rotation.set( 40 * THREE.MathUtils.DEG2RAD, 0, 0 );
 scene.add( object3 );
-region.importThreeMesh( object3 );
+octree.addGraphNode( object3 );
 
 const object3Helper = new THREE.LineSegments( new THREE.WireframeGeometry( object3.geometry ) );
 object3Helper.position.copy( object3.position );
@@ -119,7 +125,7 @@ const object4 = new THREE.Mesh(
 object4.position.set( - 15, 10.5, - 13 );
 object4.rotation.set( 60 * THREE.MathUtils.DEG2RAD, 0, 0 );
 scene.add( object4 );
-region.importThreeMesh( object4 );
+octree.addGraphNode( object4 );
 
 const object4Helper = new THREE.LineSegments( new THREE.WireframeGeometry( object4.geometry ) );
 object4Helper.position.copy( object4.position );
@@ -128,31 +134,45 @@ scene.add( object4Helper );
 
 
 const object5 = new THREE.Mesh(
-	new THREE.SphereGeometry( 10, 8, 8 ),
+	new THREE.SphereGeometry( 10, 16, 16 ),
 	new THREE.MeshNormalMaterial()
 );
 object5.position.set( 20, 0, 0 );
 scene.add( object5 );
-region.importThreeMesh( object5 );
+octree.addGraphNode( object5 );
 
 const object5Helper = new THREE.LineSegments( new THREE.WireframeGeometry( object5.geometry ) );
 object5Helper.position.copy( object5.position );
 scene.add( object5Helper );
 
 
+const object6 = new THREE.Mesh(
+	new THREE.BoxGeometry( 5, 1, 4 ),
+	new THREE.MeshNormalMaterial()
+);
+object6.position.set( 8, 7, 0 );
+scene.add( object6 );
+octree.addGraphNode( object6 );
 
-const playerRadius = 1;
+const object6Helper = new THREE.LineSegments( new THREE.WireframeGeometry( object6.geometry ) );
+object6Helper.position.copy( object6.position );
+scene.add( object6Helper );
+
+
+
+const playerRadius = .75;
 const playerObjectHolder = new THREE.Object3D();
-playerObjectHolder.position.set( 0, 10, 0 );
 scene.add( playerObjectHolder );
 
 const sphere = new THREE.Mesh(
 	new THREE.SphereGeometry( playerRadius, 16, 16 ),
 	new THREE.MeshBasicMaterial( { color: 0xff0000,  wireframe: true} )
 );
+sphere.position.y = playerRadius;
 playerObjectHolder.add( sphere );
 
 const playerController = new MW.CharacterController( playerObjectHolder, playerRadius );
+playerController.teleport( 0, 10, 0 );
 world.add( playerController );
 window.setMaxSlopeGradient = ( deg ) => {
 
@@ -165,9 +185,9 @@ const keyInputControl = new MW.KeyInputControl();
 const tpsCameraControls = new MW.TPSCameraControls(
 	camera, // three.js camera
 	playerObjectHolder, // tracking object
+	world,
 	renderer.domElement
 );
-tpsCameraControls.colliderMeshes = [ ground, object1, object2, object3, object4, object5 ];
 
 // bind events
 keyInputControl.addEventListener( 'movekeyon',    () => playerController.isRunning = true );
@@ -186,6 +206,8 @@ keyInputControl.addEventListener( 'movekeychange', () => {
 // the 'updated' event is fired by `tpsCameraControls.update()`
 tpsCameraControls.addEventListener( 'update', () => {
 
+	if ( ! playerController.isRunning ) return;
+
 	const cameraFrontAngle = tpsCameraControls.frontAngle;
 	const characterFrontAngle = keyInputControl.frontAngle;
 	playerController.direction = cameraFrontAngle + characterFrontAngle;
@@ -193,17 +215,19 @@ tpsCameraControls.addEventListener( 'update', () => {
 } );
 
 
+// const helper = new OctreeHelper( octree );
+// scene.add( helper );
+
 ( function update () {
 
 	const delta = clock.getDelta();
 
 	requestAnimationFrame( update );
-	world.step( Math.min( delta, 0.02 ) );
+	world.fixedUpdate();
 	tpsCameraControls.update( delta );
 	renderer.render( scene, camera );
 
 } )();
-
 </script>
 
 </body>

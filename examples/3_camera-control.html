@@ -7,31 +7,36 @@
 body{margin: 0;padding: 0; background: #000;}
 canvas{display: block;}
 .info{
-  color: #fff;
-  position: absolute;
-  top: 0;
-  left: 0;
+	color: #fff;
+	position: absolute;
+	top: 0;
+	left: 0;
 }
 </style>
 </head>
 <body>
 <div class="info">
-  WASD to move, Space to jump. Plus, mousedrag to rotate, scroll to zoom
+	WASD to move, Space to jump. Plus, mousedrag to rotate, scroll to zoom
 </div>
 
+<script async src="https://unpkg.com/es-module-shims@1.6.3/dist/es-module-shims.js"></script>
+<script type="importmap">
+	{
+		"imports": {
+			"three": "https://unpkg.com/three@0.151.2/build/three.module.js",
+			"three/addons/": "https://unpkg.com/three@0.151.2/examples/jsm/",
+			"three/examples/": "https://unpkg.com/three@0.151.2/examples/"
+		}
+	}
+</script>
 <script type="module">
-import * as THREE from 'https://unpkg.com/three@0.120.0/build/three.module.js';
+import * as THREE from 'three';
 import * as MW from '../dist/meshwalk.module.js';
 // See demo/2_keyboardInput.html first
 
-MW.install( THREE );
-
 const world = new MW.World();
-const min = new THREE.Vector3( - 15, - 15, - 15 );
-const max = new THREE.Vector3(  15,  15,  15 );
-const partition = 5;
-const region = new MW.Octree( min, max, partition );
-world.add( region );
+const octree = new MW.Octree();
+world.add( octree );
 
 
 const width = window.innerWidth;
@@ -46,34 +51,35 @@ document.body.appendChild( renderer.domElement );
 
 
 const ground = new THREE.Mesh(
-	new THREE.PlaneBufferGeometry( 30, 30, 10, 10 ),
+	new THREE.PlaneGeometry( 30, 30, 10, 10 ),
 	new THREE.MeshBasicMaterial( { color: 0xffffff,  wireframe: true } )
 );
 ground.rotation.x = - 90 * THREE.MathUtils.DEG2RAD;
 scene.add( ground );
-region.importThreeMesh( ground );
+octree.addGraphNode( ground );
 
 
 const wall = new THREE.Mesh(
-	new THREE.BoxGeometry( 5, 6, 10 ),
+	new THREE.BoxGeometry( 5, 5, 10 ),
 	new THREE.MeshNormalMaterial( { wireframe: true } )
 );
-wall.position.set( 0, 3, 0 );
+wall.position.set( 0, 2.5, 0 );
 scene.add( wall );
-region.importThreeMesh( wall );
+octree.addGraphNode( wall );
 
-const playerRadius = 1;
+const playerRadius = .75;
 const playerObjectHolder = new THREE.Object3D();
-playerObjectHolder.position.set( 0, 10, 0 );
 scene.add( playerObjectHolder );
 
 const sphere = new THREE.Mesh(
 	new THREE.SphereGeometry( playerRadius, 16, 16 ),
 	new THREE.MeshBasicMaterial( { color: 0xff0000,  wireframe: true} )
 );
+sphere.position.y = playerRadius;
 playerObjectHolder.add( sphere );
 
 const playerController = new MW.CharacterController( playerObjectHolder, playerRadius );
+playerController.teleport( 0, 10, 0 );
 world.add( playerController );
 
 const keyInputControl = new MW.KeyInputControl();
@@ -81,9 +87,9 @@ const keyInputControl = new MW.KeyInputControl();
 const tpsCameraControls = new MW.TPSCameraControls(
 	camera, // three.js camera
 	playerObjectHolder, // tracking object
+	world,
 	renderer.domElement
 );
-tpsCameraControls.colliderMeshes = [ ground, wall ];
 
 
 // bind events
@@ -103,7 +109,9 @@ keyInputControl.addEventListener( 'movekeychange', () => {
 // the 'updated' event is fired by `tpsCameraControls.update()`
 tpsCameraControls.addEventListener( 'update', () => {
 
-	const cameraFrontAngle    = tpsCameraControls.frontAngle;
+	if ( ! playerController.isRunning ) return;
+
+	const cameraFrontAngle = tpsCameraControls.frontAngle;
 	const characterFrontAngle = keyInputControl.frontAngle;
 	playerController.direction = cameraFrontAngle + characterFrontAngle;
 
@@ -115,7 +123,7 @@ tpsCameraControls.addEventListener( 'update', () => {
 	const delta = clock.getDelta();
 
 	requestAnimationFrame( update );
-	world.step( Math.min( delta, 0.02 ) );
+	world.fixedUpdate();
 	tpsCameraControls.update( delta );
 	renderer.render( scene, camera );
 
