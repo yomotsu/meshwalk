@@ -1,14 +1,11 @@
 import { MathUtils, Sphere, Vector2, Vector3 } from 'three';
 // import { Capsule } from 'three/examples/jsm/math/Capsule.js';
-import type { Object3D } from 'three';
+import { type Object3D } from 'three';
 import { EventDispatcher } from './EventDispatcher';
-import {
-	Intersection,
-	testLineTriangle,
-	// testTriangleCapsule,
-	isIntersectionSphereTriangle,
-} from '../math/collision.js';
-import type { ComputedTriangle } from '../math/triangle';
+import { Intersection } from '../math/Intersection';
+import { intersectsLineTriangle } from '../math/intersectsLineTriangle';
+import { intersectsSphereTriangle } from '../math/intersectsSphereTriangle';
+import { type ComputedTriangle } from '../math/triangle';
 
 const FALL_VELOCITY = - 20;
 const JUMP_DURATION = 1000;
@@ -303,7 +300,7 @@ export class CharacterController extends EventDispatcher {
 			// 壁・天井は接地処理では無視
 			if ( triangle.normal.y <= 0 ) continue;
 
-			const isIntersected = testLineTriangle(
+			const isIntersected = intersectsLineTriangle(
 				groundingHead,
 				groundingTo,
 				triangle.a,
@@ -397,7 +394,7 @@ export class CharacterController extends EventDispatcher {
 			if ( ! triangle.boundingSphere ) triangle.computeBoundingSphere();
 			if ( ! sphere.intersectsSphere( triangle.boundingSphere! ) ) continue;
 
-			const isIntersected = isIntersectionSphereTriangle(
+			const isIntersected = intersectsSphereTriangle(
 				sphere,
 				triangle.a,
 				triangle.b,

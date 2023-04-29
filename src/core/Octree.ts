@@ -1,5 +1,3 @@
-import { ComputedTriangle } from '../math/triangle';
-
 import {
 	Box3,
 	Line3,
@@ -7,16 +5,13 @@ import {
 	Sphere,
 	Vector3,
 	Mesh,
-} from 'three';
-import type {
-	Ray,
-	Object3D,
+	type Ray,
+	type Object3D,
 } from 'three';
 // import { Capsule } from '../math/Capsule.js';
-import {
-	isIntersectionLineBox,
-	testLineTriangle,
-} from "../math/collision";
+import { ComputedTriangle } from '../math/triangle';
+import { intersectsLineBox } from "../math/intersectsLineBox";
+import { intersectsLineTriangle } from "../math/intersectsLineTriangle";
 
 const _v1 = new Vector3();
 const _v2 = new Vector3();
@@ -140,7 +135,7 @@ export class Octree {
 		for ( let i = 0; i < this.subTrees.length; i ++ ) {
 
 			const subTree = this.subTrees[ i ];
-			if ( ! isIntersectionLineBox( line, subTree.box ) ) continue;
+			if ( ! intersectsLineBox( line, subTree.box ) ) continue;
 
 			if ( subTree.triangles.length > 0 ) {
 
@@ -255,7 +250,7 @@ export class Octree {
 		for ( let i = 0; i < triangles.length; i ++ ) {
 
 			const result = _v1;
-			const isIntersected = testLineTriangle( line.start, line.end, triangles[ i ].a, triangles[ i ].b, triangles[ i ].c, result );
+			const isIntersected = intersectsLineTriangle( line.start, line.end, triangles[ i ].a, triangles[ i ].b, triangles[ i ].c, result );
 
 			if ( isIntersected ) {
 
