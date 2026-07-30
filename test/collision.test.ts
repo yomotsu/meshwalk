@@ -185,6 +185,49 @@ describe( 'CharacterController capsule collision', () => {
 
 	} );
 
+	it( 'jump() で上昇し、重力で地面に戻って再接地する', () => {
+
+		const { world, player } = makeScene();
+		player.teleport( 10, 0, 10 ); // 箱から離れた平地
+		player.velocity.set( 0, 0, 0 );
+		for ( let i = 0; i < 60; i ++ ) {
+
+			player.move( STOP ); world.fixedUpdate();
+
+		}
+		expect( player.isGrounded ).toBe( true );
+		const restY = player.position.y;
+
+		player.jump();
+		let maxY = restY;
+		for ( let i = 0; i < 150; i ++ ) {
+
+			player.move( STOP ); world.fixedUpdate();
+			if ( player.position.y > maxY ) maxY = player.position.y;
+
+		}
+
+		expect( maxY, 'ジャンプで上昇していない' ).toBeGreaterThan( restY + 0.5 );
+		expect( player.position.y, '着地して地面に戻っていない' ).toBeCloseTo( restY, 1 );
+		expect( player.isGrounded ).toBe( true );
+
+	} );
+
+	it( 'gravityScale = 0 なら落下しない', () => {
+
+		const { world, player } = makeScene();
+		player.teleport( 10, 5, 10 ); // 空中
+		player.velocity.set( 0, 0, 0 );
+		player.gravityScale = 0;
+		for ( let i = 0; i < 60; i ++ ) {
+
+			player.move( STOP ); world.fixedUpdate();
+
+		}
+		expect( player.position.y, '無重力なのに落下した' ).toBeCloseTo( 5, 1 );
+
+	} );
+
 	it( '箱の上から歩いて端から降りても床にちゃんと着地する（床抜けしない）', () => {
 
 		const { world, player } = makeScene();

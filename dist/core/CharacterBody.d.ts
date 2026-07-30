@@ -2,6 +2,7 @@ import { Vector3 } from 'three';
 import { type Object3D } from 'three';
 import { Body } from './Body';
 import { type ComputedTriangle } from '../math/triangle';
+export type GravityField = Vector3 | ((body: CharacterBody) => Vector3);
 export declare class CharacterBody extends Body {
     isCharacterBody: boolean;
     object: Object3D;
@@ -16,8 +17,9 @@ export declare class CharacterBody extends Body {
     isRunning: boolean;
     isJumping: boolean;
     velocity: Vector3;
-    currentJumpPower: number;
-    jumpStartTime: number;
+    jumpSpeed: number;
+    gravityScale: number;
+    gravity: GravityField | null;
     groundHeight: number;
     groundNormal: Vector3;
     nearTriangles: ComputedTriangle[];
@@ -39,13 +41,13 @@ export declare class CharacterBody extends Body {
      * 停止させるにはゼロベクトルを渡す。
      */
     move(velocity: Vector3): void;
-    update(deltaTime: number): void;
-    _updateVelocity(): void;
+    update(deltaTime: number, worldGravity: GravityField): void;
+    private _resolveGravity;
+    _updateVelocity(deltaTime: number, worldGravity: GravityField): void;
     _checkGround(): void;
     _updatePosition(deltaTime: number): void;
     _collisionDetection(): void;
     _solvePosition(): void;
     jump(): void;
-    _updateJumping(): void;
     teleport(x: number, y: number, z: number): void;
 }

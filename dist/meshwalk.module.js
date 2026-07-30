@@ -958,10 +958,9 @@ function intersectsCapsuleSphere(capsule, sphere) {
     return vec3.distanceToSquared(sphere.center) <= r * r;
 }
 
-const FALL_VELOCITY = -20;
-const JUMP_DURATION = 1000;
 const PI_HALF$1 = Math.PI * 0.5;
 const PI_ONE_HALF = Math.PI * 1.5;
+const _gravity = new Vector3();
 const direction2D = new Vector2();
 const wallNormal2D = new Vector2();
 const groundingHead = new Vector3();
@@ -990,9 +989,10 @@ class CharacterBody extends Body {
         this.isIdling = false;
         this.isRunning = false; // 派生状態: move() で移動が指定されているとき true
         this.isJumping = false;
-        this.velocity = new Vector3(0, -9.8, 0);
-        this.currentJumpPower = 0;
-        this.jumpStartTime = 0;
+        this.velocity = new Vector3(0, 0, 0);
+        this.jumpSpeed = 15; // ジャンプの初速。到達高さ ≈ jumpSpeed^2 / (2 * |gravity|)
+        this.gravityScale = 1; // このボディにかかる重力の倍率（0 で無重力）
+        this.gravity = null; // 個体別の重力上書き（null なら world.gravity を使う）
         this.groundHeight = 0;
         this.groundNormal = new Vector3();
         this.nearTriangles = [];
@@ -1064,41 +1064,44 @@ class CharacterBody extends Body {
         if (this.isRunning)
             this._facingAngle = Math.atan2(-this._moveVelocity.x, -this._moveVelocity.z);
     }
-    update(deltaTime) {
+    update(deltaTime, worldGravity) {
         // 状態をリセットしておく
         this.isGrounded = false;
         this.isOnSlope = false;
         this.groundHeight = -Infinity;
         this.groundNormal.set(0, 1, 0);
         this._checkGround();
-        this._updateJumping();
         this._updatePosition(deltaTime);
         this._collisionDetection();
         this._solvePosition();
-        this._updateVelocity();
+        this._updateVelocity(deltaTime, worldGravity);
         this._events();
     }
-    _updateVelocity() {
+    // このボディに働く重力を解決する（個体上書き ?? world 既定）。
+    // L1 では鉛直成分のみ使う（重力方向可変=壁歩き/惑星は L2）。
+    _resolveGravity(worldGravity) {
+        var _a;
+        const source = (_a = this.gravity) !== null && _a !== void 0 ? _a : worldGravity;
+        const g = (typeof source === 'function') ? source(this) : source;
+        return _gravity.copy(g).multiplyScalar(this.gravityScale);
+    }
+    _updateVelocity(deltaTime, worldGravity) {
         let isHittingCeiling = false;
-        this.velocity.set(this._moveVelocity.x, FALL_VELOCITY, this._moveVelocity.z);
-        // 急勾配や自由落下など、自動で付与される速度の処理
-        if (this.contactInfo.length === 0 && !this.isJumping) {
-            // 何とも衝突していないので、自由落下
-            return;
-        }
-        else if (this.isGrounded && !this.isOnSlope && !this.isJumping) {
-            // 通常の地面上にいる場合、ただしジャンプ開始時は除く
+        // 水平は move() の入力速度、垂直は重力を積分して保持する
+        const gravityY = this._resolveGravity(worldGravity).y;
+        this.velocity.x = this._moveVelocity.x;
+        this.velocity.z = this._moveVelocity.z;
+        this.velocity.y += gravityY * deltaTime; // 重力で加速（インパルスジャンプは jump() で velocity.y を直接与える）
+        if (this.isGrounded && !this.isOnSlope && this.velocity.y <= 0) {
+            // 地面の上で降下中なら垂直速度を止める
             this.velocity.y = 0;
         }
         else if (this.isOnSlope) {
-            const horizontalSpeed = 20 / (1 - this.groundNormal.y) * 0.2;
+            // 急勾配は滑り落ちる（垂直は重力積分のまま）
+            // TODO 0.2 はマジックナンバーなので、幾何学的な求め方を考える
+            const horizontalSpeed = -gravityY / (1 - this.groundNormal.y) * 0.2;
             this.velocity.x = this.groundNormal.x * horizontalSpeed;
-            this.velocity.y = FALL_VELOCITY;
             this.velocity.z = this.groundNormal.z * horizontalSpeed;
-        }
-        else if (!this.isGrounded && !this.isOnSlope && this.isJumping) {
-            // ジャンプの処理
-            this.velocity.y = this.currentJumpPower * -FALL_VELOCITY;
         }
         // 壁に向かった場合、壁方向の速度を0にする処理
         // vs walls and sliding on the wall
@@ -1188,8 +1191,8 @@ class CharacterBody extends Body {
         // その他、床の属性を追加で取得する場合はここで
         const top = groundingHead.y;
         const bottom = this.position.y - this.groundCheckDepth;
-        // ジャンプ中、かつ上方向に移動中だったら、強制接地しない
-        if (this.isJumping && 0 < this.currentJumpPower) {
+        // 上昇中（ジャンプ直後など）は強制接地しない
+        if (0 < this.velocity.y) {
             this.isOnSlope = false;
             this.isGrounded = false;
             return;
@@ -1263,7 +1266,7 @@ class CharacterBody extends Body {
             // フェイスは急勾配な坂か否か
             const isSlopeFace = (this._slopeLimitCos <= normal.y && normal.y < 1);
             // ジャンプ降下中に、急勾配な坂に衝突したらジャンプ終わり
-            if (this.isJumping && 0 >= this.currentJumpPower && isSlopeFace) {
+            if (this.isJumping && this.velocity.y <= 0 && isSlopeFace) {
                 this.isJumping = false;
                 this.isGrounded = true;
                 // console.log( 'jump end' );
@@ -1287,16 +1290,9 @@ class CharacterBody extends Body {
     jump() {
         if (this.isJumping || !this.isGrounded || this.isOnSlope)
             return;
-        this.jumpStartTime = performance.now();
-        this.currentJumpPower = 1;
+        // 初速インパルスを与え、以降は重力に任せる
+        this.velocity.y = this.jumpSpeed;
         this.isJumping = true;
-    }
-    _updateJumping() {
-        if (!this.isJumping)
-            return;
-        const elapsed = performance.now() - this.jumpStartTime;
-        const progress = elapsed / JUMP_DURATION;
-        this.currentJumpPower = Math.cos(Math.min(progress, 1) * Math.PI);
     }
     teleport(x, y, z) {
         this.position.set(x, y, z);
@@ -1306,11 +1302,12 @@ class CharacterBody extends Body {
 
 const sphere = new Sphere();
 class World {
-    constructor({ fps = 60, stepsPerFrame = 4 } = {}) {
+    constructor({ fps = 60, stepsPerFrame = 4, gravity = new Vector3(0, -30, 0) } = {}) {
         this._staticBodies = [];
         this._characterBodies = [];
         this._fps = fps;
         this._stepsPerFrame = stepsPerFrame;
+        this.gravity = gravity;
     }
     /**
      * 静的ボディ一覧（読み取り専用）。カメラのレイ衝突など内部処理から参照する。
@@ -1359,7 +1356,7 @@ class World {
                 this._staticBodies[ii].getSphereTriangles(sphere, triangles);
             }
             character.setNearTriangles(triangles);
-            character.update(stepDeltaTime);
+            character.update(stepDeltaTime, this.gravity);
         }
     }
     dispose() {

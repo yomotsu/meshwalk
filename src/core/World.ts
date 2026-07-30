@@ -1,22 +1,26 @@
-import { Sphere } from 'three';
+import { Sphere, Vector3 } from 'three';
 import { ComputedTriangle } from '../math/triangle';
 import { Body } from './Body';
 import { StaticBody } from './StaticBody';
-import { CharacterBody } from './CharacterBody';
+import { CharacterBody, type GravityField } from './CharacterBody';
 
 const sphere = new Sphere();
 
 export class World {
 
+	// 全体の既定の重力。Vector3 または (body) => Vector3（位置依存の重力場）。
+	// CharacterBody 側で gravity 上書き / gravityScale も可能。
+	gravity: GravityField;
 	private _staticBodies: StaticBody[] = [];
 	private _characterBodies: CharacterBody[] = [];
 	private _fps: number;
 	private _stepsPerFrame: number;
 
-	constructor( { fps = 60, stepsPerFrame = 4 } = {} ) {
+	constructor( { fps = 60, stepsPerFrame = 4, gravity = new Vector3( 0, - 30, 0 ) }: { fps?: number, stepsPerFrame?: number, gravity?: GravityField } = {} ) {
 
 		this._fps = fps;
 		this._stepsPerFrame = stepsPerFrame;
+		this.gravity = gravity;
 
 	}
 
@@ -90,7 +94,7 @@ export class World {
 			}
 
 			character.setNearTriangles( triangles );
-			character.update( stepDeltaTime );
+			character.update( stepDeltaTime, this.gravity );
 
 		}
 

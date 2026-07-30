@@ -8,10 +8,12 @@ import { intersectsCapsuleTriangle } from '../math/intersectsCapsuleTriangle';
 import { intersectsCapsuleSphere } from '../math/intersectsCapsuleSphere';
 import { type ComputedTriangle } from '../math/triangle';
 
-const FALL_VELOCITY = - 20;
-const JUMP_DURATION = 1000;
 const PI_HALF = Math.PI * 0.5;
 const PI_ONE_HALF = Math.PI * 1.5;
+const _gravity = new Vector3();
+
+// world.gravity / body.gravity は Vector3 または (body) => Vector3
+export type GravityField = Vector3 | ( ( body: CharacterBody ) => Vector3 );
 
 const direction2D = new Vector2();
 const wallNormal2D = new Vector2();
@@ -42,9 +44,10 @@ export class CharacterBody extends Body {
 	isIdling   = false;
 	isRunning  = false; // 派生状態: move() で移動が指定されているとき true
 	isJumping  = false;
-	velocity = new Vector3( 0, - 9.8, 0 );
-	currentJumpPower = 0;
-	jumpStartTime = 0;
+	velocity = new Vector3( 0, 0, 0 );
+	jumpSpeed = 15;          // ジャンプの初速。到達高さ ≈ jumpSpeed^2 / (2 * |gravity|)
+	gravityScale = 1;        // このボディにかかる重力の倍率（0 で無重力）
+	gravity: GravityField | null = null; // 個体別の重力上書き（null なら world.gravity を使う）
 	groundHeight = 0;
 	groundNormal = new Vector3();
 	nearTriangles: ComputedTriangle[] = [];
@@ -163,7 +166,7 @@ export class CharacterBody extends Body {
 
 	}
 
-	update( deltaTime: number ) {
+	update( deltaTime: number, worldGravity: GravityField ) {
 
 		// 状態をリセットしておく
 		this.isGrounded = false;
@@ -172,50 +175,46 @@ export class CharacterBody extends Body {
 		this.groundNormal.set( 0, 1, 0 );
 
 		this._checkGround();
-		this._updateJumping();
 		this._updatePosition( deltaTime );
 		this._collisionDetection();
 		this._solvePosition();
-		this._updateVelocity();
+		this._updateVelocity( deltaTime, worldGravity );
 		this._events();
 
 	}
 
-	_updateVelocity() {
+	// このボディに働く重力を解決する（個体上書き ?? world 既定）。
+	// L1 では鉛直成分のみ使う（重力方向可変=壁歩き/惑星は L2）。
+	private _resolveGravity( worldGravity: GravityField ): Vector3 {
+
+		const source = this.gravity ?? worldGravity;
+		const g = ( typeof source === 'function' ) ? source( this ) : source;
+		return _gravity.copy( g ).multiplyScalar( this.gravityScale );
+
+	}
+
+	_updateVelocity( deltaTime: number, worldGravity: GravityField ) {
 
 		let isHittingCeiling = false;
 
-		this.velocity.set(
-			this._moveVelocity.x,
-			FALL_VELOCITY,
-			this._moveVelocity.z
-		);
+		// 水平は move() の入力速度、垂直は重力を積分して保持する
+		const gravityY = this._resolveGravity( worldGravity ).y;
+		this.velocity.x = this._moveVelocity.x;
+		this.velocity.z = this._moveVelocity.z;
+		this.velocity.y += gravityY * deltaTime; // 重力で加速（インパルスジャンプは jump() で velocity.y を直接与える）
 
-		// 急勾配や自由落下など、自動で付与される速度の処理
-		if ( this.contactInfo.length === 0 && ! this.isJumping ) {
+		if ( this.isGrounded && ! this.isOnSlope && this.velocity.y <= 0 ) {
 
-			// 何とも衝突していないので、自由落下
-			return;
-
-		} else if ( this.isGrounded && ! this.isOnSlope && ! this.isJumping ) {
-
-			// 通常の地面上にいる場合、ただしジャンプ開始時は除く
+			// 地面の上で降下中なら垂直速度を止める
 			this.velocity.y = 0;
 
 		} else if ( this.isOnSlope ) {
 
+			// 急勾配は滑り落ちる（垂直は重力積分のまま）
 			// TODO 0.2 はマジックナンバーなので、幾何学的な求め方を考える
-			const slidingDownVelocity = FALL_VELOCITY;
-			const horizontalSpeed = - slidingDownVelocity / ( 1 - this.groundNormal.y ) * 0.2;
-
+			const horizontalSpeed = - gravityY / ( 1 - this.groundNormal.y ) * 0.2;
 			this.velocity.x = this.groundNormal.x * horizontalSpeed;
-			this.velocity.y = FALL_VELOCITY;
 			this.velocity.z = this.groundNormal.z * horizontalSpeed;
-
-		} else if ( ! this.isGrounded && ! this.isOnSlope && this.isJumping ) {
-
-			// ジャンプの処理
-			this.velocity.y = this.currentJumpPower * - FALL_VELOCITY;
 
 		}
 
@@ -362,8 +361,8 @@ export class CharacterBody extends Body {
 		const top    = groundingHead.y;
 		const bottom = this.position.y - this.groundCheckDepth;
 
-		// ジャンプ中、かつ上方向に移動中だったら、強制接地しない
-		if ( this.isJumping && 0 < this.currentJumpPower ) {
+		// 上昇中（ジャンプ直後など）は強制接地しない
+		if ( 0 < this.velocity.y ) {
 
 			this.isOnSlope  = false;
 			this.isGrounded = false;
@@ -476,7 +475,7 @@ export class CharacterBody extends Body {
 			const isSlopeFace = ( this._slopeLimitCos <= normal.y && normal.y < 1 );
 
 			// ジャンプ降下中に、急勾配な坂に衝突したらジャンプ終わり
-			if ( this.isJumping && 0 >= this.currentJumpPower && isSlopeFace ) {
+			if ( this.isJumping && this.velocity.y <= 0 && isSlopeFace ) {
 
 				this.isJumping = false;
 				this.isGrounded = true;
@@ -508,19 +507,9 @@ export class CharacterBody extends Body {
 
 		if ( this.isJumping || ! this.isGrounded || this.isOnSlope ) return;
 
-		this.jumpStartTime = performance.now();
-		this.currentJumpPower = 1;
+		// 初速インパルスを与え、以降は重力に任せる
+		this.velocity.y = this.jumpSpeed;
 		this.isJumping = true;
-
-	}
-
-	_updateJumping() {
-
-		if ( ! this.isJumping ) return;
-
-		const elapsed = performance.now() - this.jumpStartTime;
-		const progress = elapsed / JUMP_DURATION;
-		this.currentJumpPower = Math.cos( Math.min( progress, 1 ) * Math.PI );
 
 	}
 
