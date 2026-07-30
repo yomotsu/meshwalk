@@ -78,8 +78,9 @@ export class World {
 			for ( let ii = 0, ll = this.colliderPool.length; ii < ll; ii ++ ) {
 
 				const octree = this.colliderPool[ ii ];
-				sphere.center.set( 0, character.radius, 0 ).add( character.position );
-				sphere.radius = character.radius + character.groundCheckDepth;
+				// キャラクターのカプセル全体を囲む sphere で broad-phase
+				sphere.center.set( 0, character.height / 2, 0 ).add( character.position );
+				sphere.radius = character.height / 2 + character.groundCheckDepth;
 				triangles.push( ...octree.getSphereTriangles( sphere, [] ) );
 
 			}

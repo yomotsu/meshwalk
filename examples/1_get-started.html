@@ -59,20 +59,21 @@ scene.add( ground );
 octree.addGraphNode( ground );
 
 
-const playerRadius = .75;
+const playerRadius = .5;
+const playerHeight = 2;
 const playerObjectHolder = new THREE.Object3D();
 scene.add( playerObjectHolder );
 
-// make your player character
-const sphere = new THREE.Mesh(
-	new THREE.SphereGeometry( playerRadius, 16, 16 ),
+// make your player character (capsule)
+const capsule = new THREE.Mesh(
+	new THREE.CapsuleGeometry( playerRadius, playerHeight - playerRadius * 2, 4, 16 ),
 	new THREE.MeshBasicMaterial( { color: 0xff0000,  wireframe: true} )
 );
-sphere.position.y = playerRadius;
-playerObjectHolder.add( sphere );
+capsule.position.y = playerHeight / 2;
+playerObjectHolder.add( capsule );
 
 // to apply fake gravity and to be controllable object
-const playerController = new MW.CharacterController( playerObjectHolder, playerRadius );
+const playerController = new MW.CharacterController( playerObjectHolder, playerRadius, playerHeight );
 playerController.teleport( 0, 10, 0 );
 world.add( playerController );
 

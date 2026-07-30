@@ -6,6 +6,7 @@ export declare class CharacterController extends EventDispatcher {
     isCharacterController: boolean;
     object: Object3D;
     radius: number;
+    height: number;
     position: Vector3;
     groundCheckDepth: number;
     maxSlopeGradient: number;
@@ -25,10 +26,11 @@ export declare class CharacterController extends EventDispatcher {
     contactInfo: {
         depth: number;
         point: Vector3;
+        normal: Vector3;
         triangle: ComputedTriangle;
     }[];
     private _events;
-    constructor(object3d: Object3D, radius: number);
+    constructor(object3d: Object3D, radius: number, height: number);
     setNearTriangles(nearTriangles: ComputedTriangle[]): void;
     update(deltaTime: number): void;
     _updateVelocity(): void;

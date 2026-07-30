@@ -4,9 +4,9 @@
  * (c) 2017 @yomotsu
  * Released under the MIT License.
  */
-import { Vector3, Triangle, Sphere, Box3, Mesh, Vector2, MathUtils, AnimationMixer, Raycaster, Spherical, Matrix4, Quaternion, Vector4, Ray, Object3D } from 'three';
+import { Vector3, Triangle, Sphere, Box3, Mesh, Plane, Line3, MathUtils, Vector2, AnimationMixer, Raycaster, Spherical, Matrix4, Quaternion, Vector4, Ray, Object3D } from 'three';
 
-const vec3$2 = new Vector3();
+const vec3$4 = new Vector3();
 class ComputedTriangle extends Triangle {
     constructor(a, b, c) {
         super(a, b, c);
@@ -25,7 +25,7 @@ class ComputedTriangle extends Triangle {
     // 	this.boundingSphere = undefined;
     // }
     extend(amount) {
-        const incenter = getIncenter(this, vec3$2);
+        const incenter = getIncenter(this, vec3$4);
         const a = incenter.distanceTo(this.a);
         const b = incenter.distanceTo(this.b);
         const c = incenter.distanceTo(this.c);
@@ -116,7 +116,7 @@ function makeTriangleBoundingSphere(triangle, normal) {
     return bs;
 }
 
-const vec3$1 = new Vector3();
+const vec3$3 = new Vector3();
 // https://3dkingdoms.com/weekly/weekly.php?a=3
 function intersectsLineBox(line, box, hit) {
     if (line.end.x < box.min.x && line.start.x < box.min.x)
@@ -136,7 +136,7 @@ function intersectsLineBox(line, box, hit) {
         line.start.z > box.min.z && line.start.z < box.max.z) {
         return true;
     }
-    const _hit = vec3$1;
+    const _hit = vec3$3;
     if ((getIntersection(line.start.x - box.min.x, line.end.x - box.min.x, line.start, line.end, _hit) && inBox(_hit, box, 1)) ||
         (getIntersection(line.start.y - box.min.y, line.end.y - box.min.y, line.start, line.end, _hit) && inBox(_hit, box, 2)) ||
         (getIntersection(line.start.z - box.min.z, line.end.z - box.min.z, line.start, line.end, _hit) && inBox(_hit, box, 3)) ||
@@ -153,9 +153,9 @@ function getIntersection(dst1, dst2, p1, p2, hit) {
     if (dst1 == dst2)
         return false;
     if (hit) {
-        vec3$1.subVectors(p2, p1);
-        vec3$1.multiplyScalar(-dst1 / (dst2 - dst1));
-        hit.addVectors(p1, vec3$1);
+        vec3$3.subVectors(p2, p1);
+        vec3$3.multiplyScalar(-dst1 / (dst2 - dst1));
+        hit.addVectors(p1, vec3$3);
     }
     return true;
 }
@@ -169,7 +169,7 @@ function inBox(hit, box, axis) {
     return false;
 }
 
-const vec3 = new Vector3();
+const vec3$2 = new Vector3();
 // // based on Real-Time Collision Detection Section 5.3.4
 // // p: <THREE.Vector3>, // line3.start
 // // q: <THREE.Vector3>, // line3.end
@@ -215,34 +215,34 @@ const vec3 = new Vector3();
 //   var m = b.clone().cross( c );
 //   return a.clone().cross( m );
 // }
-const ab = new Vector3();
-const ac = new Vector3();
+const ab$1 = new Vector3();
+const ac$1 = new Vector3();
 const qp = new Vector3();
 const n = new Vector3();
-const ap = new Vector3();
+const ap$1 = new Vector3();
 const e = new Vector3();
 const au = new Vector3();
 const bv = new Vector3();
 const cw = new Vector3();
 function intersectsLineTriangle(p, q, a, b, c, hit) {
-    ab.subVectors(b, a);
-    ac.subVectors(c, a);
+    ab$1.subVectors(b, a);
+    ac$1.subVectors(c, a);
     qp.subVectors(p, q);
-    n.copy(ab).cross(ac);
+    n.copy(ab$1).cross(ac$1);
     const d = qp.dot(n);
     if (d <= 0)
         return false;
-    ap.subVectors(p, a);
-    let t = ap.dot(n);
+    ap$1.subVectors(p, a);
+    let t = ap$1.dot(n);
     if (t < 0)
         return false;
     if (t > d)
         return false;
-    e.copy(qp).cross(ap);
-    let v = ac.dot(e);
+    e.copy(qp).cross(ap$1);
+    let v = ac$1.dot(e);
     if (v < 0 || v > d)
         return false;
-    let w = vec3.copy(ab).dot(e) * -1;
+    let w = vec3$2.copy(ab$1).dot(e) * -1;
     if (w < 0 || v + w > d)
         return false;
     const ood = 1 / d;
@@ -257,7 +257,7 @@ function intersectsLineTriangle(p, q, a, b, c, hit) {
     return true;
 }
 
-const _v1 = new Vector3();
+const _v1$1 = new Vector3();
 const _v2$1 = new Vector3();
 // const _plane = new Plane();
 // const _line1 = new Line3();
@@ -295,7 +295,7 @@ class Octree {
             for (let y = 0; y < 2; y++) {
                 for (let z = 0; z < 2; z++) {
                     const box = new Box3();
-                    const v = _v1.set(x, y, z);
+                    const v = _v1$1.set(x, y, z);
                     box.min.copy(this.box.min).add(v.multiply(halfSize));
                     box.max.copy(box.min).add(halfSize);
                     subTrees.push(new Octree(box));
@@ -399,7 +399,7 @@ class Octree {
         let triangle = null;
         this.getLineTriangles(line, triangles);
         for (let i = 0; i < triangles.length; i++) {
-            const result = _v1;
+            const result = _v1$1;
             const isIntersected = intersectsLineTriangle(line.start, line.end, triangles[i].a, triangles[i].b, triangles[i].c, result);
             if (isIntersected) {
                 const newDistanceSquared = line.start.distanceToSquared(result);
@@ -419,7 +419,7 @@ class Octree {
         let triangle, position, distanceSquared = 1e100;
         this.getRayTriangles(ray, triangles);
         for (let i = 0; i < triangles.length; i++) {
-            const result = ray.intersectTriangle(triangles[i].a, triangles[i].b, triangles[i].c, true, _v1);
+            const result = ray.intersectTriangle(triangles[i].a, triangles[i].b, triangles[i].c, true, _v1$1);
             if (result) {
                 const newDistanceSquared = result.sub(ray.origin).lengthSq();
                 if (distanceSquared > newDistanceSquared) {
@@ -465,6 +465,160 @@ class Octree {
         });
         this.build();
     }
+}
+
+/**
+ * A capsule is essentially a cylinder with hemispherical caps at both ends.
+ * It can be thought of as a swept sphere, where a sphere is moved along a line segment.
+ *
+ * Capsules are often used as bounding volumes (next to AABBs and bounding spheres).
+ *
+ * @three_import import { Capsule } from 'three/addons/math/Capsule.js';
+ */
+class Capsule {
+
+	/**
+	 * Constructs a new capsule.
+	 *
+	 * @param {Vector3} [start] - The start vector.
+	 * @param {Vector3} [end] - The end vector.
+	 * @param {number} [radius=1] - The capsule's radius.
+	 */
+	constructor( start = new Vector3( 0, 0, 0 ), end = new Vector3( 0, 1, 0 ), radius = 1 ) {
+
+		/**
+		 * The start vector.
+		 *
+		 * @type {Vector3}
+		 */
+		this.start = start;
+
+		/**
+		 * The end vector.
+		 *
+		 * @type {Vector3}
+		 */
+		this.end = end;
+
+		/**
+		 * The capsule's radius.
+		 *
+		 * @type {number}
+		 * @default 1
+		 */
+		this.radius = radius;
+
+	}
+
+	/**
+	 * Returns a new capsule with copied values from this instance.
+	 *
+	 * @return {Capsule} A clone of this instance.
+	 */
+	clone() {
+
+		return new this.constructor().copy( this );
+
+	}
+
+	/**
+	 * Sets the capsule components to the given values.
+	 * Please note that this method only copies the values from the given objects.
+	 *
+	 * @param {Vector3} start - The start vector.
+	 * @param {Vector3} end - The end vector
+	 * @param {number} radius - The capsule's radius.
+	 * @return {Capsule} A reference to this capsule.
+	 */
+	set( start, end, radius ) {
+
+		this.start.copy( start );
+		this.end.copy( end );
+		this.radius = radius;
+
+		return this;
+
+	}
+
+	/**
+	 * Copies the values of the given capsule to this instance.
+	 *
+	 * @param {Capsule} capsule - The capsule to copy.
+	 * @return {Capsule} A reference to this capsule.
+	 */
+	copy( capsule ) {
+
+		this.start.copy( capsule.start );
+		this.end.copy( capsule.end );
+		this.radius = capsule.radius;
+
+		return this;
+
+	}
+
+	/**
+	 * Returns the center point of this capsule.
+	 *
+	 * @param {Vector3} target - The target vector that is used to store the method's result.
+	 * @return {Vector3} The center point.
+	 */
+	getCenter( target ) {
+
+		return target.copy( this.end ).add( this.start ).multiplyScalar( 0.5 );
+
+	}
+
+	/**
+	 * Adds the given offset to this capsule, effectively moving it in 3D space.
+	 *
+	 * @param {Vector3} v - The offset that should be used to translate the capsule.
+	 * @return {Capsule} A reference to this capsule.
+	 */
+	translate( v ) {
+
+		this.start.add( v );
+		this.end.add( v );
+
+		return this;
+
+	}
+
+	/**
+	 * Returns `true` if the given bounding box intersects with this capsule.
+	 *
+	 * @param {Box3} box - The bounding box to test.
+	 * @return {boolean} Whether the given bounding box intersects with this capsule.
+	 */
+	intersectsBox( box ) {
+
+		return (
+			checkAABBAxis(
+				this.start.x, this.start.y, this.end.x, this.end.y,
+				box.min.x, box.max.x, box.min.y, box.max.y,
+				this.radius ) &&
+			checkAABBAxis(
+				this.start.x, this.start.z, this.end.x, this.end.z,
+				box.min.x, box.max.x, box.min.z, box.max.z,
+				this.radius ) &&
+			checkAABBAxis(
+				this.start.y, this.start.z, this.end.y, this.end.z,
+				box.min.y, box.max.y, box.min.z, box.max.z,
+				this.radius )
+		);
+
+	}
+
+}
+
+function checkAABBAxis( p1x, p1y, p2x, p2y, minx, maxx, miny, maxy, radius ) {
+
+	return (
+		( minx - p1x < radius || minx - p2x < radius ) &&
+		( p1x - maxx < radius || p2x - maxx < radius ) &&
+		( miny - p1y < radius || miny - p2y < radius ) &&
+		( p1y - maxy < radius || p2y - maxy < radius )
+	);
+
 }
 
 let EventDispatcher$1 = class EventDispatcher {
@@ -540,89 +694,203 @@ class Intersection {
     }
 }
 
+const EPSILON$2 = 1e-10;
+const ab = new Vector3();
+const ac = new Vector3();
+const bc = new Vector3();
+const ap = new Vector3();
+const bp = new Vector3();
+const cp = new Vector3();
+const closestPoint = new Vector3();
+const diff = new Vector3();
+// Sphere vs Triangle
+// 三角形上で、球の中心に最も近い点 (closestPoint) を求める。
+// その点と中心の距離が半径以下なら交差。
+//   out.point  : 三角形上の最近点
+//   out.normal : 押し出し方向（最近点 → 中心 の単位ベクトル。フェイス内接触ならフェイス法線と一致）
+//   out.depth  : 貫通量（正の値）= 半径 - 距離
+// フェイス内・辺・頂点のどの領域で接触しても正しい法線・貫通量を返す。
+//
+// based on "Real-Time Collision Detection" (Christer Ericson) 5.1.5
+function intersectsSphereTriangle(sphere, a, b, c, normal, out) {
+    const p = sphere.center;
+    // 三角形 (a, b, c) 上で p に最も近い点 closestPoint を求める
+    ab.subVectors(b, a);
+    ac.subVectors(c, a);
+    ap.subVectors(p, a);
+    const d1 = ab.dot(ap);
+    const d2 = ac.dot(ap);
+    if (d1 <= 0 && d2 <= 0) {
+        // 頂点 a の領域
+        closestPoint.copy(a);
+    }
+    else {
+        bp.subVectors(p, b);
+        const d3 = ab.dot(bp);
+        const d4 = ac.dot(bp);
+        cp.subVectors(p, c);
+        const d5 = ab.dot(cp);
+        const d6 = ac.dot(cp);
+        const vc = d1 * d4 - d3 * d2;
+        const vb = d5 * d2 - d1 * d6;
+        const va = d3 * d6 - d5 * d4;
+        if (d3 >= 0 && d4 <= d3) {
+            // 頂点 b の領域
+            closestPoint.copy(b);
+        }
+        else if (d6 >= 0 && d5 <= d6) {
+            // 頂点 c の領域
+            closestPoint.copy(c);
+        }
+        else if (vc <= 0 && d1 >= 0 && d3 <= 0) {
+            // 辺 ab の領域
+            const v = d1 / (d1 - d3);
+            closestPoint.copy(a).addScaledVector(ab, v);
+        }
+        else if (vb <= 0 && d2 >= 0 && d6 <= 0) {
+            // 辺 ac の領域
+            const w = d2 / (d2 - d6);
+            closestPoint.copy(a).addScaledVector(ac, w);
+        }
+        else if (va <= 0 && (d4 - d3) >= 0 && (d5 - d6) >= 0) {
+            // 辺 bc の領域
+            const w = (d4 - d3) / ((d4 - d3) + (d5 - d6));
+            bc.subVectors(c, b);
+            closestPoint.copy(b).addScaledVector(bc, w);
+        }
+        else {
+            // フェイス内部の領域
+            const denom = 1 / (va + vb + vc);
+            const v = vb * denom;
+            const w = vc * denom;
+            closestPoint.copy(a).addScaledVector(ab, v).addScaledVector(ac, w);
+        }
+    }
+    diff.subVectors(p, closestPoint);
+    const distanceSquared = diff.lengthSq();
+    if (distanceSquared > sphere.radius * sphere.radius) {
+        return false;
+    }
+    const distance = Math.sqrt(distanceSquared);
+    // 中心が三角形上にほぼ乗っている場合は方向が定まらないのでフェイス法線を使う
+    if (distance <= EPSILON$2) {
+        out.set(closestPoint, normal, sphere.radius);
+        return true;
+    }
+    out.set(closestPoint, diff.divideScalar(distance), // 最近点 → 中心 の単位ベクトル
+    sphere.radius - distance);
+    return true;
+}
+
+const EPSILON$1 = 1e-10;
+const vec3$1 = new Vector3();
 const vec3_0 = new Vector3();
 const vec3_1 = new Vector3();
-const A = new Vector3();
-const B = new Vector3();
-const C = new Vector3();
-const V = new Vector3();
-const AB = new Vector3();
-const BC = new Vector3();
-const CA = new Vector3();
-const Q1 = new Vector3();
-const Q2 = new Vector3();
-const Q3 = new Vector3();
-const QC = new Vector3();
-const QA = new Vector3();
-const QB = new Vector3();
-const negatedNormal = new Vector3();
-// Sphere vs Triangle
-// 1. Triangle から Plane をつくる
-// 2. Sphere の中心から Plane の距離を求める
-// 3. 距離が Sphere の半径よりも大きければ、交差していないので return null
-// 4. Sphere の中心を通る、Plane からの垂線の、Plane 上の座標を求める
-// 5. その座標が Triangle の内側にあれば、交差している。return { position: 交差座標、 normal: triangle の法線、depth: 半径 - 距離 }
-// 6. 外側の場合、Triangle の3つの辺（セグメント）と、Sphere との最近距離を求める
-// 7. 最近距離が半径よりも大きければ、交差していないので return null
-// 8. 交差している場合、最も近い辺の、セグメント上の最近距離のを求める。return { position: 交差座標、 normal: 点と中心の方向ベクトル、depth: 半径 - 距離 }
-// 9. 例外は return null
+const sphere$1 = new Sphere();
+// based on https://github.com/mrdoob/three.js/blob/master/examples/jsm/math/Octree.js
 //
-// sphere: <THREE.Sphere>
-// a: <THREE.Vector3>, // vertex of a triangle
-// b: <THREE.Vector3>, // vertex of a triangle
-// c: <THREE.Vector3>, // vertex of a triangle
-// normal: <THREE.Vector3>, // normal of a triangle
-function intersectsSphereTriangle(sphere, a, b, c, normal, out) {
-    // http://realtimecollisiondetection.net/blog/?p=103
-    // vs plain of triangle face
-    A.subVectors(a, sphere.center);
-    B.subVectors(b, sphere.center);
-    C.subVectors(c, sphere.center);
-    const rr = sphere.radius * sphere.radius;
-    V.crossVectors(vec3_0.subVectors(B, A), vec3_1.subVectors(C, A));
-    const d = A.dot(V);
-    const e = V.dot(V);
-    if (d * d > rr * e) {
+// https://wickedengine.net/2020/04/26/capsule-collision-detection/
+// we select the closest point on the capsule line to the triangle,
+// place a sphere on that point and then perform the sphere – triangle test.
+// also
+// 5.1.10
+const _v1 = new Vector3();
+const _plane = new Plane();
+const _line1 = new Line3();
+const _line2 = new Line3();
+const point1 = new Vector3();
+const point2 = new Vector3();
+function intersectsCapsuleTriangle(capsule, triangle, out) {
+    // 線分長が 0 の退化カプセルは球として扱う（start === end のときの NaN を回避）
+    if (capsule.start.distanceToSquared(capsule.end) <= EPSILON$1) {
+        sphere$1.center.copy(capsule.start);
+        sphere$1.radius = capsule.radius;
+        return intersectsSphereTriangle(sphere$1, triangle.a, triangle.b, triangle.c, triangle.normal, out);
+    }
+    // based on three.js examples/jsm/math/Octree.js triangleCapsuleIntersect
+    // 中心線の両端のフェイス平面からの符号付き距離（半径ぶん差し引く）
+    triangle.getPlane(_plane);
+    const d1 = _plane.distanceToPoint(capsule.start) - capsule.radius;
+    const d2 = _plane.distanceToPoint(capsule.end) - capsule.radius;
+    if (
+    // 両端ともフェイスの表側（+法線側）で半径より遠い → 接触なし
+    (d1 > 0 && d2 > 0) ||
+        // 両端とも裏側（-法線側）を半径以上通り過ぎている → 接触なし
+        // （床面と同じ高さの下向き面などで、上に居るキャラを真下へ押し出す誤検出を防ぐ）
+        (d1 < -capsule.radius && d2 < -capsule.radius)) {
         return false;
     }
-    // vs triangle vertex
-    const aa = A.dot(A);
-    const ab = A.dot(B);
-    const ac = A.dot(C);
-    const bb = B.dot(B);
-    const bc = B.dot(C);
-    const cc = C.dot(C);
-    if ((aa > rr) && (ab > aa) && (ac > aa) ||
-        (bb > rr) && (ab > bb) && (bc > bb) ||
-        (cc > rr) && (ac > cc) && (bc > cc)) {
-        return false;
+    // フェイス内部との接触:
+    // 中心線上でフェイス平面に最も近づく点がフェイスの内側にあれば、面で接している。
+    // （縦カプセル vs 縦壁のように中心線が面と平行でも正しく検出できる）
+    const delta = Math.abs(d1 / (Math.abs(d1) + Math.abs(d2)));
+    const intersectPoint = _v1.copy(capsule.start).lerp(capsule.end, delta);
+    if (triangle.containsPoint(intersectPoint)) {
+        out.set(intersectPoint, _plane.normal, // 押し出し方向 = フェイス法線
+        Math.abs(Math.min(d1, d2)));
+        return true;
     }
-    // vs edge
-    AB.subVectors(B, A);
-    BC.subVectors(C, B);
-    CA.subVectors(A, C);
-    const d1 = ab - aa;
-    const d2 = bc - bb;
-    const d3 = ac - cc;
-    const e1 = AB.dot(AB);
-    const e2 = BC.dot(BC);
-    const e3 = CA.dot(CA);
-    Q1.subVectors(A.multiplyScalar(e1), AB.multiplyScalar(d1));
-    Q2.subVectors(B.multiplyScalar(e2), BC.multiplyScalar(d2));
-    Q3.subVectors(C.multiplyScalar(e3), CA.multiplyScalar(d3));
-    QC.subVectors(C.multiplyScalar(e1), Q1);
-    QA.subVectors(A.multiplyScalar(e2), Q2);
-    QB.subVectors(B.multiplyScalar(e3), Q3);
-    if ((Q1.dot(Q1) > rr * e1 * e1) && (Q1.dot(QC) >= 0) ||
-        (Q2.dot(Q2) > rr * e2 * e2) && (Q2.dot(QA) >= 0) ||
-        (Q3.dot(Q3) > rr * e3 * e3) && (Q3.dot(QB) >= 0)) {
-        return false;
+    // 辺との接触: 中心線と三角形の各辺の最近点間距離が半径以下なら、辺で接している。
+    // もっとも深い（距離が最小の）辺を採用する。
+    const radiusSquared = capsule.radius * capsule.radius;
+    _line1.set(capsule.start, capsule.end);
+    const edges = [
+        [triangle.a, triangle.b],
+        [triangle.b, triangle.c],
+        [triangle.c, triangle.a],
+    ];
+    let found = false;
+    let minDistanceSquared = Infinity;
+    for (let i = 0; i < edges.length; i++) {
+        _line2.set(edges[i][0], edges[i][1]);
+        nearestPointsOnLineSegments(_line1.start, _line1.end, _line2.start, _line2.end, point1, point2);
+        const distanceSquared = point1.distanceToSquared(point2);
+        if (distanceSquared < radiusSquared && distanceSquared < minDistanceSquared) {
+            minDistanceSquared = distanceSquared;
+            const distance = Math.sqrt(distanceSquared);
+            out.set(point1, _v1.subVectors(point1, point2).divideScalar(distance || 1), // 辺 → 中心線 の単位ベクトル
+            capsule.radius - distance);
+            found = true;
+        }
     }
-    const distance = Math.sqrt(d * d / e) - sphere.radius - 1;
-    negatedNormal.set(-normal.x, -normal.y, -normal.z);
-    const contactPoint = sphere.center.clone().add(negatedNormal.multiplyScalar(distance));
-    out.set(contactPoint, normal, distance);
-    return true;
+    return found;
+}
+// https://stackoverflow.com/a/67102941/1512272
+function nearestPointsOnLineSegments(a0, a1, b0, b1, out0, out1) {
+    const r = vec3$1.subVectors(b0, a0);
+    const u = vec3_0.subVectors(a1, a0);
+    const v = vec3_1.subVectors(b1, b0);
+    const ru = r.dot(u);
+    const rv = r.dot(v);
+    const uu = u.dot(u);
+    const uv = u.dot(v);
+    const vv = v.dot(v);
+    const det = uu * vv - uv * uv;
+    let s, t;
+    if (det < EPSILON$1 * uu * vv) {
+        s = MathUtils.clamp(ru / uu, 0, 1);
+        t = 0;
+    }
+    else {
+        s = MathUtils.clamp((ru * vv - rv * uv) / det, 0, 1);
+        t = MathUtils.clamp((ru * uv - rv * uu) / det, 0, 1);
+    }
+    const S = MathUtils.clamp((t * uv + ru) / uu, 0, 1);
+    const T = MathUtils.clamp((s * uv - rv) / vv, 0, 1);
+    const A = out0.addVectors(a0, u.multiplyScalar(S));
+    const B = out1.addVectors(b0, v.multiplyScalar(T));
+    return [A, B];
+}
+
+const vec3 = new Vector3();
+const line = new Line3();
+// https://arrowinmyknee.com/2021/03/15/some-math-about-capsule-collision/
+function intersectsCapsuleSphere(capsule, sphere) {
+    line.start.copy(capsule.start);
+    line.end.copy(capsule.end);
+    line.closestPointToPoint(sphere.center, true, vec3);
+    const r = capsule.radius + sphere.radius;
+    return vec3.distanceToSquared(sphere.center) <= r * r;
 }
 
 const FALL_VELOCITY = -20;
@@ -640,11 +908,10 @@ const groundContactPoint = new Vector3();
 // const direction = new Vector3();
 // const translateScoped = new Vector3();
 const translate = new Vector3();
-const sphereCenter = new Vector3();
-const sphere$1 = new Sphere();
+const capsule = new Capsule(new Vector3(), new Vector3(), 0);
 const intersection = new Intersection();
 class CharacterController extends EventDispatcher$1 {
-    constructor(object3d, radius) {
+    constructor(object3d, radius, height) {
         super();
         this.isCharacterController = true;
         this.position = new Vector3();
@@ -666,6 +933,8 @@ class CharacterController extends EventDispatcher$1 {
         this.contactInfo = [];
         this.object = object3d;
         this.radius = radius;
+        // カプセルの全高（先端から先端まで）。幾何学的に最小でも球の直径（2 * radius）
+        this.height = Math.max(height, radius * 2);
         this.position.set(0, 0, 0);
         let isFirstUpdate = true;
         let wasGrounded = false;
@@ -808,7 +1077,7 @@ class CharacterController extends EventDispatcher$1 {
         //    | segment (player's head to almost -infinity)
         let groundContact = null;
         const triangles = this.nearTriangles;
-        groundingHead.set(this.position.x, this.position.y + this.radius * 2, this.position.z);
+        groundingHead.set(this.position.x, this.position.y + this.height, this.position.z);
         groundingTo.set(this.position.x, this.position.y - 1e1, this.position.z);
         for (let i = 0, l = triangles.length; i < l; i++) {
             const triangle = triangles[i];
@@ -861,8 +1130,12 @@ class CharacterController extends EventDispatcher$1 {
         this.position.set(this.position.x + this.velocity.x * deltaTime, this.isGrounded ? this.groundHeight : this.position.y + this.velocity.y * deltaTime, this.position.z + this.velocity.z * deltaTime);
     }
     _collisionDetection() {
-        sphereCenter.set(0, this.radius, 0).add(this.position);
-        sphere$1.set(sphereCenter, this.radius);
+        // プレイヤーのカプセルを現在の position から作る
+        // start: 下半球の中心、end: 上半球の中心
+        const segment = this.height - this.radius * 2;
+        capsule.start.set(this.position.x, this.position.y + this.radius, this.position.z);
+        capsule.end.set(this.position.x, this.position.y + this.radius + segment, this.position.z);
+        capsule.radius = this.radius;
         // 交差していそうなフェイス (nearTriangles) のリストから、
         // 実際に交差している壁フェイスを抜き出して
         // this.contactInfo に追加する
@@ -872,13 +1145,14 @@ class CharacterController extends EventDispatcher$1 {
             const triangle = triangles[i];
             if (!triangle.boundingSphere)
                 triangle.computeBoundingSphere();
-            if (!sphere$1.intersectsSphere(triangle.boundingSphere))
+            if (!intersectsCapsuleSphere(capsule, triangle.boundingSphere))
                 continue;
-            const isIntersected = intersectsSphereTriangle(sphere$1, triangle.a, triangle.b, triangle.c, triangle.normal, intersection);
+            const isIntersected = intersectsCapsuleTriangle(capsule, triangle, intersection);
             if (!isIntersected)
                 continue;
             this.contactInfo.push({
                 point: intersection.point.clone(),
+                normal: intersection.normal.clone(),
                 depth: intersection.depth,
                 triangle,
             });
@@ -888,9 +1162,6 @@ class CharacterController extends EventDispatcher$1 {
         // updatePosition() で position を動かした後
         // 壁と衝突し食い込んでいる場合、
         // ここで壁の外への押し出しをする
-        // let triangle;
-        let normal;
-        // let distance;
         if (this.contactInfo.length === 0) {
             // 何とも衝突していない
             // position の値をそのままつかって終了
@@ -898,18 +1169,13 @@ class CharacterController extends EventDispatcher$1 {
             this.object.rotation.y = this.direction + Math.PI;
             return;
         }
-        //
         // vs walls and sliding on the wall
+        // 壁に食い込んでいる分だけ、法線方向に押し出す（デペネトレーション）。
+        // これを毎ステップ行うことで、斜め・側面から高速で進入しても壁を貫通しない。
         translate.set(0, 0, 0);
         for (let i = 0, l = this.contactInfo.length; i < l; i++) {
-            // triangle = this.contactInfo[ i ].triangle;
-            normal = this.contactInfo[i].triangle.normal;
-            // distance = this.contactInfo[ i ].distance;
-            // if ( 0 <= distance ) {
-            //   // 交差点までの距離が 0 以上ならこのフェイスとは衝突していない
-            //   // 無視する
-            //   continue;
-            // }
+            const contact = this.contactInfo[i];
+            const normal = contact.triangle.normal;
             if (this.maxSlopeGradient < normal.y) {
                 // this triangle is a ground or slope, not a wall or ceil
                 // フェイスは急勾配でない坂、つまり地面。
@@ -924,25 +1190,19 @@ class CharacterController extends EventDispatcher$1 {
                 this.isGrounded = true;
                 // console.log( 'jump end' );
             }
-            // if ( this.isGrounded || this.isOnSlope ) {
-            //   // 地面の上にいる場合はy(縦)方向は同一のまま
-            //   // x, z (横) 方向だけを変更して押し出す
-            //   // http://gamedev.stackexchange.com/questions/80293/how-do-i-resolve-a-sphere-triangle-collision-in-a-given-direction
-            // 	sphereCenter.set( 0, this.radius, 0 ).add( this.position );
-            // 	point1.copy( normal ).multiplyScalar( - this.radius ).add( sphereCenter );
-            // 	direction.set( normal.x, 0, normal.z ).normalize();
-            // 	const plainD = triangle.a.dot( normal );
-            // 	const t = ( plainD - ( normal.x * point1.x + normal.y * point1.y + normal.z * point1.z ) ) / ( normal.x * direction.x + normal.y * direction.y + normal.z * direction.z );
-            // 	point2.copy( direction ).multiplyScalar( t ).add( point1 );
-            // 	translateScoped.subVectors( point2, point1 );
-            // 	if ( translate.lengthSq() < translateScoped.lengthSq() ) {
-            // 		translate.copy( translateScoped );
-            // 	}
-            // 	// break;
-            // 	continue;
-            // }
+            // 壁・天井: 貫通量 (contact.depth) を「最近点 → 中心」の接触法線方向へ押し出す。
+            // フェイス法線ではなく接触法線を使うことで、壁の辺・角に当たったときも
+            // 正しく壁の外側へ押し出される（フェイス法線だと角で横方向に弾かれ貫通する）。
+            // すでに translate で押し出した分を差し引き、二重押し出しを避ける。
+            const pushNormal = contact.normal;
+            const remaining = contact.depth - translate.dot(pushNormal);
+            if (0 < remaining)
+                translate.addScaledVector(pushNormal, remaining);
         }
         this.position.add(translate);
+        // 安全策: 接地しているなら、壁の押し出しによって地面より下へ沈み込ませない（床抜け防止）
+        if (this.isGrounded && this.position.y < this.groundHeight)
+            this.position.y = this.groundHeight;
         this.object.position.copy(this.position);
         this.object.rotation.y = this.direction + Math.PI;
     }
@@ -1010,8 +1270,9 @@ class World {
             // character に渡して判定する
             for (let ii = 0, ll = this.colliderPool.length; ii < ll; ii++) {
                 const octree = this.colliderPool[ii];
-                sphere.center.set(0, character.radius, 0).add(character.position);
-                sphere.radius = character.radius + character.groundCheckDepth;
+                // キャラクターのカプセル全体を囲む sphere で broad-phase
+                sphere.center.set(0, character.height / 2, 0).add(character.position);
+                sphere.radius = character.height / 2 + character.groundCheckDepth;
                 triangles.push(...octree.getSphereTriangles(sphere, []));
             }
             character.setNearTriangles(triangles);
