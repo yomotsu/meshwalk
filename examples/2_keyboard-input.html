@@ -105,10 +105,13 @@ keyInputControl.addEventListener( 'movekeyoff',    () => playerController.move( 
 keyInputControl.addEventListener( 'jumpkeypress',  () => playerController.jump() );
 
 
+const clock = new THREE.Clock();
+
 ( function update () {
 
 	requestAnimationFrame( update );
-	world.fixedUpdate();
+	const delta = clock.getDelta();
+	world.update( delta );
 	// 物理(Body)からメッシュへ transform を同期する
 	playerObjectHolder.position.copy( playerController.position );
 	playerObjectHolder.quaternion.copy( playerController.quaternion );

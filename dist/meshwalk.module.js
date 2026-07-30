@@ -1318,10 +1318,14 @@ class CharacterController extends Body {
 }
 
 const sphere = new Sphere();
+// 巨大な deltaTime（タブ復帰・ブレークポイント復帰など）で追いつき処理が暴走
+// （spiral of death）しないよう、1回の update で進める固定ステップ数の上限。
+const MAX_CATCH_UP_FRAMES = 5;
 class World {
     constructor({ fps = 60, stepsPerFrame = 4 } = {}) {
         this._staticBodies = [];
         this._characterControllers = [];
+        this._accumulatedTime = 0;
         this._fps = fps;
         this._stepsPerFrame = stepsPerFrame;
     }
@@ -1351,6 +1355,21 @@ class World {
             const index = this._characterControllers.indexOf(body);
             if (index !== -1)
                 this._characterControllers.splice(index, 1);
+        }
+    }
+    /**
+     * 可変フレーム時間 deltaTime（秒）を受け取り、内部の固定ステップ（1/fps）へ
+     * 分解して実行する。物理はフレームレートに依存せず一定速度で進む。
+     * 毎フレーム `clock.getDelta()` などの実 delta を渡す。
+     * 決定論的にちょうど1フレーム進めたい場合（テスト等）は `fixedUpdate()` を直接使う。
+     */
+    update(deltaTime) {
+        const frameTime = 1 / this._fps;
+        // 巨大な delta が来ても追いつき過多にならないよう上限でクランプする
+        this._accumulatedTime += Math.min(deltaTime, frameTime * MAX_CATCH_UP_FRAMES);
+        while (this._accumulatedTime >= frameTime) {
+            this.fixedUpdate();
+            this._accumulatedTime -= frameTime;
         }
     }
     fixedUpdate() {

@@ -313,4 +313,53 @@ describe( 'CharacterController capsule collision', () => {
 
 	} );
 
+	// ---- Phase 4 ゴールデン（固定ステップ・アキュムレータ world.update(dt)）----
+
+	it( '[golden] update(1/60) を N 回は fixedUpdate() を N 回と同一軌跡', () => {
+
+		const a = makeScene();
+		const b = makeScene();
+		a.player.teleport( 10, 8, 10 ); a.player.velocity.set( 0, 0, 0 );
+		b.player.teleport( 10, 8, 10 ); b.player.velocity.set( 0, 0, 0 );
+
+		for ( let i = 0; i < 150; i ++ ) { a.player.move( STOP ); a.world.fixedUpdate(); }
+		for ( let i = 0; i < 150; i ++ ) { b.player.move( STOP ); b.world.update( 1 / 60 ); }
+
+		// 60fps ちょうどでは 1 呼び出し = 1 fixedUpdate なので完全一致する
+		expect( b.player.position.y ).toBeCloseTo( a.player.position.y, 6 );
+		expect( b.player.position.x ).toBeCloseTo( a.player.position.x, 6 );
+
+	} );
+
+	it( '[golden] 端数 delta は蓄積され、固定ステップ(1/60)到達時のみ進む', () => {
+
+		const { world, player } = makeScene();
+		player.teleport( 10, 8, 10 ); // 空中
+		player.velocity.set( 0, 0, 0 );
+
+		// 1/120 は閾値 1/60 未満 → まだ 1 ステップも実行されず位置は不変
+		player.move( STOP ); world.update( 1 / 120 );
+		expect( player.position.y, '閾値未満で進んでしまった' ).toBe( 8 );
+
+		// もう 1/120 で合計 1/60 到達 → 1 ステップ実行され落下開始
+		player.move( STOP ); world.update( 1 / 120 );
+		expect( player.position.y, '閾値到達で進んでいない' ).toBeLessThan( 8 );
+
+	} );
+
+	it( '[golden] 巨大 delta は追いつき上限(5フレーム)で打ち切る', () => {
+
+		const a = makeScene();
+		const b = makeScene();
+		a.player.teleport( 10, 50, 10 ); a.player.velocity.set( 0, 0, 0 );
+		b.player.teleport( 10, 50, 10 ); b.player.velocity.set( 0, 0, 0 );
+
+		// a: fixedUpdate 5回 / b: update(100) 1回（上限5フレームに丸められる）
+		for ( let i = 0; i < 5; i ++ ) { a.player.move( STOP ); a.world.fixedUpdate(); }
+		b.player.move( STOP ); b.world.update( 100 );
+
+		expect( b.player.position.y, '上限を超えて（または未満で）進んだ' ).toBeCloseTo( a.player.position.y, 6 );
+
+	} );
+
 } );

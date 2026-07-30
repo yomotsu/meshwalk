@@ -135,7 +135,7 @@ animationController.play( 'slide'  );
 	const delta = clock.getDelta();
 
 	requestAnimationFrame( update );
-	world.fixedUpdate();
+	world.update( delta );
 	// 物理(Body)からメッシュへ transform を同期する
 	playerObjectHolder.position.copy( playerController.position );
 	playerObjectHolder.quaternion.copy( playerController.quaternion );
