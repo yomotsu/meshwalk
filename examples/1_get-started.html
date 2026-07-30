@@ -73,7 +73,7 @@ capsule.position.y = playerHeight / 2;
 playerObjectHolder.add( capsule );
 
 // to apply fake gravity and to be controllable object
-const playerController = new MW.CharacterBody( playerObjectHolder, playerRadius, playerHeight );
+const playerController = new MW.CharacterBody( playerRadius, playerHeight );
 playerController.teleport( 0, 10, 0 );
 world.add( playerController );
 
@@ -82,6 +82,9 @@ world.add( playerController );
 
 	requestAnimationFrame( update );
 	world.fixedUpdate();
+	// 物理(Body)からメッシュへ transform を同期する
+	playerObjectHolder.position.copy( playerController.position );
+	playerObjectHolder.quaternion.copy( playerController.quaternion );
 	renderer.render( scene, camera );
 
 } )();

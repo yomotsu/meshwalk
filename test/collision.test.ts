@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest';
 import {
-	Object3D,
 	Mesh,
 	Vector3,
 	PlaneGeometry,
@@ -39,7 +38,7 @@ function makeScene( { boxSize = [ 5, 5, 10 ] as [ number, number, number ] } = {
 	level.addFromObject( box );
 	world.add( level );
 
-	const player = new CharacterBody( new Object3D(), PLAYER_RADIUS, PLAYER_HEIGHT );
+	const player = new CharacterBody( PLAYER_RADIUS, PLAYER_HEIGHT );
 	world.add( player );
 
 	// 箱の水平フットプリント（中心がこの内側に入る = 箱にめり込み）
@@ -257,7 +256,7 @@ describe( 'CharacterController capsule collision', () => {
 		level.addFromObject( ramp );
 		world.add( level );
 
-		const player = new CharacterBody( new Object3D(), PLAYER_RADIUS, PLAYER_HEIGHT );
+		const player = new CharacterBody( PLAYER_RADIUS, PLAYER_HEIGHT );
 		world.add( player );
 		player.teleport( 0, 3, 0 );
 		player.velocity.set( 0, 0, 0 );

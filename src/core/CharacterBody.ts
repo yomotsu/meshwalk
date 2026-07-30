@@ -1,6 +1,5 @@
-import { MathUtils, Vector2, Vector3 } from 'three';
+import { MathUtils, Quaternion, Vector2, Vector3 } from 'three';
 import { Capsule } from 'three/examples/jsm/math/Capsule.js';
-import { type Object3D } from 'three';
 import { Body } from './Body';
 import { Intersection } from '../math/Intersection';
 import { intersectsLineTriangle } from '../math/intersectsLineTriangle';
@@ -24,6 +23,7 @@ const groundContactPoint = new Vector3();
 // const direction = new Vector3();
 // const translateScoped = new Vector3();
 const translate = new Vector3();
+const _yAxis = new Vector3( 0, 1, 0 );
 const capsule = new Capsule( new Vector3(), new Vector3(), 0 );
 
 const intersection = new Intersection();
@@ -31,10 +31,10 @@ const intersection = new Intersection();
 export class CharacterBody extends Body {
 
 	isCharacterBody = true;
-	object: Object3D;
 	radius: number;
 	height: number;
 	position = new Vector3();
+	quaternion = new Quaternion(); // 向き（利用側がメッシュへ同期する）
 	groundCheckDepth = .2;
 	slopeLimit = 50; // 度。これより急な面は登れず滑り落ちる（Unity の slopeLimit 相当）
 	isGrounded = false;
@@ -65,11 +65,10 @@ export class CharacterBody extends Body {
 
 	}
 
-	constructor( object3d: Object3D, radius: number, height: number ) {
+	constructor( radius: number, height: number ) {
 
 		super();
 
-		this.object = object3d;
 		this.radius = radius;
 		// カプセルの全高（先端から先端まで）。幾何学的に最小でも球の直径（2 * radius）
 		this.height = Math.max( height, radius * 2 );
@@ -446,10 +445,8 @@ export class CharacterBody extends Body {
 
 		if ( this.contactInfo.length === 0 ) {
 
-			// 何とも衝突していない
-			// position の値をそのままつかって終了
-			this.object.position.copy( this.position );
-			this.object.rotation.y = this._facingAngle + Math.PI;
+			// 何とも衝突していない。position はそのまま、向きだけ更新して終了
+			this._updateQuaternion();
 			return;
 
 		}
@@ -499,8 +496,15 @@ export class CharacterBody extends Body {
 		// 安全策: 接地しているなら、壁の押し出しによって地面より下へ沈み込ませない（床抜け防止）
 		if ( this.isGrounded && this.position.y < this.groundHeight ) this.position.y = this.groundHeight;
 
-		this.object.position.copy( this.position );
-		this.object.rotation.y = this._facingAngle + Math.PI;
+		this._updateQuaternion();
+
+	}
+
+	// 向き（facingAngle）を quaternion へ反映する。position と合わせて利用側がメッシュに同期する。
+	// 旧実装の object.rotation.y = facingAngle + π と等価。
+	private _updateQuaternion() {
+
+		this.quaternion.setFromAxisAngle( _yAxis, this._facingAngle + Math.PI );
 
 	}
 
@@ -529,7 +533,6 @@ export class CharacterBody extends Body {
 	teleport( x: number, y: number, z: number ) {
 
 		this.position.set( x, y, z );
-		this.object.position.copy( this.position );
 
 	}
 

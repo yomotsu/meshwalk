@@ -4,7 +4,7 @@
  * (c) 2017 @yomotsu
  * Released under the MIT License.
  */
-import { Vector3, Box3, Triangle, Sphere, Mesh, Plane, Line3, MathUtils, Vector2, AnimationMixer, Raycaster, Spherical, Matrix4, Quaternion, Vector4, Ray, Object3D } from 'three';
+import { Vector3, Box3, Triangle, Sphere, Mesh, Plane, Line3, MathUtils, Vector2, Quaternion, AnimationMixer, Raycaster, Spherical, Matrix4, Vector4, Ray, Object3D } from 'three';
 
 let EventDispatcher$1 = class EventDispatcher {
     constructor() {
@@ -973,16 +973,18 @@ const groundContactPoint = new Vector3();
 // const direction = new Vector3();
 // const translateScoped = new Vector3();
 const translate = new Vector3();
+const _yAxis = new Vector3(0, 1, 0);
 const capsule = new Capsule(new Vector3(), new Vector3(), 0);
 const intersection = new Intersection();
 class CharacterBody extends Body {
     get _slopeLimitCos() {
         return Math.cos(this.slopeLimit * MathUtils.DEG2RAD);
     }
-    constructor(object3d, radius, height) {
+    constructor(radius, height) {
         super();
         this.isCharacterBody = true;
         this.position = new Vector3();
+        this.quaternion = new Quaternion(); // 向き（利用側がメッシュへ同期する）
         this.groundCheckDepth = .2;
         this.slopeLimit = 50; // 度。これより急な面は登れず滑り落ちる（Unity の slopeLimit 相当）
         this.isGrounded = false;
@@ -999,7 +1001,6 @@ class CharacterBody extends Body {
         this._moveVelocity = new Vector3(); // move() で設定する望む水平速度
         this._facingAngle = 0; // 向き（移動方向から算出）
         this._jumpElapsed = 0; // ジャンプ開始からの経過（秒）。deltaTime を積算
-        this.object = object3d;
         this.radius = radius;
         // カプセルの全高（先端から先端まで）。幾何学的に最小でも球の直径（2 * radius）
         this.height = Math.max(height, radius * 2);
@@ -1241,10 +1242,8 @@ class CharacterBody extends Body {
         // 壁と衝突し食い込んでいる場合、
         // ここで壁の外への押し出しをする
         if (this.contactInfo.length === 0) {
-            // 何とも衝突していない
-            // position の値をそのままつかって終了
-            this.object.position.copy(this.position);
-            this.object.rotation.y = this._facingAngle + Math.PI;
+            // 何とも衝突していない。position はそのまま、向きだけ更新して終了
+            this._updateQuaternion();
             return;
         }
         // vs walls and sliding on the wall
@@ -1281,8 +1280,12 @@ class CharacterBody extends Body {
         // 安全策: 接地しているなら、壁の押し出しによって地面より下へ沈み込ませない（床抜け防止）
         if (this.isGrounded && this.position.y < this.groundHeight)
             this.position.y = this.groundHeight;
-        this.object.position.copy(this.position);
-        this.object.rotation.y = this._facingAngle + Math.PI;
+        this._updateQuaternion();
+    }
+    // 向き（facingAngle）を quaternion へ反映する。position と合わせて利用側がメッシュに同期する。
+    // 旧実装の object.rotation.y = facingAngle + π と等価。
+    _updateQuaternion() {
+        this.quaternion.setFromAxisAngle(_yAxis, this._facingAngle + Math.PI);
     }
     jump() {
         if (this.isJumping || !this.isGrounded || this.isOnSlope)
@@ -1302,7 +1305,6 @@ class CharacterBody extends Body {
     }
     teleport(x, y, z) {
         this.position.set(x, y, z);
-        this.object.position.copy(this.position);
     }
 }
 

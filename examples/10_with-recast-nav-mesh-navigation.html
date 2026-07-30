@@ -72,7 +72,7 @@ const playerHeight = 2;
 // capsule.position.y = playerHeight / 2;
 // playerObjectHolder.add( capsule );
 
-const playerController = new MW.CharacterBody( playerObjectHolder, playerRadius, playerHeight );
+const playerController = new MW.CharacterBody( playerRadius, playerHeight );
 playerController.teleport( 0, 10, 0 );
 world.add( playerController );
 
@@ -262,6 +262,9 @@ const navigateToBlue   = () => navigateTo( points[ 2 ].x, points[ 2 ].y, points[
 
 	requestAnimationFrame( update );
 	world.fixedUpdate();
+	// 物理(Body)からメッシュへ transform を同期する
+	playerObjectHolder.position.copy( playerController.position );
+	playerObjectHolder.quaternion.copy( playerController.quaternion );
 	tpsCameraControls.update( delta );
 	animationController.update( delta );
 

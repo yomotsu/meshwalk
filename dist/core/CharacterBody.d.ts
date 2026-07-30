@@ -1,13 +1,12 @@
-import { Vector3 } from 'three';
-import { type Object3D } from 'three';
+import { Quaternion, Vector3 } from 'three';
 import { Body } from './Body';
 import { type ComputedTriangle } from '../math/triangle';
 export declare class CharacterBody extends Body {
     isCharacterBody: boolean;
-    object: Object3D;
     radius: number;
     height: number;
     position: Vector3;
+    quaternion: Quaternion;
     groundCheckDepth: number;
     slopeLimit: number;
     isGrounded: boolean;
@@ -31,7 +30,7 @@ export declare class CharacterBody extends Body {
     private _jumpElapsed;
     private _events;
     private get _slopeLimitCos();
-    constructor(object3d: Object3D, radius: number, height: number);
+    constructor(radius: number, height: number);
     setNearTriangles(nearTriangles: ComputedTriangle[]): void;
     /**
      * 望む水平移動速度をワールド座標で指定する（Unity CharacterController.Move / Godot velocity 相当）。
@@ -45,6 +44,7 @@ export declare class CharacterBody extends Body {
     _updatePosition(deltaTime: number): void;
     _collisionDetection(): void;
     _solvePosition(): void;
+    private _updateQuaternion;
     jump(): void;
     _updateJumping(deltaTime: number): void;
     teleport(x: number, y: number, z: number): void;
