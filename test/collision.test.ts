@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import {
 	Object3D,
 	Mesh,
@@ -211,6 +211,116 @@ describe( 'CharacterController capsule collision', () => {
 			// 端から降りて床(y=0)に着地。床より下へ沈み込まない。
 			expect( minY, `x=${x} で床抜け (minY=${minY.toFixed( 2 )})` ).toBeGreaterThan( - 0.5 );
 			expect( player.position.y ).toBeCloseTo( 0, 1 );
+
+		}
+
+	} );
+
+	// ---- Phase 0 ゴールデン（現行 W2 の安定挙動を数値で固定。以降の各フェーズはこれを維持する）----
+
+	it( '[golden] 壁に沿って摺りながら進む（引っかからず・貫通せず）', () => {
+
+		const { world, player, footprint } = makeScene();
+
+		// 箱の左面(x=-2.5)へ斜めに押し当てつつ +z へ滑らせる
+		player.teleport( - 6, 0, - 3 );
+		player.velocity.set( 0, 0, 0 );
+		for ( let i = 0; i < 20; i ++ ) { player.move( STOP ); world.fixedUpdate(); }
+
+		const startZ = player.position.z;
+		const into = new Vector3( 1, 0, 1 ).normalize().multiplyScalar( 10 ); // +x(壁へ) & +z(壁に沿う)
+		let tunneled = false;
+		for ( let i = 0; i < 120; i ++ ) {
+
+			player.move( into );
+			world.fixedUpdate();
+			if ( isInsideFootprint( player.position, footprint ) ) tunneled = true;
+
+		}
+
+		// 壁に沿って +z 方向へ確実に前進している（＝摺りが機能）
+		expect( player.position.z - startZ, '壁に沿って前進していない（引っかかり）' ).toBeGreaterThan( 5 );
+		// その間、箱に一度もめり込んでいない
+		expect( tunneled, '壁にめり込んだ' ).toBe( false );
+		// 地面に接地したまま
+		expect( player.isGrounded ).toBe( true );
+
+	} );
+
+	it( '[golden] 急な坂（60°）を終端速度で滑り下り、表面から離れない', () => {
+
+		const world = new World();
+		const ramp = new Mesh( new PlaneGeometry( 200, 200 ), new MeshBasicMaterial() );
+		ramp.rotation.x = - 30 * MathUtils.DEG2RAD; // 60° 斜面。法線 ≈ (0, 0.5, 0.866)
+		ramp.updateMatrixWorld( true );
+		const level = new StaticBody();
+		level.addFromObject( ramp );
+		world.add( level );
+
+		const player = new CharacterBody( new Object3D(), PLAYER_RADIUS, PLAYER_HEIGHT );
+		world.add( player );
+		player.teleport( 0, 3, 0 );
+		player.velocity.set( 0, 0, 0 );
+
+		let maxFall = 0;
+		for ( let i = 0; i < 80; i ++ ) {
+
+			player.move( STOP );
+			world.fixedUpdate();
+			maxFall = Math.max( maxFall, - player.velocity.y );
+
+		}
+
+		// 下り方向(+z)へ滑り、しっかり下降している
+		expect( player.position.z, '滑り下りていない' ).toBeGreaterThan( 8 );
+		expect( player.position.y, '下降していない' ).toBeLessThan( - 15 );
+		// 表面上に留まっている（弾き出されていない）
+		const distToSurface = Math.abs( 0.5 * player.position.y + 0.866 * player.position.z );
+		expect( distToSurface, `表面から離れている (dist=${distToSurface.toFixed( 2 )})` ).toBeLessThan( 0.6 );
+		// 垂直速度が終端速度(20)で頭打ち＝発散しない（W2b で壊れた核心の性質を固定）
+		expect( maxFall, `終端速度を超えて発散 (maxFall=${maxFall.toFixed( 2 )})` ).toBeLessThanOrEqual( 20.1 );
+
+	} );
+
+	it( '[golden] jump() で上昇し、約1秒で頂点→着地して再接地する（現行の時間ベース弧）', () => {
+
+		// 現行 W2 のジャンプは performance.now ベースなので、フェイクタイマーで決定論化して弧を固定する。
+		// Phase 1 で時間源を deltaTime 積算へ置換した後も、この到達高さ・滞空・再接地を維持する。
+		const { world, player } = makeScene();
+		player.teleport( 10, 0, 10 );
+		player.velocity.set( 0, 0, 0 );
+		for ( let i = 0; i < 60; i ++ ) { player.move( STOP ); world.fixedUpdate(); }
+		expect( player.isGrounded ).toBe( true );
+		const restY = player.position.y;
+
+		vi.useFakeTimers();
+
+		try {
+
+			player.jump();
+			expect( player.isJumping ).toBe( true );
+
+			let maxY = restY;
+			// 90 フレーム（16ms/フレーム = 実効60fps）で約1.44秒進める
+			for ( let i = 0; i < 90; i ++ ) {
+
+				player.move( STOP );
+				world.fixedUpdate();
+				vi.advanceTimersByTime( 1000 / 60 );
+				if ( player.position.y > maxY ) maxY = player.position.y;
+
+			}
+
+			// 到達高さは現行実測(≈6.8)近傍（コサイン弧・FALL_VELOCITY=20・JUMP_DURATION=1s）
+			expect( maxY - restY, `到達高さが想定外 (rise=${( maxY - restY ).toFixed( 2 )})` ).toBeGreaterThan( 5 );
+			expect( maxY - restY ).toBeLessThan( 9 );
+			// 着地して再接地している
+			expect( player.position.y, '着地して地面に戻っていない' ).toBeCloseTo( restY, 1 );
+			expect( player.isGrounded, '再接地していない' ).toBe( true );
+
+		} finally {
+
+			vi.useRealTimers();
 
 		}
 
