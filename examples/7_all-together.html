@@ -59,11 +59,11 @@ const capsule = new THREE.Mesh(
 capsule.position.y = playerHeight / 2;
 playerObjectHolder.add( capsule );
 
-const playerController = new MW.CharacterBody( playerRadius, playerHeight );
+const playerController = new MW.CharacterController( playerRadius, playerHeight );
 playerController.teleport( 0, 10, 0 );
 world.add( playerController );
 
-const tpsCameraControls = new MW.TPSCameraControls(
+const tpsCameraControls = new MW.ThirdPersonCameraControls(
 	camera, // three.js camera
 	playerObjectHolder, // tracking object
 	world,
@@ -71,7 +71,7 @@ const tpsCameraControls = new MW.TPSCameraControls(
 );
 
 // bind events
-const keyInputControl = new MW.KeyInputControl();
+const keyInputControl = new MW.KeyboardControls();
 // キー入力 + カメラの向きから、望む水平移動速度ベクトルを作って move() に渡す
 const _moveDir = new THREE.Vector3();
 const applyMove = () => {
@@ -116,10 +116,10 @@ staticBody.addFromObject( terrain );
 playerObjectHolder.add( characterGltf.scene );
 
 const animationController = new MW.AnimationController( characterGltf.scene, characterGltf.animations );
-animationController.motion.jump.setLoop( THREE.LoopOnce, 0 );
-animationController.motion.slide.setLoop( THREE.LoopOnce, 0 );
-animationController.motion.jump.clampWhenFinished = true;
-animationController.motion.slide.clampWhenFinished = true;
+animationController.actions.jump.setLoop( THREE.LoopOnce, 0 );
+animationController.actions.slide.setLoop( THREE.LoopOnce, 0 );
+animationController.actions.jump.clampWhenFinished = true;
+animationController.actions.slide.clampWhenFinished = true;
 
 
 // player motion

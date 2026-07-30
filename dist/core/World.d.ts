@@ -2,7 +2,7 @@ import { Body } from './Body';
 import { StaticBody } from './StaticBody';
 export declare class World {
     private _staticBodies;
-    private _characterBodies;
+    private _characterControllers;
     private _fps;
     private _stepsPerFrame;
     constructor({ fps, stepsPerFrame }?: {

@@ -9,7 +9,7 @@ import {
 } from 'three';
 import { World } from '../src/core/World';
 import { StaticBody } from '../src/core/StaticBody';
-import { CharacterBody } from '../src/core/CharacterBody';
+import { CharacterController } from '../src/core/CharacterController';
 
 const PLAYER_RADIUS = 0.75;
 const PLAYER_HEIGHT = 3;
@@ -38,7 +38,7 @@ function makeScene( { boxSize = [ 5, 5, 10 ] as [ number, number, number ] } = {
 	level.addFromObject( box );
 	world.add( level );
 
-	const player = new CharacterBody( PLAYER_RADIUS, PLAYER_HEIGHT );
+	const player = new CharacterController( PLAYER_RADIUS, PLAYER_HEIGHT );
 	world.add( player );
 
 	// 箱の水平フットプリント（中心がこの内側に入る = 箱にめり込み）
@@ -56,7 +56,7 @@ function isInsideFootprint( p: { x: number; z: number }, fp: ReturnType<typeof m
 }
 
 // startX, startZ に着地させてから dir 方向へ iterations フレーム移動させ、最小 y を返す。
-function drive( world: World, player: CharacterBody, startX: number, startZ: number, dir: number, iterations: number ) {
+function drive( world: World, player: CharacterController, startX: number, startZ: number, dir: number, iterations: number ) {
 
 	player.teleport( startX, 0, startZ );
 	player.velocity.set( 0, 0, 0 );
@@ -256,7 +256,7 @@ describe( 'CharacterController capsule collision', () => {
 		level.addFromObject( ramp );
 		world.add( level );
 
-		const player = new CharacterBody( PLAYER_RADIUS, PLAYER_HEIGHT );
+		const player = new CharacterController( PLAYER_RADIUS, PLAYER_HEIGHT );
 		world.add( player );
 		player.teleport( 0, 3, 0 );
 		player.velocity.set( 0, 0, 0 );

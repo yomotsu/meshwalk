@@ -38,7 +38,7 @@ const _v3C = new Vector3();
 const _ray = new Ray();
 const _rotationMatrix = new Matrix4();
 
-export class TPSCameraControls extends CameraControls {
+export class ThirdPersonCameraControls extends CameraControls {
 
 	world: World;
 

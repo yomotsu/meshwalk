@@ -28,9 +28,16 @@ const capsule = new Capsule( new Vector3(), new Vector3(), 0 );
 
 const intersection = new Intersection();
 
-export class CharacterBody extends Body {
+export type CharacterControllerEventType =
+	| 'startIdling'
+	| 'startWalking'
+	| 'startJumping'
+	| 'startSliding'
+	| 'startFalling';
 
-	isCharacterBody = true;
+export class CharacterController extends Body<CharacterControllerEventType> {
+
+	isCharacterController = true;
 	radius: number;
 	height: number;
 	position = new Vector3();
@@ -43,11 +50,12 @@ export class CharacterBody extends Body {
 	isRunning  = false; // 派生状態: move() で移動が指定されているとき true
 	isJumping  = false;
 	velocity = new Vector3( 0, - 9.8, 0 );
-	currentJumpPower = 0;
 	groundHeight = 0;
 	groundNormal = new Vector3();
-	nearTriangles: ComputedTriangle[] = [];
-	contactInfo: {
+
+	private _currentJumpPower = 0;
+	private _nearTriangles: ComputedTriangle[] = [];
+	private _contactInfo: {
 		depth: number;
 		point: Vector3;
 		normal: Vector3;
@@ -144,7 +152,7 @@ export class CharacterBody extends Body {
 
 	setNearTriangles( nearTriangles: ComputedTriangle[] ) {
 
-		this.nearTriangles = nearTriangles;
+		this._nearTriangles = nearTriangles;
 
 	}
 
@@ -191,7 +199,7 @@ export class CharacterBody extends Body {
 		);
 
 		// 急勾配や自由落下など、自動で付与される速度の処理
-		if ( this.contactInfo.length === 0 && ! this.isJumping ) {
+		if ( this._contactInfo.length === 0 && ! this.isJumping ) {
 
 			// 何とも衝突していないので、自由落下
 			return;
@@ -214,7 +222,7 @@ export class CharacterBody extends Body {
 		} else if ( ! this.isGrounded && ! this.isOnSlope && this.isJumping ) {
 
 			// ジャンプの処理
-			this.velocity.y = this.currentJumpPower * - FALL_VELOCITY;
+			this.velocity.y = this._currentJumpPower * - FALL_VELOCITY;
 
 		}
 
@@ -225,10 +233,10 @@ export class CharacterBody extends Body {
 		// const frontAngle = Math.atan2( direction2D.y, direction2D.x );
 		const negativeFrontAngle = Math.atan2( - direction2D.y, - direction2D.x );
 
-		for ( let i = 0, l = this.contactInfo.length; i < l; i ++ ) {
+		for ( let i = 0, l = this._contactInfo.length; i < l; i ++ ) {
 
-			const normal = this.contactInfo[ i ].triangle.normal;
-			// var distance = this.contactInfo[ i ].distance;
+			const normal = this._contactInfo[ i ].triangle.normal;
+			// var distance = this._contactInfo[ i ].distance;
 
 			if ( this._slopeLimitCos < normal.y || this.isOnSlope ) {
 
@@ -299,7 +307,7 @@ export class CharacterBody extends Body {
 		//    | segment (player's head to almost -infinity)
 
 		let groundContact: { ground: ComputedTriangle, point: Vector3 } | null = null;
-		const triangles = this.nearTriangles;
+		const triangles = this._nearTriangles;
 
 		groundingHead.set(
 			this.position.x,
@@ -362,7 +370,7 @@ export class CharacterBody extends Body {
 		const bottom = this.position.y - this.groundCheckDepth;
 
 		// ジャンプ中、かつ上方向に移動中だったら、強制接地しない
-		if ( this.isJumping && 0 < this.currentJumpPower ) {
+		if ( this.isJumping && 0 < this._currentJumpPower ) {
 
 			this.isOnSlope  = false;
 			this.isGrounded = false;
@@ -406,10 +414,10 @@ export class CharacterBody extends Body {
 
 		// 交差していそうなフェイス (nearTriangles) のリストから、
 		// 実際に交差している壁フェイスを抜き出して
-		// this.contactInfo に追加する
+		// this._contactInfo に追加する
 
-		const triangles = this.nearTriangles;
-		this.contactInfo.length = 0;
+		const triangles = this._nearTriangles;
+		this._contactInfo.length = 0;
 
 		for ( let i = 0, l = triangles.length; i < l; i ++ ) {
 
@@ -426,7 +434,7 @@ export class CharacterBody extends Body {
 
 			if ( ! isIntersected ) continue;
 
-			this.contactInfo.push( {
+			this._contactInfo.push( {
 				point: intersection.point.clone(),
 				normal: intersection.normal.clone(),
 				depth: intersection.depth,
@@ -443,7 +451,7 @@ export class CharacterBody extends Body {
 		// 壁と衝突し食い込んでいる場合、
 		// ここで壁の外への押し出しをする
 
-		if ( this.contactInfo.length === 0 ) {
+		if ( this._contactInfo.length === 0 ) {
 
 			// 何とも衝突していない。position はそのまま、向きだけ更新して終了
 			this._updateQuaternion();
@@ -455,9 +463,9 @@ export class CharacterBody extends Body {
 		// 壁に食い込んでいる分だけ、法線方向に押し出す（デペネトレーション）。
 		// これを毎ステップ行うことで、斜め・側面から高速で進入しても壁を貫通しない。
 		translate.set( 0, 0, 0 );
-		for ( let i = 0, l = this.contactInfo.length; i < l; i ++ ) {
+		for ( let i = 0, l = this._contactInfo.length; i < l; i ++ ) {
 
-			const contact = this.contactInfo[ i ];
+			const contact = this._contactInfo[ i ];
 			const normal = contact.triangle.normal;
 
 			if ( this._slopeLimitCos < normal.y ) {
@@ -473,7 +481,7 @@ export class CharacterBody extends Body {
 			const isSlopeFace = ( this._slopeLimitCos <= normal.y && normal.y < 1 );
 
 			// ジャンプ降下中に、急勾配な坂に衝突したらジャンプ終わり
-			if ( this.isJumping && 0 >= this.currentJumpPower && isSlopeFace ) {
+			if ( this.isJumping && 0 >= this._currentJumpPower && isSlopeFace ) {
 
 				this.isJumping = false;
 				this.isGrounded = true;
@@ -513,7 +521,7 @@ export class CharacterBody extends Body {
 		if ( this.isJumping || ! this.isGrounded || this.isOnSlope ) return;
 
 		this._jumpElapsed = 0;
-		this.currentJumpPower = 1;
+		this._currentJumpPower = 1;
 		this.isJumping = true;
 
 	}
@@ -526,13 +534,20 @@ export class CharacterBody extends Body {
 		// コサイン弧の形は従来と同一で、60fps 実行時は旧実装と一致する。
 		this._jumpElapsed += deltaTime;
 		const progress = this._jumpElapsed / JUMP_DURATION_SEC;
-		this.currentJumpPower = Math.cos( Math.min( progress, 1 ) * Math.PI );
+		this._currentJumpPower = Math.cos( Math.min( progress, 1 ) * Math.PI );
 
 	}
 
 	teleport( x: number, y: number, z: number ) {
 
 		this.position.set( x, y, z );
+
+	}
+
+	dispose(): void {
+
+		this._nearTriangles.length = 0;
+		this._contactInfo.length = 0;
 
 	}
 

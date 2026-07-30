@@ -1,14 +1,14 @@
 import { EventDispatcher } from '../core/EventDispatcher';
 
-const KEY_W     = 87;
-const KEY_UP    = 38;
-const KEY_S     = 83;
-const KEY_DOWN  = 40;
-const KEY_A     = 65;
-const KEY_LEFT  = 37;
-const KEY_D     = 68;
-const KEY_RIGHT = 39;
-const KEY_SPACE = 32;
+const KEY_W     = 'KeyW';
+const KEY_UP    = 'ArrowUp';
+const KEY_S     = 'KeyS';
+const KEY_DOWN  = 'ArrowDown';
+const KEY_A     = 'KeyA';
+const KEY_LEFT  = 'ArrowLeft';
+const KEY_D     = 'KeyD';
+const KEY_RIGHT = 'ArrowRight';
+const KEY_SPACE = 'Space';
 
 const DEG2RAD = Math.PI / 180;
 const DEG_0   =   0 * DEG2RAD;
@@ -20,7 +20,13 @@ const DEG_225 = 225 * DEG2RAD;
 const DEG_270 = 270 * DEG2RAD;
 const DEG_315 = 315 * DEG2RAD;
 
-export class KeyInputControl extends EventDispatcher {
+export type KeyboardControlsEventType =
+	| 'movekeyon'
+	| 'movekeyoff'
+	| 'movekeychange'
+	| 'jumpkeypress';
+
+export class KeyboardControls extends EventDispatcher<KeyboardControlsEventType> {
 
 	private isDisabled = false;
 
@@ -44,7 +50,7 @@ export class KeyInputControl extends EventDispatcher {
 			if ( this.isDisabled ) return;
 			if ( isInputEvent( event ) ) return;
 
-			switch ( event.keyCode ) {
+			switch ( event.code ) {
 
 				case KEY_W :
 				case KEY_UP :
@@ -101,7 +107,7 @@ export class KeyInputControl extends EventDispatcher {
 
 			if ( this.isDisabled ) return;
 
-			switch ( event.keyCode ) {
+			switch ( event.code ) {
 
 				case KEY_W :
 				case KEY_UP :
@@ -143,14 +149,14 @@ export class KeyInputControl extends EventDispatcher {
 
 			if ( ! this.isUp && ! this.isDown && ! this.isLeft && ! this.isRight &&
 				(
-					event.keyCode === KEY_W    ||
-					event.keyCode === KEY_UP   ||
-					event.keyCode === KEY_S    ||
-					event.keyCode === KEY_DOWN ||
-					event.keyCode === KEY_A    ||
-					event.keyCode === KEY_LEFT ||
-					event.keyCode === KEY_D    ||
-					event.keyCode === KEY_RIGHT
+					event.code === KEY_W    ||
+					event.code === KEY_UP   ||
+					event.code === KEY_S    ||
+					event.code === KEY_DOWN ||
+					event.code === KEY_A    ||
+					event.code === KEY_LEFT ||
+					event.code === KEY_D    ||
+					event.code === KEY_RIGHT
 				)
 			) {
 
@@ -230,6 +236,7 @@ export class KeyInputControl extends EventDispatcher {
 		window.removeEventListener( 'keydown', this._keydownListener );
 		window.removeEventListener( 'keyup',   this._keyupListener );
 		window.removeEventListener( 'blur',    this._blurListener );
+		window.removeEventListener( 'contextmenu', this._blurListener );
 		this._blurListener();
 
 	}

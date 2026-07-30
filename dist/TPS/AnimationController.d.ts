@@ -5,7 +5,7 @@ export type Motion = {
 };
 export declare class AnimationController {
     mesh: Mesh;
-    motion: Motion;
+    actions: Motion;
     mixer: AnimationMixer;
     currentMotionName: string;
     _targetRotY: number | null;
@@ -13,4 +13,5 @@ export declare class AnimationController {
     play(name: string): void;
     turn(rad: number, immediate: boolean): void;
     update(deltaTime: number): void;
+    dispose(): void;
 }

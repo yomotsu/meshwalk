@@ -6,6 +6,11 @@
  */
 import { Vector3, Box3, Triangle, Sphere, Mesh, Plane, Line3, MathUtils, Vector2, Quaternion, AnimationMixer, Raycaster, Spherical, Matrix4, Vector4, Ray, Object3D } from 'three';
 
+/**
+ * イベント発行・購読の基底クラス。
+ * 型引数 `TEventType` にイベント名のユニオンを渡すと、`addEventListener` 等の
+ * イベント名が型チェックされる（既定は string で従来どおり任意名を許可）。
+ */
 let EventDispatcher$1 = class EventDispatcher {
     constructor() {
         this._listeners = {};
@@ -68,7 +73,7 @@ let EventDispatcher$1 = class EventDispatcher {
 
 /**
  * World に add できる物理ボディの基底クラス。
- * `StaticBody`（環境）や `CharacterBody`（キャラクター）はこれを継承する。
+ * `StaticBody`（環境）や `CharacterController`（キャラクター）はこれを継承する。
  * イベント発行のため EventDispatcher を継承している。
  */
 class Body extends EventDispatcher$1 {
@@ -976,13 +981,13 @@ const translate = new Vector3();
 const _yAxis = new Vector3(0, 1, 0);
 const capsule = new Capsule(new Vector3(), new Vector3(), 0);
 const intersection = new Intersection();
-class CharacterBody extends Body {
+class CharacterController extends Body {
     get _slopeLimitCos() {
         return Math.cos(this.slopeLimit * MathUtils.DEG2RAD);
     }
     constructor(radius, height) {
         super();
-        this.isCharacterBody = true;
+        this.isCharacterController = true;
         this.position = new Vector3();
         this.quaternion = new Quaternion(); // 向き（利用側がメッシュへ同期する）
         this.groundCheckDepth = .2;
@@ -993,11 +998,11 @@ class CharacterBody extends Body {
         this.isRunning = false; // 派生状態: move() で移動が指定されているとき true
         this.isJumping = false;
         this.velocity = new Vector3(0, -9.8, 0);
-        this.currentJumpPower = 0;
         this.groundHeight = 0;
         this.groundNormal = new Vector3();
-        this.nearTriangles = [];
-        this.contactInfo = [];
+        this._currentJumpPower = 0;
+        this._nearTriangles = [];
+        this._contactInfo = [];
         this._moveVelocity = new Vector3(); // move() で設定する望む水平速度
         this._facingAngle = 0; // 向き（移動方向から算出）
         this._jumpElapsed = 0; // ジャンプ開始からの経過（秒）。deltaTime を積算
@@ -1051,7 +1056,7 @@ class CharacterBody extends Body {
         };
     }
     setNearTriangles(nearTriangles) {
-        this.nearTriangles = nearTriangles;
+        this._nearTriangles = nearTriangles;
     }
     /**
      * 望む水平移動速度をワールド座標で指定する（Unity CharacterController.Move / Godot velocity 相当）。
@@ -1083,7 +1088,7 @@ class CharacterBody extends Body {
         let isHittingCeiling = false;
         this.velocity.set(this._moveVelocity.x, FALL_VELOCITY, this._moveVelocity.z);
         // 急勾配や自由落下など、自動で付与される速度の処理
-        if (this.contactInfo.length === 0 && !this.isJumping) {
+        if (this._contactInfo.length === 0 && !this.isJumping) {
             // 何とも衝突していないので、自由落下
             return;
         }
@@ -1099,16 +1104,16 @@ class CharacterBody extends Body {
         }
         else if (!this.isGrounded && !this.isOnSlope && this.isJumping) {
             // ジャンプの処理
-            this.velocity.y = this.currentJumpPower * -FALL_VELOCITY;
+            this.velocity.y = this._currentJumpPower * -FALL_VELOCITY;
         }
         // 壁に向かった場合、壁方向の速度を0にする処理
         // vs walls and sliding on the wall
         direction2D.set(this._moveVelocity.x, this._moveVelocity.z);
         // const frontAngle = Math.atan2( direction2D.y, direction2D.x );
         const negativeFrontAngle = Math.atan2(-direction2D.y, -direction2D.x);
-        for (let i = 0, l = this.contactInfo.length; i < l; i++) {
-            const normal = this.contactInfo[i].triangle.normal;
-            // var distance = this.contactInfo[ i ].distance;
+        for (let i = 0, l = this._contactInfo.length; i < l; i++) {
+            const normal = this._contactInfo[i].triangle.normal;
+            // var distance = this._contactInfo[ i ].distance;
             if (this._slopeLimitCos < normal.y || this.isOnSlope) {
                 // フェイスは地面なので、壁としての衝突の可能性はない。
                 // 速度の減衰はしないでいい
@@ -1155,7 +1160,7 @@ class CharacterBody extends Body {
         //    |
         //    | segment (player's head to almost -infinity)
         let groundContact = null;
-        const triangles = this.nearTriangles;
+        const triangles = this._nearTriangles;
         groundingHead.set(this.position.x, this.position.y + this.height, this.position.z);
         groundingTo.set(this.position.x, this.position.y - 1e1, this.position.z);
         for (let i = 0, l = triangles.length; i < l; i++) {
@@ -1190,7 +1195,7 @@ class CharacterBody extends Body {
         const top = groundingHead.y;
         const bottom = this.position.y - this.groundCheckDepth;
         // ジャンプ中、かつ上方向に移動中だったら、強制接地しない
-        if (this.isJumping && 0 < this.currentJumpPower) {
+        if (this.isJumping && 0 < this._currentJumpPower) {
             this.isOnSlope = false;
             this.isGrounded = false;
             return;
@@ -1217,9 +1222,9 @@ class CharacterBody extends Body {
         capsule.radius = this.radius;
         // 交差していそうなフェイス (nearTriangles) のリストから、
         // 実際に交差している壁フェイスを抜き出して
-        // this.contactInfo に追加する
-        const triangles = this.nearTriangles;
-        this.contactInfo.length = 0;
+        // this._contactInfo に追加する
+        const triangles = this._nearTriangles;
+        this._contactInfo.length = 0;
         for (let i = 0, l = triangles.length; i < l; i++) {
             const triangle = triangles[i];
             if (!triangle.boundingSphere)
@@ -1229,7 +1234,7 @@ class CharacterBody extends Body {
             const isIntersected = intersectsCapsuleTriangle(capsule, triangle, intersection);
             if (!isIntersected)
                 continue;
-            this.contactInfo.push({
+            this._contactInfo.push({
                 point: intersection.point.clone(),
                 normal: intersection.normal.clone(),
                 depth: intersection.depth,
@@ -1241,7 +1246,7 @@ class CharacterBody extends Body {
         // updatePosition() で position を動かした後
         // 壁と衝突し食い込んでいる場合、
         // ここで壁の外への押し出しをする
-        if (this.contactInfo.length === 0) {
+        if (this._contactInfo.length === 0) {
             // 何とも衝突していない。position はそのまま、向きだけ更新して終了
             this._updateQuaternion();
             return;
@@ -1250,8 +1255,8 @@ class CharacterBody extends Body {
         // 壁に食い込んでいる分だけ、法線方向に押し出す（デペネトレーション）。
         // これを毎ステップ行うことで、斜め・側面から高速で進入しても壁を貫通しない。
         translate.set(0, 0, 0);
-        for (let i = 0, l = this.contactInfo.length; i < l; i++) {
-            const contact = this.contactInfo[i];
+        for (let i = 0, l = this._contactInfo.length; i < l; i++) {
+            const contact = this._contactInfo[i];
             const normal = contact.triangle.normal;
             if (this._slopeLimitCos < normal.y) {
                 // this triangle is a ground or slope, not a wall or ceil
@@ -1262,7 +1267,7 @@ class CharacterBody extends Body {
             // フェイスは急勾配な坂か否か
             const isSlopeFace = (this._slopeLimitCos <= normal.y && normal.y < 1);
             // ジャンプ降下中に、急勾配な坂に衝突したらジャンプ終わり
-            if (this.isJumping && 0 >= this.currentJumpPower && isSlopeFace) {
+            if (this.isJumping && 0 >= this._currentJumpPower && isSlopeFace) {
                 this.isJumping = false;
                 this.isGrounded = true;
                 // console.log( 'jump end' );
@@ -1291,7 +1296,7 @@ class CharacterBody extends Body {
         if (this.isJumping || !this.isGrounded || this.isOnSlope)
             return;
         this._jumpElapsed = 0;
-        this.currentJumpPower = 1;
+        this._currentJumpPower = 1;
         this.isJumping = true;
     }
     _updateJumping(deltaTime) {
@@ -1301,10 +1306,14 @@ class CharacterBody extends Body {
         // コサイン弧の形は従来と同一で、60fps 実行時は旧実装と一致する。
         this._jumpElapsed += deltaTime;
         const progress = this._jumpElapsed / JUMP_DURATION_SEC;
-        this.currentJumpPower = Math.cos(Math.min(progress, 1) * Math.PI);
+        this._currentJumpPower = Math.cos(Math.min(progress, 1) * Math.PI);
     }
     teleport(x, y, z) {
         this.position.set(x, y, z);
+    }
+    dispose() {
+        this._nearTriangles.length = 0;
+        this._contactInfo.length = 0;
     }
 }
 
@@ -1312,7 +1321,7 @@ const sphere = new Sphere();
 class World {
     constructor({ fps = 60, stepsPerFrame = 4 } = {}) {
         this._staticBodies = [];
-        this._characterBodies = [];
+        this._characterControllers = [];
         this._fps = fps;
         this._stepsPerFrame = stepsPerFrame;
     }
@@ -1327,9 +1336,9 @@ class World {
             if (this._staticBodies.indexOf(body) === -1)
                 this._staticBodies.push(body);
         }
-        else if (body instanceof CharacterBody) {
-            if (this._characterBodies.indexOf(body) === -1)
-                this._characterBodies.push(body);
+        else if (body instanceof CharacterController) {
+            if (this._characterControllers.indexOf(body) === -1)
+                this._characterControllers.push(body);
         }
     }
     remove(body) {
@@ -1338,10 +1347,10 @@ class World {
             if (index !== -1)
                 this._staticBodies.splice(index, 1);
         }
-        else if (body instanceof CharacterBody) {
-            const index = this._characterBodies.indexOf(body);
+        else if (body instanceof CharacterController) {
+            const index = this._characterControllers.indexOf(body);
             if (index !== -1)
-                this._characterBodies.splice(index, 1);
+                this._characterControllers.splice(index, 1);
         }
     }
     fixedUpdate() {
@@ -1352,8 +1361,8 @@ class World {
         }
     }
     step(stepDeltaTime) {
-        for (let i = 0, l = this._characterBodies.length; i < l; i++) {
-            const character = this._characterBodies[i];
+        for (let i = 0, l = this._characterControllers.length; i < l; i++) {
+            const character = this._characterControllers[i];
             const triangles = [];
             // キャラクターのカプセル全体を囲む sphere で broad-phase して、
             // 近傍の三角形だけを character に渡して判定する
@@ -1369,10 +1378,10 @@ class World {
     dispose() {
         for (let i = 0; i < this._staticBodies.length; i++)
             this._staticBodies[i].dispose();
-        for (let i = 0; i < this._characterBodies.length; i++)
-            this._characterBodies[i].dispose();
+        for (let i = 0; i < this._characterControllers.length; i++)
+            this._characterControllers[i].dispose();
         this._staticBodies.length = 0;
-        this._characterBodies.length = 0;
+        this._characterControllers.length = 0;
     }
 }
 
@@ -1388,28 +1397,28 @@ class AnimationController {
     constructor(mesh, animations) {
         this._targetRotY = null;
         this.mesh = mesh;
-        this.motion = {};
+        this.actions = {};
         this.mixer = new AnimationMixer(mesh);
         this.currentMotionName = '';
         for (let i = 0, l = animations.length; i < l; i++) {
             const anim = animations[i];
-            this.motion[anim.name] = this.mixer.clipAction(anim);
-            this.motion[anim.name].setEffectiveWeight(1);
+            this.actions[anim.name] = this.mixer.clipAction(anim);
+            this.actions[anim.name].setEffectiveWeight(1);
         }
     }
     play(name) {
         if (this.currentMotionName === name)
             return;
-        if (this.motion[this.currentMotionName]) {
-            const from = this.motion[this.currentMotionName].play();
-            const to = this.motion[name].play();
+        if (this.actions[this.currentMotionName]) {
+            const from = this.actions[this.currentMotionName].play();
+            const to = this.actions[name].play();
             from.enabled = true;
             to.enabled = true;
             from.crossFadeTo(to, .3, false);
         }
         else {
-            this.motion[name].enabled = true;
-            this.motion[name].play();
+            this.actions[name].enabled = true;
+            this.actions[name].play();
         }
         this.currentMotionName = name;
     }
@@ -1450,17 +1459,21 @@ class AnimationController {
     update(deltaTime) {
         this.mixer.update(deltaTime);
     }
+    dispose() {
+        this.mixer.stopAllAction();
+        this.mixer.uncacheRoot(this.mesh);
+    }
 }
 
-const KEY_W = 87;
-const KEY_UP = 38;
-const KEY_S = 83;
-const KEY_DOWN = 40;
-const KEY_A = 65;
-const KEY_LEFT = 37;
-const KEY_D = 68;
-const KEY_RIGHT = 39;
-const KEY_SPACE = 32;
+const KEY_W = 'KeyW';
+const KEY_UP = 'ArrowUp';
+const KEY_S = 'KeyS';
+const KEY_DOWN = 'ArrowDown';
+const KEY_A = 'KeyA';
+const KEY_LEFT = 'ArrowLeft';
+const KEY_D = 'KeyD';
+const KEY_RIGHT = 'ArrowRight';
+const KEY_SPACE = 'Space';
 const DEG2RAD$1 = Math.PI / 180;
 const DEG_0 = 0 * DEG2RAD$1;
 const DEG_45 = 45 * DEG2RAD$1;
@@ -1470,7 +1483,7 @@ const DEG_180 = 180 * DEG2RAD$1;
 const DEG_225 = 225 * DEG2RAD$1;
 const DEG_270 = 270 * DEG2RAD$1;
 const DEG_315 = 315 * DEG2RAD$1;
-class KeyInputControl extends EventDispatcher$1 {
+class KeyboardControls extends EventDispatcher$1 {
     constructor() {
         super();
         this.isDisabled = false;
@@ -1485,7 +1498,7 @@ class KeyInputControl extends EventDispatcher$1 {
                 return;
             if (isInputEvent(event))
                 return;
-            switch (event.keyCode) {
+            switch (event.code) {
                 case KEY_W:
                 case KEY_UP:
                     this.isUp = true;
@@ -1522,7 +1535,7 @@ class KeyInputControl extends EventDispatcher$1 {
         this._keyupListener = (event) => {
             if (this.isDisabled)
                 return;
-            switch (event.keyCode) {
+            switch (event.code) {
                 case KEY_W:
                 case KEY_UP:
                     this.isUp = false;
@@ -1550,14 +1563,14 @@ class KeyInputControl extends EventDispatcher$1 {
                 this.dispatchEvent({ type: 'movekeychange' });
             }
             if (!this.isUp && !this.isDown && !this.isLeft && !this.isRight &&
-                (event.keyCode === KEY_W ||
-                    event.keyCode === KEY_UP ||
-                    event.keyCode === KEY_S ||
-                    event.keyCode === KEY_DOWN ||
-                    event.keyCode === KEY_A ||
-                    event.keyCode === KEY_LEFT ||
-                    event.keyCode === KEY_D ||
-                    event.keyCode === KEY_RIGHT)) {
+                (event.code === KEY_W ||
+                    event.code === KEY_UP ||
+                    event.code === KEY_S ||
+                    event.code === KEY_DOWN ||
+                    event.code === KEY_A ||
+                    event.code === KEY_LEFT ||
+                    event.code === KEY_D ||
+                    event.code === KEY_RIGHT)) {
                 this.isMoveKeyHolding = false;
                 this.dispatchEvent({ type: 'movekeyoff' });
             }
@@ -1616,6 +1629,7 @@ class KeyInputControl extends EventDispatcher$1 {
         window.removeEventListener('keydown', this._keydownListener);
         window.removeEventListener('keyup', this._keyupListener);
         window.removeEventListener('blur', this._blurListener);
+        window.removeEventListener('contextmenu', this._blurListener);
         this._blurListener();
     }
 }
@@ -4294,7 +4308,7 @@ const _v3B = new Vector3();
 const _v3C = new Vector3();
 const _ray = new Ray();
 const _rotationMatrix = new Matrix4();
-class TPSCameraControls extends CameraControls {
+class ThirdPersonCameraControls extends CameraControls {
     constructor(camera, trackObject, world, domElement) {
         super(camera, domElement);
         this.minDistance = 1;
@@ -4347,4 +4361,4 @@ class TPSCameraControls extends CameraControls {
     }
 }
 
-export { AnimationController, Body, CharacterBody, KeyInputControl, StaticBody, TPSCameraControls, World };
+export { AnimationController, Body, CharacterController, KeyboardControls, StaticBody, ThirdPersonCameraControls, World };

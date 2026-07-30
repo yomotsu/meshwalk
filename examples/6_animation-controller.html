@@ -65,10 +65,10 @@ const gltf = await new GLTFLoader().loadAsync( './miku.glb' );
 scene.add( gltf.scene );
 const animationController = new MW.AnimationController( gltf.scene, gltf.animations );
 animationController.play( 'idle' );
-animationController.motion.jump.setLoop( THREE.LoopOnce, 0 );
-animationController.motion.slide.setLoop( THREE.LoopOnce, 0 );
-animationController.motion.jump.clampWhenFinished = true;
-animationController.motion.slide.clampWhenFinished = true;
+animationController.actions.jump.setLoop( THREE.LoopOnce, 0 );
+animationController.actions.slide.setLoop( THREE.LoopOnce, 0 );
+animationController.actions.jump.clampWhenFinished = true;
+animationController.actions.slide.clampWhenFinished = true;
 
 
 ( function update () {

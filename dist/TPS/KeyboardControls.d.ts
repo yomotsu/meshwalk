@@ -1,5 +1,6 @@
 import { EventDispatcher } from '../core/EventDispatcher';
-export declare class KeyInputControl extends EventDispatcher {
+export type KeyboardControlsEventType = 'movekeyon' | 'movekeyoff' | 'movekeychange' | 'jumpkeypress';
+export declare class KeyboardControls extends EventDispatcher<KeyboardControlsEventType> {
     private isDisabled;
     private isUp;
     private isDown;

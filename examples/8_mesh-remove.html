@@ -90,12 +90,12 @@ const capsule = new THREE.Mesh(
 capsule.position.y = playerHeight / 2;
 playerObjectHolder.add( capsule );
 
-const playerController = new MW.CharacterBody( playerRadius, playerHeight );
+const playerController = new MW.CharacterController( playerRadius, playerHeight );
 playerController.teleport( 0, 10, 0 );
 world.add( playerController );
 
 // make a keyinput control
-const keyInputControl = new MW.KeyInputControl();
+const keyInputControl = new MW.KeyboardControls();
 
 // bind events
 // キー入力の向きから、望む水平移動速度ベクトルを作って move() に渡す

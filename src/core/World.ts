@@ -2,14 +2,14 @@ import { Sphere } from 'three';
 import { ComputedTriangle } from '../math/triangle';
 import { Body } from './Body';
 import { StaticBody } from './StaticBody';
-import { CharacterBody } from './CharacterBody';
+import { CharacterController } from './CharacterController';
 
 const sphere = new Sphere();
 
 export class World {
 
 	private _staticBodies: StaticBody[] = [];
-	private _characterBodies: CharacterBody[] = [];
+	private _characterControllers: CharacterController[] = [];
 	private _fps: number;
 	private _stepsPerFrame: number;
 
@@ -35,9 +35,9 @@ export class World {
 
 			if ( this._staticBodies.indexOf( body ) === - 1 ) this._staticBodies.push( body );
 
-		} else if ( body instanceof CharacterBody ) {
+		} else if ( body instanceof CharacterController ) {
 
-			if ( this._characterBodies.indexOf( body ) === - 1 ) this._characterBodies.push( body );
+			if ( this._characterControllers.indexOf( body ) === - 1 ) this._characterControllers.push( body );
 
 		}
 
@@ -50,10 +50,10 @@ export class World {
 			const index = this._staticBodies.indexOf( body );
 			if ( index !== - 1 ) this._staticBodies.splice( index, 1 );
 
-		} else if ( body instanceof CharacterBody ) {
+		} else if ( body instanceof CharacterController ) {
 
-			const index = this._characterBodies.indexOf( body );
-			if ( index !== - 1 ) this._characterBodies.splice( index, 1 );
+			const index = this._characterControllers.indexOf( body );
+			if ( index !== - 1 ) this._characterControllers.splice( index, 1 );
 
 		}
 
@@ -74,9 +74,9 @@ export class World {
 
 	step( stepDeltaTime: number ): void {
 
-		for ( let i = 0, l = this._characterBodies.length; i < l; i ++ ) {
+		for ( let i = 0, l = this._characterControllers.length; i < l; i ++ ) {
 
-			const character = this._characterBodies[ i ];
+			const character = this._characterControllers[ i ];
 			const triangles: ComputedTriangle[] = [];
 
 			// キャラクターのカプセル全体を囲む sphere で broad-phase して、
@@ -99,9 +99,9 @@ export class World {
 	dispose(): void {
 
 		for ( let i = 0; i < this._staticBodies.length; i ++ ) this._staticBodies[ i ].dispose();
-		for ( let i = 0; i < this._characterBodies.length; i ++ ) this._characterBodies[ i ].dispose();
+		for ( let i = 0; i < this._characterControllers.length; i ++ ) this._characterControllers[ i ].dispose();
 		this._staticBodies.length = 0;
-		this._characterBodies.length = 0;
+		this._characterControllers.length = 0;
 
 	}
 

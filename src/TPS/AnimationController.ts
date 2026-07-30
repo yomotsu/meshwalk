@@ -20,7 +20,7 @@ export type Motion = {
 export class AnimationController {
 
 	mesh: Mesh;
-	motion: Motion;
+	actions: Motion;
 	mixer: AnimationMixer;
 	currentMotionName: string;
 	_targetRotY: number | null = null;
@@ -28,15 +28,15 @@ export class AnimationController {
 	constructor( mesh: Mesh, animations: AnimationClip[] ) {
 
 		this.mesh   = mesh;
-		this.motion = {};
+		this.actions = {};
 		this.mixer  = new AnimationMixer( mesh );
 		this.currentMotionName = '';
 
 		for ( let i = 0, l = animations.length; i < l; i ++ ) {
 
 			const anim = animations[ i ];
-			this.motion[ anim.name ] = this.mixer.clipAction( anim );
-			this.motion[ anim.name ].setEffectiveWeight( 1 );
+			this.actions[ anim.name ] = this.mixer.clipAction( anim );
+			this.actions[ anim.name ].setEffectiveWeight( 1 );
 
 		}
 
@@ -46,10 +46,10 @@ export class AnimationController {
 
 		if ( this.currentMotionName === name ) return;
 
-		if ( this.motion[ this.currentMotionName ] ) {
+		if ( this.actions[ this.currentMotionName ] ) {
 
-			const from = this.motion[ this.currentMotionName ].play();
-			const to   = this.motion[ name ].play();
+			const from = this.actions[ this.currentMotionName ].play();
+			const to   = this.actions[ name ].play();
 
 			from.enabled = true;
 			to.enabled = true;
@@ -58,8 +58,8 @@ export class AnimationController {
 
 		} else {
 
-			this.motion[ name ].enabled = true;
-			this.motion[ name ].play();
+			this.actions[ name ].enabled = true;
+			this.actions[ name ].play();
 
 		}
 
@@ -122,6 +122,13 @@ export class AnimationController {
 	update( deltaTime: number ) {
 
 		this.mixer.update( deltaTime );
+
+	}
+
+	dispose(): void {
+
+		this.mixer.stopAllAction();
+		this.mixer.uncacheRoot( this.mesh );
 
 	}
 

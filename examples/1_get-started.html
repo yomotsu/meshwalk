@@ -73,7 +73,7 @@ capsule.position.y = playerHeight / 2;
 playerObjectHolder.add( capsule );
 
 // to apply fake gravity and to be controllable object
-const playerController = new MW.CharacterBody( playerRadius, playerHeight );
+const playerController = new MW.CharacterController( playerRadius, playerHeight );
 playerController.teleport( 0, 10, 0 );
 world.add( playerController );
 

@@ -5,7 +5,12 @@ export interface DispatcherEvent {
 	[ key: string ]: any;
 }
 
-export class EventDispatcher {
+/**
+ * イベント発行・購読の基底クラス。
+ * 型引数 `TEventType` にイベント名のユニオンを渡すと、`addEventListener` 等の
+ * イベント名が型チェックされる（既定は string で従来どおり任意名を許可）。
+ */
+export class EventDispatcher<TEventType extends string = string> {
 
 	private _listeners: { [ type: string ]: Listener[] } = {};
 
@@ -15,7 +20,7 @@ export class EventDispatcher {
 	 * @param listener handler function
 	 * @category Methods
 	 */
-	addEventListener( type: string, listener: Listener ): void {
+	addEventListener( type: TEventType, listener: Listener ): void {
 
 		const listeners = this._listeners;
 
@@ -31,7 +36,7 @@ export class EventDispatcher {
 	 * @param listener handler function
 	 * @category Methods
 	 */
-	hasEventListener( type: string, listener: Listener ): boolean {
+	hasEventListener( type: TEventType, listener: Listener ): boolean {
 
 		const listeners = this._listeners;
 
@@ -45,7 +50,7 @@ export class EventDispatcher {
 	 * @param listener handler function
 	 * @category Methods
 	 */
-	removeEventListener( type: string, listener: Listener ): void {
+	removeEventListener( type: TEventType, listener: Listener ): void {
 
 		const listeners = this._listeners;
 		const listenerArray = listeners[ type ];
@@ -65,7 +70,7 @@ export class EventDispatcher {
 	 * @param event DispatcherEvent
 	 * @category Methods
 	 */
-	dispatchEvent( event: DispatcherEvent ): void {
+	dispatchEvent( event: DispatcherEvent & { type: TEventType } ): void {
 
 		const listeners = this._listeners;
 		const listenerArray = listeners[ event.type ];

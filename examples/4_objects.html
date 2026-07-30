@@ -172,7 +172,7 @@ const capsule = new THREE.Mesh(
 capsule.position.y = playerHeight / 2;
 playerObjectHolder.add( capsule );
 
-const playerController = new MW.CharacterBody( playerRadius, playerHeight );
+const playerController = new MW.CharacterController( playerRadius, playerHeight );
 playerController.teleport( 0, 10, 0 );
 world.add( playerController );
 window.setMaxSlopeGradient = ( deg ) => {
@@ -181,9 +181,9 @@ window.setMaxSlopeGradient = ( deg ) => {
 
 };
 
-const keyInputControl = new MW.KeyInputControl();
+const keyInputControl = new MW.KeyboardControls();
 
-const tpsCameraControls = new MW.TPSCameraControls(
+const tpsCameraControls = new MW.ThirdPersonCameraControls(
 	camera, // three.js camera
 	playerObjectHolder, // tracking object
 	world,
