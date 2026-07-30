@@ -25,77 +25,90 @@ const _plane = new Plane();
 const _line1 = new Line3();
 const _line2 = new Line3();
 
-const capsuleNormal = new Vector3();
-const lineEndOffset = new Vector3();
-const capsuleTip = new Vector3();
-const capsuleBase = new Vector3();
 const point1 = new Vector3();
 const point2 = new Vector3();
 
 export function intersectsCapsuleTriangle( capsule: Capsule, triangle: ComputedTriangle, out: Intersection ) {
 
-	capsuleNormal.subVectors( capsule.start, capsule.end ).normalize();
-	lineEndOffset.copy( capsuleNormal ).multiplyScalar( capsule.radius );
+	// 線分長が 0 の退化カプセルは球として扱う（start === end のときの NaN を回避）
+	if ( capsule.start.distanceToSquared( capsule.end ) <= EPSILON ) {
 
-	// top
-	capsuleTip.addVectors( capsule.start, lineEndOffset );
-	// bottom
-	capsuleBase.subVectors( capsule.end, lineEndOffset );
+		sphere.center.copy( capsule.start );
+		sphere.radius = capsule.radius;
+		return intersectsSphereTriangle( sphere, triangle.a, triangle.b, triangle.c, triangle.normal, out );
 
+	}
+
+	// based on three.js examples/jsm/math/Octree.js triangleCapsuleIntersect
+	// 中心線の両端のフェイス平面からの符号付き距離（半径ぶん差し引く）
 	triangle.getPlane( _plane );
-	_line1.set( capsuleTip, capsuleBase );
+	const d1 = _plane.distanceToPoint( capsule.start ) - capsule.radius;
+	const d2 = _plane.distanceToPoint( capsule.end ) - capsule.radius;
 
-	// ラインセグメントが貫通しているでの、交差している。
-	if ( _plane.intersectLine( _line1, _v1 ) && triangle.containsPoint( _v1 ) ) {
+	if (
+		// 両端ともフェイスの表側（+法線側）で半径より遠い → 接触なし
+		( d1 > 0 && d2 > 0 ) ||
+		// 両端とも裏側（-法線側）を半径以上通り過ぎている → 接触なし
+		// （床面と同じ高さの下向き面などで、上に居るキャラを真下へ押し出す誤検出を防ぐ）
+		( d1 < - capsule.radius && d2 < - capsule.radius )
+	) {
 
-		const d1 = _plane.distanceToPoint( capsuleTip );
-		const d2 = _plane.distanceToPoint( capsuleBase );
+		return false;
+
+	}
+
+	// フェイス内部との接触:
+	// 中心線上でフェイス平面に最も近づく点がフェイスの内側にあれば、面で接している。
+	// （縦カプセル vs 縦壁のように中心線が面と平行でも正しく検出できる）
+	const delta = Math.abs( d1 / ( Math.abs( d1 ) + Math.abs( d2 ) ) );
+	const intersectPoint = _v1.copy( capsule.start ).lerp( capsule.end, delta );
+
+	if ( triangle.containsPoint( intersectPoint ) ) {
 
 		out.set(
-			_v1,
-			_plane.normal,
-			Math.abs( Math.min( d1, d2 ) ),
+			intersectPoint,
+			_plane.normal, // 押し出し方向 = フェイス法線
+			Math.abs( Math.min( d1, d2 ) ), // 貫通量（正の値）
 		);
 
 		return true;
 
 	}
 
-	// カプセルの中心線と三角形の辺を検証し、カプセルの中心線内で一番近い点を探す
-	const line1 = _line1.set( capsule.start, capsule.end );
-	const lines = [
+	// 辺との接触: 中心線と三角形の各辺の最近点間距離が半径以下なら、辺で接している。
+	// もっとも深い（距離が最小の）辺を採用する。
+	const radiusSquared = capsule.radius * capsule.radius;
+	_line1.set( capsule.start, capsule.end );
+	const edges = [
 		[ triangle.a, triangle.b ],
 		[ triangle.b, triangle.c ],
-		[ triangle.c, triangle.a ]
+		[ triangle.c, triangle.a ],
 	];
 
-	const closestPoint = _v1;
-	let minimumDistanceSquared = Infinity;
-	for ( let i = 0; i < lines.length; i ++ ) {
+	let found = false;
+	let minDistanceSquared = Infinity;
+	for ( let i = 0; i < edges.length; i ++ ) {
 
-		const line2 = _line2.set( lines[ i ][ 0 ], lines[ i ][ 1 ] );
-		nearestPointsOnLineSegments( line1.start, line1.end, line2.start, line2.end, point1, point2 );
+		_line2.set( edges[ i ][ 0 ], edges[ i ][ 1 ] );
+		nearestPointsOnLineSegments( _line1.start, _line1.end, _line2.start, _line2.end, point1, point2 );
 		const distanceSquared = point1.distanceToSquared( point2 );
 
-		if ( distanceSquared < minimumDistanceSquared ) {
+		if ( distanceSquared < radiusSquared && distanceSquared < minDistanceSquared ) {
 
-			closestPoint.copy( point1 );
-			minimumDistanceSquared = distanceSquared;
+			minDistanceSquared = distanceSquared;
+			const distance = Math.sqrt( distanceSquared );
+			out.set(
+				point1,
+				_v1.subVectors( point1, point2 ).divideScalar( distance || 1 ), // 辺 → 中心線 の単位ベクトル
+				capsule.radius - distance,
+			);
+			found = true;
 
 		}
 
 	}
 
-	if ( minimumDistanceSquared <= capsule.radius * capsule.radius ) {
-
-		// 残りは、球と三角形の交差テストと同様
-		sphere.center.copy( closestPoint );
-		sphere.radius = capsule.radius;
-		return intersectsSphereTriangle( sphere, triangle.a, triangle.b, triangle.c, triangle.normal, out );
-
-	}
-
-	return false;
+	return found;
 
 }
 

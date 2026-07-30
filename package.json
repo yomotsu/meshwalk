@@ -4,78 +4,49 @@
   "author": "Yomotsu",
   "license": "MIT",
   "type": "module",
-  "main": "dist/meshwalk.js",
   "module": "dist/meshwalk.module.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/meshwalk.module.js"
+    }
+  },
   "repository": {
     "type": "git",
     "url": "https://github.com/yomotsu/meshwalk"
   },
   "scripts": {
     "dev": "rollup --config --watch",
-    "build": "rollup --config && terser dist/meshwalk.js -o dist/meshwalk.min.js --comments '/^!/' && terser dist/meshwalk.module.js -o dist/meshwalk.module.min.js --comments '/^!/'",
-    "lint": "eslint src --ext ts"
+    "build": "rollup --config && terser dist/meshwalk.module.js -o dist/meshwalk.module.min.js --comments '/^!/'",
+    "lint": "eslint src",
+    "test": "vitest run"
   },
   "devDependencies": {
-    "@rollup/plugin-node-resolve": "^15.0.2",
-    "@rollup/plugin-replace": "^5.0.2",
-    "@rollup/plugin-typescript": "^11.1.0",
-    "@types/three": "^0.150.2",
-    "@typescript-eslint/eslint-plugin": "^5.59.1",
-    "@typescript-eslint/parser": "^5.59.1",
-    "eslint": "^8.39.0",
-    "eslint-config-mdcs": "^5.0.0",
-    "lint-staged": "^13.2.2",
-    "rollup": "^3.21.0",
-    "terser": "^5.17.1",
-    "typescript": "^5.0.4"
+    "@rollup/plugin-node-resolve": "^16.0.3",
+    "@rollup/plugin-replace": "^6.0.3",
+    "@rollup/plugin-typescript": "^12.3.0",
+    "@stylistic/eslint-plugin": "^5.10.0",
+    "@types/three": "^0.185.1",
+    "@typescript-eslint/eslint-plugin": "^8.65.0",
+    "@typescript-eslint/parser": "^8.65.0",
+    "eslint": "^10.8.0",
+    "lint-staged": "^17.2.0",
+    "rollup": "^4.62.3",
+    "terser": "^5.49.0",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.10"
   },
   "dependencies": {
-    "camera-controls": "^2.3.4"
+    "camera-controls": "^3.1.2"
   },
   "peerDependencies": {
-    "three": "^0.151.3"
+    "three": "^0.185.1"
   },
   "browserslist": [
     "> 1%",
     "last 3 versions",
     "not dead"
-  ],
-  "eslintConfig": {
-    "root": true,
-    "parser": "@typescript-eslint/parser",
-    "extends": "mdcs",
-    "plugins": [
-      "@typescript-eslint"
-    ],
-    "rules": {
-      "no-unused-vars": 0,
-      "@typescript-eslint/no-unused-vars": 1,
-      "indent": 0,
-      "@typescript-eslint/indent": [
-        "error",
-        "tab",
-        {
-          "SwitchCase": 1,
-          "flatTernaryExpressions": true
-        }
-      ],
-      "no-multi-spaces": [
-        0
-      ],
-      "no-trailing-spaces": [
-        "error",
-        {
-          "ignoreComments": true
-        }
-      ],
-      "key-spacing": [
-        0
-      ]
-    }
-  },
-  "eslintIgnore": [
-    "/dist/",
-    "/node_modules/"
   ],
   "keywords": [
     "three",

@@ -1,9 +1,11 @@
 {
   "compilerOptions": {
-    "baseUrl": "src",
+    "rootDir": "src",
     "outDir": "./dist",
+    "paths": { "*": ["./src/*"] },
     "declaration": true,
     "target": "es2017",
+    "module": "esnext",
     "lib": ["es2017", "dom"],
     "strict": true,
     "removeComments": false,
@@ -16,7 +18,7 @@
     "strictNullChecks": true,
     "strictFunctionTypes": true,
     "noFallthroughCasesInSwitch": true,
-    "moduleResolution": "node"
+    "moduleResolution": "bundler"
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules"]

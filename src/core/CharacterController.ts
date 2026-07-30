@@ -1,10 +1,11 @@
-import { MathUtils, Sphere, Vector2, Vector3 } from 'three';
-// import { Capsule } from 'three/examples/jsm/math/Capsule.js';
+import { MathUtils, Vector2, Vector3 } from 'three';
+import { Capsule } from 'three/examples/jsm/math/Capsule.js';
 import { type Object3D } from 'three';
 import { EventDispatcher } from './EventDispatcher';
 import { Intersection } from '../math/Intersection';
 import { intersectsLineTriangle } from '../math/intersectsLineTriangle';
-import { intersectsSphereTriangle } from '../math/intersectsSphereTriangle';
+import { intersectsCapsuleTriangle } from '../math/intersectsCapsuleTriangle';
+import { intersectsCapsuleSphere } from '../math/intersectsCapsuleSphere';
 import { type ComputedTriangle } from '../math/triangle';
 
 const FALL_VELOCITY = - 20;
@@ -23,8 +24,7 @@ const groundContactPoint = new Vector3();
 // const direction = new Vector3();
 // const translateScoped = new Vector3();
 const translate = new Vector3();
-const sphereCenter = new Vector3();
-const sphere = new Sphere();
+const capsule = new Capsule( new Vector3(), new Vector3(), 0 );
 
 const intersection = new Intersection();
 
@@ -33,6 +33,7 @@ export class CharacterController extends EventDispatcher {
 	isCharacterController = true;
 	object: Object3D;
 	radius: number;
+	height: number;
 	position = new Vector3();
 	groundCheckDepth = .2;
 	maxSlopeGradient = Math.cos( 50 * MathUtils.DEG2RAD );
@@ -52,17 +53,20 @@ export class CharacterController extends EventDispatcher {
 	contactInfo: {
 		depth: number;
 		point: Vector3;
+		normal: Vector3;
 		triangle: ComputedTriangle;
 	}[] = [];
 
 	private _events: () => void;
 
-	constructor( object3d: Object3D, radius: number ) {
+	constructor( object3d: Object3D, radius: number, height: number ) {
 
 		super();
 
 		this.object = object3d;
 		this.radius = radius;
+		// カプセルの全高（先端から先端まで）。幾何学的に最小でも球の直径（2 * radius）
+		this.height = Math.max( height, radius * 2 );
 		this.position.set( 0, 0, 0 );
 
 		let isFirstUpdate = true;
@@ -212,8 +216,8 @@ export class CharacterController extends EventDispatcher {
 
 			if ( this.maxSlopeGradient < normal.y || this.isOnSlope ) {
 
-			  // フェイスは地面なので、壁としての衝突の可能性はない。
-			  // 速度の減衰はしないでいい
+				// フェイスは地面なので、壁としての衝突の可能性はない。
+				// 速度の減衰はしないでいい
 				continue;
 
 			}
@@ -228,12 +232,12 @@ export class CharacterController extends EventDispatcher {
 			const wallAngle = Math.atan2( wallNormal2D.y, wallNormal2D.x );
 
 			if (
-			  Math.abs( negativeFrontAngle - wallAngle ) >= PI_HALF &&  //  90deg
+				Math.abs( negativeFrontAngle - wallAngle ) >= PI_HALF &&  //  90deg
 			  Math.abs( negativeFrontAngle - wallAngle ) <= PI_ONE_HALF // 270deg
 			) {
 
-			  // フェイスは進行方向とは逆方向、要は背中側の壁なので
-			  // 速度の減衰はしないでいい
+				// フェイスは進行方向とは逆方向、要は背中側の壁なので
+				// 速度の減衰はしないでいい
 				continue;
 
 			}
@@ -241,8 +245,8 @@ export class CharacterController extends EventDispatcher {
 			// 上記までの条件に一致しなければ、フェイスは壁
 			// 壁の法線を求めて、その逆方向に向いている速度ベクトルを0にする
 			wallNormal2D.set(
-			  direction2D.dot( wallNormal2D ) * wallNormal2D.x,
-			  direction2D.dot( wallNormal2D ) * wallNormal2D.y
+				direction2D.dot( wallNormal2D ) * wallNormal2D.x,
+				direction2D.dot( wallNormal2D ) * wallNormal2D.y
 			);
 			direction2D.sub( wallNormal2D );
 
@@ -283,7 +287,7 @@ export class CharacterController extends EventDispatcher {
 
 		groundingHead.set(
 			this.position.x,
-			this.position.y + this.radius * 2,
+			this.position.y + this.height,
 			this.position.z
 		);
 
@@ -377,8 +381,12 @@ export class CharacterController extends EventDispatcher {
 
 	_collisionDetection() {
 
-		sphereCenter.set( 0, this.radius, 0 ).add( this.position );
-		sphere.set( sphereCenter, this.radius );
+		// プレイヤーのカプセルを現在の position から作る
+		// start: 下半球の中心、end: 上半球の中心
+		const segment = this.height - this.radius * 2;
+		capsule.start.set( this.position.x, this.position.y + this.radius, this.position.z );
+		capsule.end.set( this.position.x, this.position.y + this.radius + segment, this.position.z );
+		capsule.radius = this.radius;
 
 		// 交差していそうなフェイス (nearTriangles) のリストから、
 		// 実際に交差している壁フェイスを抜き出して
@@ -392,14 +400,11 @@ export class CharacterController extends EventDispatcher {
 			const triangle = triangles[ i ];
 
 			if ( ! triangle.boundingSphere ) triangle.computeBoundingSphere();
-			if ( ! sphere.intersectsSphere( triangle.boundingSphere! ) ) continue;
+			if ( ! intersectsCapsuleSphere( capsule, triangle.boundingSphere! ) ) continue;
 
-			const isIntersected = intersectsSphereTriangle(
-				sphere,
-				triangle.a,
-				triangle.b,
-				triangle.c,
-				triangle.normal,
+			const isIntersected = intersectsCapsuleTriangle(
+				capsule,
+				triangle,
 				intersection,
 			);
 
@@ -407,6 +412,7 @@ export class CharacterController extends EventDispatcher {
 
 			this.contactInfo.push( {
 				point: intersection.point.clone(),
+				normal: intersection.normal.clone(),
 				depth: intersection.depth,
 				triangle,
 			} );
@@ -421,10 +427,6 @@ export class CharacterController extends EventDispatcher {
 		// 壁と衝突し食い込んでいる場合、
 		// ここで壁の外への押し出しをする
 
-		// let triangle;
-		let normal;
-		// let distance;
-
 		if ( this.contactInfo.length === 0 ) {
 
 			// 何とも衝突していない
@@ -435,28 +437,20 @@ export class CharacterController extends EventDispatcher {
 
 		}
 
-		//
 		// vs walls and sliding on the wall
+		// 壁に食い込んでいる分だけ、法線方向に押し出す（デペネトレーション）。
+		// これを毎ステップ行うことで、斜め・側面から高速で進入しても壁を貫通しない。
 		translate.set( 0, 0, 0 );
 		for ( let i = 0, l = this.contactInfo.length; i < l; i ++ ) {
 
-			// triangle = this.contactInfo[ i ].triangle;
-			normal = this.contactInfo[ i ].triangle.normal;
-			// distance = this.contactInfo[ i ].distance;
-
-			// if ( 0 <= distance ) {
-
-			//   // 交差点までの距離が 0 以上ならこのフェイスとは衝突していない
-			//   // 無視する
-			//   continue;
-
-			// }
+			const contact = this.contactInfo[ i ];
+			const normal = contact.triangle.normal;
 
 			if ( this.maxSlopeGradient < normal.y ) {
 
-			  // this triangle is a ground or slope, not a wall or ceil
-			  // フェイスは急勾配でない坂、つまり地面。
-			  // 接地の処理は updatePosition() 内で解決しているので無視する
+				// this triangle is a ground or slope, not a wall or ceil
+				// フェイスは急勾配でない坂、つまり地面。
+				// 接地の処理は updatePosition() 内で解決しているので無視する
 				continue;
 
 			}
@@ -469,37 +463,25 @@ export class CharacterController extends EventDispatcher {
 
 				this.isJumping = false;
 				this.isGrounded = true;
-			  // console.log( 'jump end' );
+				// console.log( 'jump end' );
 
 			}
 
-			// if ( this.isGrounded || this.isOnSlope ) {
-
-			//   // 地面の上にいる場合はy(縦)方向は同一のまま
-			//   // x, z (横) 方向だけを変更して押し出す
-			//   // http://gamedev.stackexchange.com/questions/80293/how-do-i-resolve-a-sphere-triangle-collision-in-a-given-direction
-			// 	sphereCenter.set( 0, this.radius, 0 ).add( this.position );
-			// 	point1.copy( normal ).multiplyScalar( - this.radius ).add( sphereCenter );
-			// 	direction.set( normal.x, 0, normal.z ).normalize();
-			// 	const plainD = triangle.a.dot( normal );
-			// 	const t = ( plainD - ( normal.x * point1.x + normal.y * point1.y + normal.z * point1.z ) ) / ( normal.x * direction.x + normal.y * direction.y + normal.z * direction.z );
-			// 	point2.copy( direction ).multiplyScalar( t ).add( point1 );
-			// 	translateScoped.subVectors( point2, point1 );
-
-			// 	if ( translate.lengthSq() < translateScoped.lengthSq() ) {
-
-			// 		translate.copy( translateScoped );
-
-			// 	}
-
-			// 	// break;
-			// 	continue;
-
-			// }
+			// 壁・天井: 貫通量 (contact.depth) を「最近点 → 中心」の接触法線方向へ押し出す。
+			// フェイス法線ではなく接触法線を使うことで、壁の辺・角に当たったときも
+			// 正しく壁の外側へ押し出される（フェイス法線だと角で横方向に弾かれ貫通する）。
+			// すでに translate で押し出した分を差し引き、二重押し出しを避ける。
+			const pushNormal = contact.normal;
+			const remaining = contact.depth - translate.dot( pushNormal );
+			if ( 0 < remaining ) translate.addScaledVector( pushNormal, remaining );
 
 		}
 
 		this.position.add( translate );
+
+		// 安全策: 接地しているなら、壁の押し出しによって地面より下へ沈み込ませない（床抜け防止）
+		if ( this.isGrounded && this.position.y < this.groundHeight ) this.position.y = this.groundHeight;
+
 		this.object.position.copy( this.position );
 		this.object.rotation.y = this.direction + Math.PI;
 
