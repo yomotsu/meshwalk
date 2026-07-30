@@ -1,7 +1,7 @@
 import { Vector3 } from 'three';
-import type { Object3D } from 'three';
+import { type Object3D } from 'three';
 import { EventDispatcher } from './EventDispatcher';
-import type { ComputedTriangle } from '../math/triangle';
+import { type ComputedTriangle } from '../math/triangle';
 export declare class CharacterController extends EventDispatcher {
     isCharacterController: boolean;
     object: Object3D;

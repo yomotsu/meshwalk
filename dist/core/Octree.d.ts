@@ -1,6 +1,5 @@
+import { Box3, Line3, Sphere, Vector3, type Ray, type Object3D } from 'three';
 import { ComputedTriangle } from '../math/triangle';
-import { Box3, Line3, Sphere, Vector3 } from 'three';
-import type { Ray, Object3D } from 'three';
 export declare class Octree {
     box: Box3;
     bounds: Box3;

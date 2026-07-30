@@ -12,6 +12,7 @@ import {
 
 	Ray,
 	Object3D,
+	PerspectiveCamera,
 } from 'three';
 import CameraControls from 'camera-controls';
 import { World } from 'core/World';
@@ -41,7 +42,7 @@ export class TPSCameraControls extends CameraControls {
 
 	world: World;
 
-	constructor( camera: THREE.PerspectiveCamera, trackObject: THREE.Object3D, world: World, domElement: HTMLElement ) {
+	constructor( camera: PerspectiveCamera, trackObject: Object3D, world: World, domElement: HTMLElement ) {
 
 		super( camera, domElement );
 		this.minDistance = 1;

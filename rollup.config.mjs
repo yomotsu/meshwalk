@@ -1,4 +1,4 @@
-import pkg from './package.json' assert { type: 'json' };
+import pkg from './package.json' with { type: 'json' };
 import rollupReplace from '@rollup/plugin-replace';
 import rollupTypescript from '@rollup/plugin-typescript';
 import nodeResolve from "@rollup/plugin-node-resolve";
@@ -13,21 +13,12 @@ const license = `/*!
 
 export default {
 	input: 'src/index.ts',
-	output: [
-		{
-			format: 'umd',
-			name: 'CameraControls',
-			file: pkg.main,
-			banner: license,
-			indent: '\t',
-		},
-		{
-			format: 'es',
-			file: pkg.module,
-			banner: license,
-			indent: '\t',
-		}
-	],
+	output: {
+		format: 'es',
+		file: pkg.module,
+		banner: license,
+		indent: '\t',
+	},
 	external: [
 		'three',
 	],

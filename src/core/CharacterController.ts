@@ -212,8 +212,8 @@ export class CharacterController extends EventDispatcher {
 
 			if ( this.maxSlopeGradient < normal.y || this.isOnSlope ) {
 
-			  // フェイスは地面なので、壁としての衝突の可能性はない。
-			  // 速度の減衰はしないでいい
+				// フェイスは地面なので、壁としての衝突の可能性はない。
+				// 速度の減衰はしないでいい
 				continue;
 
 			}
@@ -228,12 +228,12 @@ export class CharacterController extends EventDispatcher {
 			const wallAngle = Math.atan2( wallNormal2D.y, wallNormal2D.x );
 
 			if (
-			  Math.abs( negativeFrontAngle - wallAngle ) >= PI_HALF &&  //  90deg
+				Math.abs( negativeFrontAngle - wallAngle ) >= PI_HALF &&  //  90deg
 			  Math.abs( negativeFrontAngle - wallAngle ) <= PI_ONE_HALF // 270deg
 			) {
 
-			  // フェイスは進行方向とは逆方向、要は背中側の壁なので
-			  // 速度の減衰はしないでいい
+				// フェイスは進行方向とは逆方向、要は背中側の壁なので
+				// 速度の減衰はしないでいい
 				continue;
 
 			}
@@ -241,8 +241,8 @@ export class CharacterController extends EventDispatcher {
 			// 上記までの条件に一致しなければ、フェイスは壁
 			// 壁の法線を求めて、その逆方向に向いている速度ベクトルを0にする
 			wallNormal2D.set(
-			  direction2D.dot( wallNormal2D ) * wallNormal2D.x,
-			  direction2D.dot( wallNormal2D ) * wallNormal2D.y
+				direction2D.dot( wallNormal2D ) * wallNormal2D.x,
+				direction2D.dot( wallNormal2D ) * wallNormal2D.y
 			);
 			direction2D.sub( wallNormal2D );
 
@@ -454,9 +454,9 @@ export class CharacterController extends EventDispatcher {
 
 			if ( this.maxSlopeGradient < normal.y ) {
 
-			  // this triangle is a ground or slope, not a wall or ceil
-			  // フェイスは急勾配でない坂、つまり地面。
-			  // 接地の処理は updatePosition() 内で解決しているので無視する
+				// this triangle is a ground or slope, not a wall or ceil
+				// フェイスは急勾配でない坂、つまり地面。
+				// 接地の処理は updatePosition() 内で解決しているので無視する
 				continue;
 
 			}
@@ -469,7 +469,7 @@ export class CharacterController extends EventDispatcher {
 
 				this.isJumping = false;
 				this.isGrounded = true;
-			  // console.log( 'jump end' );
+				// console.log( 'jump end' );
 
 			}
 
