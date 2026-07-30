@@ -19,7 +19,8 @@
   "scripts": {
     "dev": "rollup --config --watch",
     "build": "rollup --config && terser dist/meshwalk.module.js -o dist/meshwalk.module.min.js --comments '/^!/'",
-    "lint": "eslint src"
+    "lint": "eslint src",
+    "test": "vitest run"
   },
   "devDependencies": {
     "@rollup/plugin-node-resolve": "^16.0.3",
@@ -33,7 +34,8 @@
     "lint-staged": "^17.2.0",
     "rollup": "^4.62.3",
     "terser": "^5.49.0",
-    "typescript": "^6.0.3"
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.10"
   },
   "dependencies": {
     "camera-controls": "^3.1.2"
