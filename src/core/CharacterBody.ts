@@ -36,14 +36,12 @@ export class CharacterBody extends Body {
 	height: number;
 	position = new Vector3();
 	groundCheckDepth = .2;
-	maxSlopeGradient = Math.cos( 50 * MathUtils.DEG2RAD );
+	slopeLimit = 50; // 度。これより急な面は登れず滑り落ちる（Unity の slopeLimit 相当）
 	isGrounded = false;
 	isOnSlope  = false;
 	isIdling   = false;
-	isRunning  = false;
+	isRunning  = false; // 派生状態: move() で移動が指定されているとき true
 	isJumping  = false;
-	direction  = 0; // 0 to 2PI (= 360deg) in rad
-	movementSpeed = 10; // Meters Per Second
 	velocity = new Vector3( 0, - 9.8, 0 );
 	currentJumpPower = 0;
 	jumpStartTime = 0;
@@ -57,7 +55,15 @@ export class CharacterBody extends Body {
 		triangle: ComputedTriangle;
 	}[] = [];
 
+	private _moveVelocity = new Vector3(); // move() で設定する望む水平速度
+	private _facingAngle = 0;              // 向き（移動方向から算出）
 	private _events: () => void;
+
+	private get _slopeLimitCos(): number {
+
+		return Math.cos( this.slopeLimit * MathUtils.DEG2RAD );
+
+	}
 
 	constructor( object3d: Object3D, radius: number, height: number ) {
 
@@ -143,6 +149,20 @@ export class CharacterBody extends Body {
 
 	}
 
+	/**
+	 * 望む水平移動速度をワールド座標で指定する（Unity CharacterController.Move / Godot velocity 相当）。
+	 * y 成分は無視する（上下は重力・ジャンプ・接地が扱う）。次に move() を呼ぶまで保持される。
+	 * 停止させるにはゼロベクトルを渡す。
+	 */
+	move( velocity: Vector3 ) {
+
+		this._moveVelocity.set( velocity.x, 0, velocity.z );
+		this.isRunning = this._moveVelocity.lengthSq() > 1e-8;
+		// 向きは移動方向に合わせる（移動している間のみ更新）
+		if ( this.isRunning ) this._facingAngle = Math.atan2( - this._moveVelocity.x, - this._moveVelocity.z );
+
+	}
+
 	update( deltaTime: number ) {
 
 		// 状態をリセットしておく
@@ -163,15 +183,12 @@ export class CharacterBody extends Body {
 
 	_updateVelocity() {
 
-		const frontDirection = - Math.cos( this.direction );
-		const rightDirection = - Math.sin( this.direction );
-
 		let isHittingCeiling = false;
 
 		this.velocity.set(
-			this.isRunning ? rightDirection * this.movementSpeed : 0,
+			this._moveVelocity.x,
 			FALL_VELOCITY,
-			this.isRunning ? frontDirection * this.movementSpeed : 0
+			this._moveVelocity.z
 		);
 
 		// 急勾配や自由落下など、自動で付与される速度の処理
@@ -205,7 +222,7 @@ export class CharacterBody extends Body {
 
 		// 壁に向かった場合、壁方向の速度を0にする処理
 		// vs walls and sliding on the wall
-		direction2D.set( rightDirection, frontDirection );
+		direction2D.set( this._moveVelocity.x, this._moveVelocity.z );
 		// const frontAngle = Math.atan2( direction2D.y, direction2D.x );
 		const negativeFrontAngle = Math.atan2( - direction2D.y, - direction2D.x );
 
@@ -214,7 +231,7 @@ export class CharacterBody extends Body {
 			const normal = this.contactInfo[ i ].triangle.normal;
 			// var distance = this.contactInfo[ i ].distance;
 
-			if ( this.maxSlopeGradient < normal.y || this.isOnSlope ) {
+			if ( this._slopeLimitCos < normal.y || this.isOnSlope ) {
 
 				// フェイスは地面なので、壁としての衝突の可能性はない。
 				// 速度の減衰はしないでいい
@@ -250,8 +267,8 @@ export class CharacterBody extends Body {
 			);
 			direction2D.sub( wallNormal2D );
 
-			this.velocity.x = this.isRunning ? direction2D.x * this.movementSpeed : 0;
-			this.velocity.z = this.isRunning ? direction2D.y * this.movementSpeed : 0;
+			this.velocity.x = direction2D.x;
+			this.velocity.z = direction2D.y;
 
 		}
 
@@ -355,7 +372,7 @@ export class CharacterBody extends Body {
 		}
 
 		this.isGrounded = ( bottom <= this.groundHeight && this.groundHeight <= top );
-		this.isOnSlope  = ( this.groundNormal.y <= this.maxSlopeGradient );
+		this.isOnSlope  = ( this.groundNormal.y <= this._slopeLimitCos );
 
 		if ( this.isGrounded ) {
 
@@ -432,7 +449,7 @@ export class CharacterBody extends Body {
 			// 何とも衝突していない
 			// position の値をそのままつかって終了
 			this.object.position.copy( this.position );
-			this.object.rotation.y = this.direction + Math.PI;
+			this.object.rotation.y = this._facingAngle + Math.PI;
 			return;
 
 		}
@@ -446,7 +463,7 @@ export class CharacterBody extends Body {
 			const contact = this.contactInfo[ i ];
 			const normal = contact.triangle.normal;
 
-			if ( this.maxSlopeGradient < normal.y ) {
+			if ( this._slopeLimitCos < normal.y ) {
 
 				// this triangle is a ground or slope, not a wall or ceil
 				// フェイスは急勾配でない坂、つまり地面。
@@ -456,7 +473,7 @@ export class CharacterBody extends Body {
 			}
 
 			// フェイスは急勾配な坂か否か
-			const isSlopeFace = ( this.maxSlopeGradient <= normal.y && normal.y < 1 );
+			const isSlopeFace = ( this._slopeLimitCos <= normal.y && normal.y < 1 );
 
 			// ジャンプ降下中に、急勾配な坂に衝突したらジャンプ終わり
 			if ( this.isJumping && 0 >= this.currentJumpPower && isSlopeFace ) {
@@ -483,11 +500,9 @@ export class CharacterBody extends Body {
 		if ( this.isGrounded && this.position.y < this.groundHeight ) this.position.y = this.groundHeight;
 
 		this.object.position.copy( this.position );
-		this.object.rotation.y = this.direction + Math.PI;
+		this.object.rotation.y = this._facingAngle + Math.PI;
 
 	}
-
-	setDirection() {}
 
 	jump() {
 

@@ -29,7 +29,7 @@ export class KeyInputControl extends EventDispatcher {
 	private isLeft  = false;
 	private isRight = false;
 	private isMoveKeyHolding = false;
-	private frontAngle = 0;
+	frontAngle = 0;
 
 	private _keydownListener: ( event: KeyboardEvent ) => void;
 	private _keyupListener: ( event: KeyboardEvent ) => void;

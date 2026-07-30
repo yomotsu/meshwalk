@@ -6,7 +6,7 @@ export declare class KeyInputControl extends EventDispatcher {
     private isLeft;
     private isRight;
     private isMoveKeyHolding;
-    private frontAngle;
+    frontAngle: number;
     private _keydownListener;
     private _keyupListener;
     private _blurListener;

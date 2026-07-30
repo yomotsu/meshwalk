@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
 	Object3D,
 	Mesh,
+	Vector3,
 	PlaneGeometry,
 	BoxGeometry,
 	MeshBasicMaterial,
@@ -13,6 +14,10 @@ import { CharacterBody } from '../src/core/CharacterBody';
 
 const PLAYER_RADIUS = 0.75;
 const PLAYER_HEIGHT = 3;
+
+const STOP = new Vector3();
+// dir(角度: 0=-z, 0.5PI=-x, 1.0PI=+z, 1.5PI=+x) から水平移動速度ベクトルを作る
+const moveVec = ( dir: number, speed = 10 ) => new Vector3( - Math.sin( dir ), 0, - Math.cos( dir ) ).multiplyScalar( speed );
 
 // demo2 相当のシーン（床 + 箱）を作る。
 // floor は端で落ちないよう十分大きく、セルサイズは demo2 と同じ 3 に合わせる。
@@ -58,7 +63,7 @@ function drive( world: World, player: CharacterBody, startX: number, startZ: num
 	player.velocity.set( 0, 0, 0 );
 	for ( let i = 0; i < 20; i ++ ) {
 
-		player.isRunning = false;
+		player.move( STOP );
 		world.fixedUpdate();
 
 	}
@@ -66,8 +71,7 @@ function drive( world: World, player: CharacterBody, startX: number, startZ: num
 	let minY = Infinity;
 	for ( let i = 0; i < iterations; i ++ ) {
 
-		player.isRunning = true;
-		player.direction = dir;
+		player.move( moveVec( dir ) );
 		world.fixedUpdate();
 		if ( player.position.y < minY ) minY = player.position.y;
 
@@ -89,7 +93,7 @@ describe( 'CharacterController capsule collision', () => {
 		player.velocity.set( 0, 0, 0 );
 		for ( let i = 0; i < 120; i ++ ) {
 
-			player.isRunning = false;
+			player.move( STOP );
 			world.fixedUpdate();
 
 		}
@@ -108,15 +112,14 @@ describe( 'CharacterController capsule collision', () => {
 			player.velocity.set( 0, 0, 0 );
 			for ( let i = 0; i < 20; i ++ ) {
 
-				player.isRunning = false; world.fixedUpdate();
+				player.move( STOP ); world.fixedUpdate();
 
 			}
 
 			let tunneled = false;
 			for ( let i = 0; i < 300; i ++ ) {
 
-				player.isRunning = true;
-				player.direction = DIR.posX; // +x（左面 x=-2.5 へ突入）
+				player.move( moveVec( DIR.posX ) ); // +x（左面 x=-2.5 へ突入）
 				world.fixedUpdate();
 				if ( isInsideFootprint( player.position, footprint ) ) tunneled = true;
 
@@ -139,15 +142,14 @@ describe( 'CharacterController capsule collision', () => {
 			player.velocity.set( 0, 0, 0 );
 			for ( let i = 0; i < 20; i ++ ) {
 
-				player.isRunning = false; world.fixedUpdate();
+				player.move( STOP ); world.fixedUpdate();
 
 			}
 
 			let tunneled = false;
 			for ( let i = 0; i < 260; i ++ ) {
 
-				player.isRunning = true;
-				player.direction = dir;
+				player.move( moveVec( dir ) );
 				world.fixedUpdate();
 				if ( isInsideFootprint( player.position, footprint ) ) tunneled = true;
 
@@ -193,7 +195,7 @@ describe( 'CharacterController capsule collision', () => {
 			player.velocity.set( 0, 0, 0 );
 			for ( let i = 0; i < 60; i ++ ) {
 
-				player.isRunning = false; world.fixedUpdate();
+				player.move( STOP ); world.fixedUpdate();
 
 			}
 			expect( player.position.y, `x=${x} で上面に着地していない` ).toBeCloseTo( 5, 0 );
@@ -201,8 +203,7 @@ describe( 'CharacterController capsule collision', () => {
 			let minY = Infinity;
 			for ( let i = 0; i < 220; i ++ ) {
 
-				player.isRunning = true;
-				player.direction = DIR.negZ; // 奥(-z)へ歩いて端から降りる
+				player.move( moveVec( DIR.negZ ) ); // 奥(-z)へ歩いて端から降りる
 				world.fixedUpdate();
 				if ( player.position.y < minY ) minY = player.position.y;
 

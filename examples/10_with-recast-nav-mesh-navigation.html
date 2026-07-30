@@ -63,8 +63,8 @@ const playerObjectHolder = new THREE.Object3D();
 playerObjectHolder.position.set( 0, 10, 0 );
 scene.add( playerObjectHolder );
 
-const playerRadius = .75;
-const playerHeight = 3;
+const playerRadius = .5;
+const playerHeight = 2;
 // const capsule = new THREE.Mesh(
 // 	new THREE.CapsuleGeometry( playerRadius, playerHeight - playerRadius * 2, 4, 16 ),
 // 	new THREE.MeshBasicMaterial( { color: 0xff0000,  wireframe: true} )
@@ -85,27 +85,24 @@ const tpsCameraControls = new MW.TPSCameraControls(
 
 // bind events
 const keyInputControl = new MW.KeyInputControl();
-keyInputControl.addEventListener( 'movekeyon', () => { playerController.isRunning = true; } );
-keyInputControl.addEventListener( 'movekeyoff', () => { playerController.isRunning = false; } );
-keyInputControl.addEventListener( 'jumpkeypress', () => { playerController.jump(); } );
+// キー入力 + カメラの向きから、望む水平移動速度ベクトルを作って move() に渡す
+const _moveDir = new THREE.Vector3();
+const applyMove = () => {
 
-// synk with keybord input and camera control input
-keyInputControl.addEventListener( 'movekeychange', () => {
+	const angle = tpsCameraControls.frontAngle + keyInputControl.frontAngle;
+	playerController.move( _moveDir.set( - Math.sin( angle ), 0, - Math.cos( angle ) ).multiplyScalar( 10 ) );
 
-	const cameraFrontAngle = tpsCameraControls.frontAngle;
-	const characterFrontAngle = keyInputControl.frontAngle;
-	playerController.direction = cameraFrontAngle + characterFrontAngle;
+};
 
-} );
+keyInputControl.addEventListener( 'movekeyon',     applyMove );
+keyInputControl.addEventListener( 'movekeychange', applyMove );
+keyInputControl.addEventListener( 'movekeyoff',    () => playerController.move( _moveDir.set( 0, 0, 0 ) ) );
+keyInputControl.addEventListener( 'jumpkeypress',  () => playerController.jump() );
 
-// 'updated' event is fired by `tpsCameraControls.update()`
+// 移動中はカメラの向きに追従させる（'update' は tpsCameraControls.update() が発火）
 tpsCameraControls.addEventListener( 'update', () => {
 
-	if ( ! playerController.isRunning ) return;
-
-	const cameraFrontAngle = tpsCameraControls.frontAngle;
-	const characterFrontAngle = keyInputControl.frontAngle;
-	playerController.direction = cameraFrontAngle + characterFrontAngle;
+	if ( playerController.isRunning ) applyMove();
 
 } );
 
@@ -234,7 +231,7 @@ const checkAutoPilotState = () => {
 		animationController.play( 'run' );
 		const agentVelocity = crowd.getAgentVelocity( agentIndex )
 		direction.set( - agentVelocity.z, - agentVelocity.x ).normalize();
-		if ( Math.abs( agentVelocity.x ) > 1e-10 || Math.abs( agentVelocity.y ) > 1e-10 ) playerController.direction = direction.angle();
+		if ( Math.abs( agentVelocity.x ) > 1e-10 || Math.abs( agentVelocity.y ) > 1e-10 ) { const a = direction.angle(); playerController.move( _moveDir.set( - Math.sin( a ), 0, - Math.cos( a ) ) ); }
 		playerController.teleport( agentPosition.x, agentPosition.y - 0.25, agentPosition.z );
 
 	}

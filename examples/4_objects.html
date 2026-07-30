@@ -160,8 +160,8 @@ scene.add( object6Helper );
 
 
 
-const playerRadius = .75;
-const playerHeight = 3;
+const playerRadius = .5;
+const playerHeight = 2;
 const playerObjectHolder = new THREE.Object3D();
 scene.add( playerObjectHolder );
 
@@ -177,7 +177,7 @@ playerController.teleport( 0, 10, 0 );
 world.add( playerController );
 window.setMaxSlopeGradient = ( deg ) => {
 
-	playerController.maxSlopeGradient = Math.cos( deg * THREE.MathUtils.DEG2RAD );
+	playerController.slopeLimit = deg;
 
 };
 
@@ -191,27 +191,24 @@ const tpsCameraControls = new MW.TPSCameraControls(
 );
 
 // bind events
-keyInputControl.addEventListener( 'movekeyon',    () => playerController.isRunning = true );
-keyInputControl.addEventListener( 'movekeyoff',   () => playerController.isRunning = false );
-keyInputControl.addEventListener( 'jumpkeypress', () => playerController.jump() );
+// キー入力 + カメラの向きから、望む水平移動速度ベクトルを作って move() に渡す
+const _moveDir = new THREE.Vector3();
+const applyMove = () => {
 
-// synk with keybord input and camera control input
-keyInputControl.addEventListener( 'movekeychange', () => {
+	const angle = tpsCameraControls.frontAngle + keyInputControl.frontAngle;
+	playerController.move( _moveDir.set( - Math.sin( angle ), 0, - Math.cos( angle ) ).multiplyScalar( 10 ) );
 
-	const cameraFrontAngle = tpsCameraControls.frontAngle;
-	const characterFrontAngle = keyInputControl.frontAngle;
-	playerController.direction = cameraFrontAngle + characterFrontAngle;
+};
 
-} );
+keyInputControl.addEventListener( 'movekeyon',     applyMove );
+keyInputControl.addEventListener( 'movekeychange', applyMove );
+keyInputControl.addEventListener( 'movekeyoff',    () => playerController.move( _moveDir.set( 0, 0, 0 ) ) );
+keyInputControl.addEventListener( 'jumpkeypress',  () => playerController.jump() );
 
-// the 'updated' event is fired by `tpsCameraControls.update()`
+// 移動中はカメラの向きに追従させる（'update' は tpsCameraControls.update() が発火）
 tpsCameraControls.addEventListener( 'update', () => {
 
-	if ( ! playerController.isRunning ) return;
-
-	const cameraFrontAngle = tpsCameraControls.frontAngle;
-	const characterFrontAngle = keyInputControl.frontAngle;
-	playerController.direction = cameraFrontAngle + characterFrontAngle;
+	if ( playerController.isRunning ) applyMove();
 
 } );
 

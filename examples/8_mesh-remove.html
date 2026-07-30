@@ -78,8 +78,8 @@ window.removeBox = () => {
 }
 
 
-const playerRadius = .75;
-const playerHeight = 3;
+const playerRadius = .5;
+const playerHeight = 2;
 const playerObjectHolder = new THREE.Object3D();
 scene.add( playerObjectHolder );
 
@@ -98,9 +98,18 @@ world.add( playerController );
 const keyInputControl = new MW.KeyInputControl();
 
 // bind events
-keyInputControl.addEventListener( 'movekeyon',     () => playerController.isRunning = true );
-keyInputControl.addEventListener( 'movekeyoff',    () => playerController.isRunning = false );
-keyInputControl.addEventListener( 'movekeychange', () => playerController.direction = keyInputControl.frontAngle );
+// キー入力の向きから、望む水平移動速度ベクトルを作って move() に渡す
+const _moveDir = new THREE.Vector3();
+const applyMove = () => {
+
+	const angle = keyInputControl.frontAngle;
+	playerController.move( _moveDir.set( - Math.sin( angle ), 0, - Math.cos( angle ) ).multiplyScalar( 10 ) );
+
+};
+
+keyInputControl.addEventListener( 'movekeyon',     applyMove );
+keyInputControl.addEventListener( 'movekeychange', applyMove );
+keyInputControl.addEventListener( 'movekeyoff',    () => playerController.move( _moveDir.set( 0, 0, 0 ) ) );
 keyInputControl.addEventListener( 'jumpkeypress',  () => playerController.jump() );
 
 

@@ -976,19 +976,20 @@ const translate = new Vector3();
 const capsule = new Capsule(new Vector3(), new Vector3(), 0);
 const intersection = new Intersection();
 class CharacterBody extends Body {
+    get _slopeLimitCos() {
+        return Math.cos(this.slopeLimit * MathUtils.DEG2RAD);
+    }
     constructor(object3d, radius, height) {
         super();
         this.isCharacterBody = true;
         this.position = new Vector3();
         this.groundCheckDepth = .2;
-        this.maxSlopeGradient = Math.cos(50 * MathUtils.DEG2RAD);
+        this.slopeLimit = 50; // 度。これより急な面は登れず滑り落ちる（Unity の slopeLimit 相当）
         this.isGrounded = false;
         this.isOnSlope = false;
         this.isIdling = false;
-        this.isRunning = false;
+        this.isRunning = false; // 派生状態: move() で移動が指定されているとき true
         this.isJumping = false;
-        this.direction = 0; // 0 to 2PI (= 360deg) in rad
-        this.movementSpeed = 10; // Meters Per Second
         this.velocity = new Vector3(0, -9.8, 0);
         this.currentJumpPower = 0;
         this.jumpStartTime = 0;
@@ -996,6 +997,8 @@ class CharacterBody extends Body {
         this.groundNormal = new Vector3();
         this.nearTriangles = [];
         this.contactInfo = [];
+        this._moveVelocity = new Vector3(); // move() で設定する望む水平速度
+        this._facingAngle = 0; // 向き（移動方向から算出）
         this.object = object3d;
         this.radius = radius;
         // カプセルの全高（先端から先端まで）。幾何学的に最小でも球の直径（2 * radius）
@@ -1049,6 +1052,18 @@ class CharacterBody extends Body {
     setNearTriangles(nearTriangles) {
         this.nearTriangles = nearTriangles;
     }
+    /**
+     * 望む水平移動速度をワールド座標で指定する（Unity CharacterController.Move / Godot velocity 相当）。
+     * y 成分は無視する（上下は重力・ジャンプ・接地が扱う）。次に move() を呼ぶまで保持される。
+     * 停止させるにはゼロベクトルを渡す。
+     */
+    move(velocity) {
+        this._moveVelocity.set(velocity.x, 0, velocity.z);
+        this.isRunning = this._moveVelocity.lengthSq() > 1e-8;
+        // 向きは移動方向に合わせる（移動している間のみ更新）
+        if (this.isRunning)
+            this._facingAngle = Math.atan2(-this._moveVelocity.x, -this._moveVelocity.z);
+    }
     update(deltaTime) {
         // 状態をリセットしておく
         this.isGrounded = false;
@@ -1064,10 +1079,8 @@ class CharacterBody extends Body {
         this._events();
     }
     _updateVelocity() {
-        const frontDirection = -Math.cos(this.direction);
-        const rightDirection = -Math.sin(this.direction);
         let isHittingCeiling = false;
-        this.velocity.set(this.isRunning ? rightDirection * this.movementSpeed : 0, FALL_VELOCITY, this.isRunning ? frontDirection * this.movementSpeed : 0);
+        this.velocity.set(this._moveVelocity.x, FALL_VELOCITY, this._moveVelocity.z);
         // 急勾配や自由落下など、自動で付与される速度の処理
         if (this.contactInfo.length === 0 && !this.isJumping) {
             // 何とも衝突していないので、自由落下
@@ -1089,13 +1102,13 @@ class CharacterBody extends Body {
         }
         // 壁に向かった場合、壁方向の速度を0にする処理
         // vs walls and sliding on the wall
-        direction2D.set(rightDirection, frontDirection);
+        direction2D.set(this._moveVelocity.x, this._moveVelocity.z);
         // const frontAngle = Math.atan2( direction2D.y, direction2D.x );
         const negativeFrontAngle = Math.atan2(-direction2D.y, -direction2D.x);
         for (let i = 0, l = this.contactInfo.length; i < l; i++) {
             const normal = this.contactInfo[i].triangle.normal;
             // var distance = this.contactInfo[ i ].distance;
-            if (this.maxSlopeGradient < normal.y || this.isOnSlope) {
+            if (this._slopeLimitCos < normal.y || this.isOnSlope) {
                 // フェイスは地面なので、壁としての衝突の可能性はない。
                 // 速度の減衰はしないでいい
                 continue;
@@ -1116,8 +1129,8 @@ class CharacterBody extends Body {
             // 壁の法線を求めて、その逆方向に向いている速度ベクトルを0にする
             wallNormal2D.set(direction2D.dot(wallNormal2D) * wallNormal2D.x, direction2D.dot(wallNormal2D) * wallNormal2D.y);
             direction2D.sub(wallNormal2D);
-            this.velocity.x = this.isRunning ? direction2D.x * this.movementSpeed : 0;
-            this.velocity.z = this.isRunning ? direction2D.y * this.movementSpeed : 0;
+            this.velocity.x = direction2D.x;
+            this.velocity.z = direction2D.y;
         }
         // ジャンプ中に天井にぶつかったら、ジャンプを中断する
         if (isHittingCeiling) {
@@ -1182,7 +1195,7 @@ class CharacterBody extends Body {
             return;
         }
         this.isGrounded = (bottom <= this.groundHeight && this.groundHeight <= top);
-        this.isOnSlope = (this.groundNormal.y <= this.maxSlopeGradient);
+        this.isOnSlope = (this.groundNormal.y <= this._slopeLimitCos);
         if (this.isGrounded) {
             this.isJumping = false;
         }
@@ -1231,7 +1244,7 @@ class CharacterBody extends Body {
             // 何とも衝突していない
             // position の値をそのままつかって終了
             this.object.position.copy(this.position);
-            this.object.rotation.y = this.direction + Math.PI;
+            this.object.rotation.y = this._facingAngle + Math.PI;
             return;
         }
         // vs walls and sliding on the wall
@@ -1241,14 +1254,14 @@ class CharacterBody extends Body {
         for (let i = 0, l = this.contactInfo.length; i < l; i++) {
             const contact = this.contactInfo[i];
             const normal = contact.triangle.normal;
-            if (this.maxSlopeGradient < normal.y) {
+            if (this._slopeLimitCos < normal.y) {
                 // this triangle is a ground or slope, not a wall or ceil
                 // フェイスは急勾配でない坂、つまり地面。
                 // 接地の処理は updatePosition() 内で解決しているので無視する
                 continue;
             }
             // フェイスは急勾配な坂か否か
-            const isSlopeFace = (this.maxSlopeGradient <= normal.y && normal.y < 1);
+            const isSlopeFace = (this._slopeLimitCos <= normal.y && normal.y < 1);
             // ジャンプ降下中に、急勾配な坂に衝突したらジャンプ終わり
             if (this.isJumping && 0 >= this.currentJumpPower && isSlopeFace) {
                 this.isJumping = false;
@@ -1269,9 +1282,8 @@ class CharacterBody extends Body {
         if (this.isGrounded && this.position.y < this.groundHeight)
             this.position.y = this.groundHeight;
         this.object.position.copy(this.position);
-        this.object.rotation.y = this.direction + Math.PI;
+        this.object.rotation.y = this._facingAngle + Math.PI;
     }
-    setDirection() { }
     jump() {
         if (this.isJumping || !this.isGrounded || this.isOnSlope)
             return;

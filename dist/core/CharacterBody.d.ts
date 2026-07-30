@@ -9,14 +9,12 @@ export declare class CharacterBody extends Body {
     height: number;
     position: Vector3;
     groundCheckDepth: number;
-    maxSlopeGradient: number;
+    slopeLimit: number;
     isGrounded: boolean;
     isOnSlope: boolean;
     isIdling: boolean;
     isRunning: boolean;
     isJumping: boolean;
-    direction: number;
-    movementSpeed: number;
     velocity: Vector3;
     currentJumpPower: number;
     jumpStartTime: number;
@@ -29,16 +27,24 @@ export declare class CharacterBody extends Body {
         normal: Vector3;
         triangle: ComputedTriangle;
     }[];
+    private _moveVelocity;
+    private _facingAngle;
     private _events;
+    private get _slopeLimitCos();
     constructor(object3d: Object3D, radius: number, height: number);
     setNearTriangles(nearTriangles: ComputedTriangle[]): void;
+    /**
+     * 望む水平移動速度をワールド座標で指定する（Unity CharacterController.Move / Godot velocity 相当）。
+     * y 成分は無視する（上下は重力・ジャンプ・接地が扱う）。次に move() を呼ぶまで保持される。
+     * 停止させるにはゼロベクトルを渡す。
+     */
+    move(velocity: Vector3): void;
     update(deltaTime: number): void;
     _updateVelocity(): void;
     _checkGround(): void;
     _updatePosition(deltaTime: number): void;
     _collisionDetection(): void;
     _solvePosition(): void;
-    setDirection(): void;
     jump(): void;
     _updateJumping(): void;
     teleport(x: number, y: number, z: number): void;
