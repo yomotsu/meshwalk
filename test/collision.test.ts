@@ -8,8 +8,8 @@ import {
 	MathUtils,
 } from 'three';
 import { World } from '../src/core/World';
-import { Octree } from '../src/core/Octree';
-import { CharacterController } from '../src/core/CharacterController';
+import { StaticBody } from '../src/core/StaticBody';
+import { CharacterBody } from '../src/core/CharacterBody';
 
 const PLAYER_RADIUS = 0.75;
 const PLAYER_HEIGHT = 3;
@@ -19,21 +19,22 @@ const PLAYER_HEIGHT = 3;
 function makeScene( { boxSize = [ 5, 5, 10 ] as [ number, number, number ] } = {} ) {
 
 	const world = new World();
-	const octree = new Octree();
-	world.add( octree );
 
 	const floor = new Mesh( new PlaneGeometry( 198, 198, 66, 66 ), new MeshBasicMaterial() );
 	floor.rotation.x = - 90 * MathUtils.DEG2RAD;
 	floor.updateMatrixWorld( true );
-	octree.addGraphNode( floor );
 
 	const [ bx, by, bz ] = boxSize;
 	const box = new Mesh( new BoxGeometry( bx, by, bz ), new MeshBasicMaterial() );
 	box.position.set( 0, by / 2, 0 ); // 床の上に載せる
 	box.updateMatrixWorld( true );
-	octree.addGraphNode( box );
 
-	const player = new CharacterController( new Object3D(), PLAYER_RADIUS, PLAYER_HEIGHT );
+	const level = new StaticBody();
+	level.addFromObject( floor );
+	level.addFromObject( box );
+	world.add( level );
+
+	const player = new CharacterBody( new Object3D(), PLAYER_RADIUS, PLAYER_HEIGHT );
 	world.add( player );
 
 	// 箱の水平フットプリント（中心がこの内側に入る = 箱にめり込み）
@@ -51,7 +52,7 @@ function isInsideFootprint( p: { x: number; z: number }, fp: ReturnType<typeof m
 }
 
 // startX, startZ に着地させてから dir 方向へ iterations フレーム移動させ、最小 y を返す。
-function drive( world: World, player: CharacterController, startX: number, startZ: number, dir: number, iterations: number ) {
+function drive( world: World, player: CharacterBody, startX: number, startZ: number, dir: number, iterations: number ) {
 
 	player.teleport( startX, 0, startZ );
 	player.velocity.set( 0, 0, 0 );

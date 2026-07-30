@@ -4,9 +4,7 @@ import {
 	// Plane,
 	Sphere,
 	Vector3,
-	Mesh,
 	type Ray,
-	type Object3D,
 } from 'three';
 // import { Capsule } from '../math/Capsule.js';
 import { ComputedTriangle } from '../math/triangle';
@@ -302,59 +300,6 @@ export class Octree {
 		}
 
 		return distanceSquared < 1e100 ? { distance: Math.sqrt( distanceSquared ), triangle, position } : false;
-
-	}
-
-	addGraphNode( object: Object3D ) {
-
-		object.updateWorldMatrix( true, true );
-		object.traverse( ( childObject ) => {
-
-			if ( childObject instanceof Mesh ) {
-
-				const mesh = childObject;
-				const geometry   = mesh.geometry.clone();
-				geometry.applyMatrix4( mesh.matrix );
-				geometry.computeVertexNormals();
-
-				if ( !! geometry.index ) {
-
-					const indices   = geometry.index.array;
-					const positions = geometry.attributes.position.array;
-					const groups   = ( geometry.groups.length !== 0 ) ? geometry.groups : [ { start: 0, count: indices.length, materialIndex: 0 } ];
-
-					for ( let i = 0, l = groups.length; i < l; ++ i ) {
-
-						const start  = groups[ i ].start;
-						const count  = groups[ i ].count;
-
-						for ( let ii = start, ll = start + count; ii < ll; ii += 3 ) {
-
-							const a = indices[ ii ];
-							const b = indices[ ii + 1 ];
-							const c = indices[ ii + 2 ];
-
-							const vA = new Vector3().fromArray( positions, a * 3 );
-							const vB = new Vector3().fromArray( positions, b * 3 );
-							const vC = new Vector3().fromArray( positions, c * 3 );
-
-							const triangle = new ComputedTriangle( vA, vB, vC );
-							// ポリゴンの継ぎ目の辺で raycast が交差しない可能性があるので、わずかに拡大する
-							triangle.extend( 1e-10 );
-							triangle.computeBoundingSphere();
-							this.addTriangle( triangle );
-
-						}
-
-					}
-
-				}
-
-			}
-
-		} );
-
-		this.build();
 
 	}
 

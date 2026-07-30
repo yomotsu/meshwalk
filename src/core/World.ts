@@ -1,14 +1,15 @@
 import { Sphere } from 'three';
 import { ComputedTriangle } from '../math/triangle';
-import { Octree } from './Octree';
-import { CharacterController } from './CharacterController';
+import { Body } from './Body';
+import { StaticBody } from './StaticBody';
+import { CharacterBody } from './CharacterBody';
 
 const sphere = new Sphere();
 
 export class World {
 
-	colliderPool: Octree[] = [];
-	characterPool: CharacterController[] = [];
+	private _staticBodies: StaticBody[] = [];
+	private _characterBodies: CharacterBody[] = [];
 	private _fps: number;
 	private _stepsPerFrame: number;
 
@@ -19,41 +20,46 @@ export class World {
 
 	}
 
-	add( object: Octree | CharacterController ) {
+	/**
+	 * 静的ボディ一覧（読み取り専用）。カメラのレイ衝突など内部処理から参照する。
+	 */
+	get colliders(): readonly StaticBody[] {
 
-		if ( object instanceof Octree ) {
+		return this._staticBodies;
 
-			this.colliderPool.push( object );
+	}
 
-		}
+	add( body: Body ): void {
 
-		if ( object instanceof CharacterController ) {
+		if ( body instanceof StaticBody ) {
 
-			this.characterPool.push( object );
+			if ( this._staticBodies.indexOf( body ) === - 1 ) this._staticBodies.push( body );
+
+		} else if ( body instanceof CharacterBody ) {
+
+			if ( this._characterBodies.indexOf( body ) === - 1 ) this._characterBodies.push( body );
 
 		}
 
 	}
 
-	remove( object: Octree | CharacterController ) {
+	remove( body: Body ): void {
 
-		if ( object instanceof Octree ) {
+		if ( body instanceof StaticBody ) {
 
-			const index = this.colliderPool.indexOf( object );
-			if ( index !== - 1 ) this.colliderPool.splice( index, 1 );
+			const index = this._staticBodies.indexOf( body );
+			if ( index !== - 1 ) this._staticBodies.splice( index, 1 );
 
-		}
+		} else if ( body instanceof CharacterBody ) {
 
-		if ( object instanceof CharacterController ) {
-
-			const index = this.characterPool.indexOf( object );
-			if ( index !== - 1 ) this.characterPool.splice( index, 1 );
+			const index = this._characterBodies.indexOf( body );
+			if ( index !== - 1 ) this._characterBodies.splice( index, 1 );
 
 		}
 
 	}
 
-	fixedUpdate() {
+	fixedUpdate(): void {
 
 		const deltaTime = 1 / this._fps;
 		const stepDeltaTime = deltaTime / this._stepsPerFrame;
@@ -66,22 +72,20 @@ export class World {
 
 	}
 
-	step( stepDeltaTime: number ) {
+	step( stepDeltaTime: number ): void {
 
-		for ( let i = 0, l = this.characterPool.length; i < l; i ++ ) {
+		for ( let i = 0, l = this._characterBodies.length; i < l; i ++ ) {
 
-			const character = this.characterPool[ i ];
-			let triangles: ComputedTriangle[] = [];
+			const character = this._characterBodies[ i ];
+			const triangles: ComputedTriangle[] = [];
 
-			// octree で絞られた node に含まれる face だけを
-			// character に渡して判定する
-			for ( let ii = 0, ll = this.colliderPool.length; ii < ll; ii ++ ) {
+			// キャラクターのカプセル全体を囲む sphere で broad-phase して、
+			// 近傍の三角形だけを character に渡して判定する
+			for ( let ii = 0, ll = this._staticBodies.length; ii < ll; ii ++ ) {
 
-				const octree = this.colliderPool[ ii ];
-				// キャラクターのカプセル全体を囲む sphere で broad-phase
 				sphere.center.set( 0, character.height / 2, 0 ).add( character.position );
 				sphere.radius = character.height / 2 + character.groundCheckDepth;
-				triangles.push( ...octree.getSphereTriangles( sphere, [] ) );
+				this._staticBodies[ ii ].getSphereTriangles( sphere, triangles );
 
 			}
 
@@ -89,6 +93,15 @@ export class World {
 			character.update( stepDeltaTime );
 
 		}
+
+	}
+
+	dispose(): void {
+
+		for ( let i = 0; i < this._staticBodies.length; i ++ ) this._staticBodies[ i ].dispose();
+		for ( let i = 0; i < this._characterBodies.length; i ++ ) this._characterBodies[ i ].dispose();
+		this._staticBodies.length = 0;
+		this._characterBodies.length = 0;
 
 	}
 

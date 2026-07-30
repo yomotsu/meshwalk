@@ -42,8 +42,8 @@ import * as MW from '../dist/meshwalk.module.js';
 // See demo/2_keyboardInput.html first
 
 const world = new MW.World();
-const octree = new MW.Octree();
-world.add( octree );
+const staticBody = new MW.StaticBody();
+world.add( staticBody );
 
 
 const width = window.innerWidth;
@@ -67,7 +67,7 @@ const ground = new THREE.Mesh(
 );
 ground.rotation.x = - 90 * THREE.MathUtils.DEG2RAD;
 scene.add( ground );
-octree.addGraphNode( ground );
+staticBody.addFromObject( ground );
 
 const groundHelper = new THREE.LineSegments( new THREE.WireframeGeometry( ground.geometry ) );
 groundHelper.rotation.copy( ground.rotation );
@@ -81,7 +81,7 @@ const object1 = new THREE.Mesh(
 );
 object1.position.set( 0, 2, 0 );
 scene.add( object1 );
-octree.addGraphNode( object1 );
+staticBody.addFromObject( object1 );
 
 const object1Helper = new THREE.LineSegments( new THREE.WireframeGeometry( object1.geometry ) );
 object1Helper.position.copy( object1.position );
@@ -96,7 +96,7 @@ const object2 = new THREE.Mesh(
 object2.position.set( - 15, 0, 0 );
 object2.rotation.set( 20 * THREE.MathUtils.DEG2RAD, 0, 0 );
 scene.add( object2 );
-octree.addGraphNode( object2 );
+staticBody.addFromObject( object2 );
 
 const object2Helper = new THREE.LineSegments( new THREE.WireframeGeometry( object2.geometry ) );
 object2Helper.position.copy( object2.position );
@@ -110,7 +110,7 @@ const object3 = new THREE.Mesh(
 object3.position.set( - 15, 4.5, - 8 );
 object3.rotation.set( 40 * THREE.MathUtils.DEG2RAD, 0, 0 );
 scene.add( object3 );
-octree.addGraphNode( object3 );
+staticBody.addFromObject( object3 );
 
 const object3Helper = new THREE.LineSegments( new THREE.WireframeGeometry( object3.geometry ) );
 object3Helper.position.copy( object3.position );
@@ -125,7 +125,7 @@ const object4 = new THREE.Mesh(
 object4.position.set( - 15, 10.5, - 13 );
 object4.rotation.set( 60 * THREE.MathUtils.DEG2RAD, 0, 0 );
 scene.add( object4 );
-octree.addGraphNode( object4 );
+staticBody.addFromObject( object4 );
 
 const object4Helper = new THREE.LineSegments( new THREE.WireframeGeometry( object4.geometry ) );
 object4Helper.position.copy( object4.position );
@@ -139,7 +139,7 @@ const object5 = new THREE.Mesh(
 );
 object5.position.set( 20, 0, 0 );
 scene.add( object5 );
-octree.addGraphNode( object5 );
+staticBody.addFromObject( object5 );
 
 const object5Helper = new THREE.LineSegments( new THREE.WireframeGeometry( object5.geometry ) );
 object5Helper.position.copy( object5.position );
@@ -152,7 +152,7 @@ const object6 = new THREE.Mesh(
 );
 object6.position.set( 8, 7, 0 );
 scene.add( object6 );
-octree.addGraphNode( object6 );
+staticBody.addFromObject( object6 );
 
 const object6Helper = new THREE.LineSegments( new THREE.WireframeGeometry( object6.geometry ) );
 object6Helper.position.copy( object6.position );
@@ -172,7 +172,7 @@ const capsule = new THREE.Mesh(
 capsule.position.y = playerHeight / 2;
 playerObjectHolder.add( capsule );
 
-const playerController = new MW.CharacterController( playerObjectHolder, playerRadius, playerHeight );
+const playerController = new MW.CharacterBody( playerObjectHolder, playerRadius, playerHeight );
 playerController.teleport( 0, 10, 0 );
 world.add( playerController );
 window.setMaxSlopeGradient = ( deg ) => {
@@ -216,7 +216,7 @@ tpsCameraControls.addEventListener( 'update', () => {
 } );
 
 
-// const helper = new OctreeHelper( octree );
+// const helper = new OctreeHelper( staticBody );
 // scene.add( helper );
 
 ( function update () {

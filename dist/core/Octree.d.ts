@@ -1,4 +1,4 @@
-import { Box3, Line3, Sphere, Vector3, type Ray, type Object3D } from 'three';
+import { Box3, Line3, Sphere, Vector3, type Ray } from 'three';
 import { ComputedTriangle } from '../math/triangle';
 export declare class Octree {
     box: Box3;
@@ -24,5 +24,4 @@ export declare class Octree {
         triangle: ComputedTriangle | undefined;
         position: Vector3 | undefined;
     } | undefined;
-    addGraphNode(object: Object3D): void;
 }

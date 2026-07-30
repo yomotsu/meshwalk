@@ -36,10 +36,10 @@ import * as MW from '../dist/meshwalk.module.js';
 // See demo/1_getstarted.html first
 
 const world = new MW.World();
-const octree1 = new MW.Octree();
-world.add( octree1 );
-const octree2 = new MW.Octree();
-world.add( octree2 );
+const staticBody1 = new MW.StaticBody();
+world.add( staticBody1 );
+const staticBody2 = new MW.StaticBody();
+world.add( staticBody2 );
 
 
 const width = window.innerWidth;
@@ -58,7 +58,7 @@ const ground = new THREE.Mesh(
 );
 ground.rotation.x =  - 90 * THREE.MathUtils.DEG2RAD;
 scene.add( ground );
-octree1.addGraphNode( ground );
+staticBody1.addFromObject( ground );
 
 
 const wall = new THREE.Mesh(
@@ -68,12 +68,12 @@ const wall = new THREE.Mesh(
 wall.position.set( 0, 3, 0 );
 // wall.rotation.set( 0, 0, 20 * THREE.MathUtils.DEG2RAD );
 scene.add( wall );
-octree2.addGraphNode( wall );
+staticBody2.addFromObject( wall );
 
 window.removeBox = () => {
 
 	scene.remove( wall );
-	world.remove( octree2 );
+	world.remove( staticBody2 );
 
 }
 
@@ -90,7 +90,7 @@ const capsule = new THREE.Mesh(
 capsule.position.y = playerHeight / 2;
 playerObjectHolder.add( capsule );
 
-const playerController = new MW.CharacterController( playerObjectHolder, playerRadius, playerHeight );
+const playerController = new MW.CharacterBody( playerObjectHolder, playerRadius, playerHeight );
 playerController.teleport( 0, 10, 0 );
 world.add( playerController );
 

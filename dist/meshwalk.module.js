@@ -4,119 +4,86 @@
  * (c) 2017 @yomotsu
  * Released under the MIT License.
  */
-import { Vector3, Triangle, Sphere, Box3, Mesh, Plane, Line3, MathUtils, Vector2, AnimationMixer, Raycaster, Spherical, Matrix4, Quaternion, Vector4, Ray, Object3D } from 'three';
+import { Vector3, Box3, Triangle, Sphere, Mesh, Plane, Line3, MathUtils, Vector2, AnimationMixer, Raycaster, Spherical, Matrix4, Quaternion, Vector4, Ray, Object3D } from 'three';
+
+let EventDispatcher$1 = class EventDispatcher {
+    constructor() {
+        this._listeners = {};
+    }
+    /**
+     * Adds the specified event listener.
+     * @param type event name
+     * @param listener handler function
+     * @category Methods
+     */
+    addEventListener(type, listener) {
+        const listeners = this._listeners;
+        if (listeners[type] === undefined)
+            listeners[type] = [];
+        if (listeners[type].indexOf(listener) === -1)
+            listeners[type].push(listener);
+    }
+    /**
+     * Presence of the specified event listener.
+     * @param type event name
+     * @param listener handler function
+     * @category Methods
+     */
+    hasEventListener(type, listener) {
+        const listeners = this._listeners;
+        return listeners[type] !== undefined && listeners[type].indexOf(listener) !== -1;
+    }
+    /**
+     * Removes the specified event listener
+     * @param type event name
+     * @param listener handler function
+     * @category Methods
+     */
+    removeEventListener(type, listener) {
+        const listeners = this._listeners;
+        const listenerArray = listeners[type];
+        if (listenerArray !== undefined) {
+            const index = listenerArray.indexOf(listener);
+            if (index !== -1)
+                listenerArray.splice(index, 1);
+        }
+    }
+    /**
+     * Fire an event type.
+     * @param event DispatcherEvent
+     * @category Methods
+     */
+    dispatchEvent(event) {
+        const listeners = this._listeners;
+        const listenerArray = listeners[event.type];
+        if (listenerArray !== undefined) {
+            event.target = this;
+            const array = listenerArray.slice(0);
+            for (let i = 0, l = array.length; i < l; i++) {
+                array[i].call(this, event);
+            }
+        }
+    }
+};
+
+/**
+ * World に add できる物理ボディの基底クラス。
+ * `StaticBody`（環境）や `CharacterBody`（キャラクター）はこれを継承する。
+ * イベント発行のため EventDispatcher を継承している。
+ */
+class Body extends EventDispatcher$1 {
+    constructor() {
+        super(...arguments);
+        this.isBody = true;
+    }
+    /**
+     * 内部リソース（octree / イベントリスナ等）を解放する。
+     * 継承側で必要に応じてオーバーライドする。
+     */
+    dispose() { }
+}
 
 const vec3$4 = new Vector3();
-class ComputedTriangle extends Triangle {
-    constructor(a, b, c) {
-        super(a, b, c);
-        this.normal = this.getNormal(new Vector3());
-    }
-    computeBoundingSphere() {
-        this.boundingSphere = makeTriangleBoundingSphere(this, this.normal);
-    }
-    // https://math.stackexchange.com/questions/1397456/how-to-scale-a-triangle-such-that-the-distance-between-original-edges-and-new-ed
-    // scale( amount: number ) {
-    // 	const incenter = getIncenter( this, vec3 );
-    // 	this.a.sub( incenter ).multiplyScalar( amount ).add( incenter );
-    // 	this.b.sub( incenter ).multiplyScalar( amount ).add( incenter );
-    // 	this.c.sub( incenter ).multiplyScalar( amount ).add( incenter );
-    // 	拡張したら、過去の boundingSphere はすでに大きさが違うものとなる。破棄する。
-    // 	this.boundingSphere = undefined;
-    // }
-    extend(amount) {
-        const incenter = getIncenter(this, vec3$4);
-        const a = incenter.distanceTo(this.a);
-        const b = incenter.distanceTo(this.b);
-        const c = incenter.distanceTo(this.c);
-        this.a.sub(incenter).normalize().multiplyScalar(a + amount).add(incenter);
-        this.b.sub(incenter).normalize().multiplyScalar(b + amount).add(incenter);
-        this.c.sub(incenter).normalize().multiplyScalar(c + amount).add(incenter);
-        // 拡張したら、過去の boundingSphere はすでに大きさが違うものとなる。破棄する。
-        this.boundingSphere = undefined;
-    }
-}
-// aka Semiperimeter
-function getIncenter(triangle, out) {
-    // https://byjus.com/maths/incenter-of-a-triangle/
-    const a = triangle.a.distanceTo(triangle.b);
-    const b = triangle.b.distanceTo(triangle.c);
-    const c = triangle.c.distanceTo(triangle.a);
-    const p = a + b + c;
-    out.set((a * triangle.a.x + b * triangle.b.x + c * triangle.c.x) / p, (a * triangle.a.y + b * triangle.b.y + c * triangle.c.y) / p, (a * triangle.a.z + b * triangle.b.z + c * triangle.c.z) / p);
-    return out;
-}
-// const edge = new Line3();
-// function getInradius( triangle: Triangle ) {
-// 	const incenter = getIncenter( triangle, vec3 );
-// 	const closestPointToEdge = new Vector3();
-// 	edge.start = triangle.a;
-// 	edge.end = triangle.b;
-// 	edge.closestPointToPoint( incenter, true, closestPointToEdge );
-// 	return incenter.distanceTo( closestPointToEdge );
-// }
-// function makeTriangleBoundingBox( triangle: Triangle ) {
-// 	const bb = new Box3();
-// 	bb.min = bb.min.min( triangle.a );
-// 	bb.min = bb.min.min( triangle.b );
-// 	bb.min = bb.min.min( triangle.c );
-// 	bb.max = bb.max.max( triangle.a );
-// 	bb.max = bb.max.max( triangle.b );
-// 	bb.max = bb.max.max( triangle.c );
-// 	return bb;
-// }
-const v = new Vector3();
-const v0 = new Vector3();
-const v1 = new Vector3();
-const e0 = new Vector3();
-const e1 = new Vector3();
-const triangleNormal = new Vector3();
-function makeTriangleBoundingSphere(triangle, normal) {
-    const bs = new Sphere();
-    // obtuse triangle
-    v0.subVectors(triangle.b, triangle.a);
-    v1.subVectors(triangle.c, triangle.a);
-    if (v0.dot(v1) <= 0) {
-        bs.center.addVectors(triangle.b, triangle.c).divideScalar(2);
-        bs.radius = v.subVectors(triangle.b, triangle.c).length() / 2;
-        return bs;
-    }
-    v0.subVectors(triangle.a, triangle.b);
-    v1.subVectors(triangle.c, triangle.b);
-    if (v0.dot(v1) <= 0) {
-        bs.center.addVectors(triangle.a, triangle.c).divideScalar(2);
-        bs.radius = v.subVectors(triangle.a, triangle.c).length() / 2;
-        return bs;
-    }
-    v0.subVectors(triangle.a, triangle.c);
-    v1.subVectors(triangle.b, triangle.c);
-    if (v0.dot(v1) <= 0) {
-        bs.center.addVectors(triangle.a, triangle.b).divideScalar(2);
-        bs.radius = v.subVectors(triangle.a, triangle.b).length() / 2;
-        return bs;
-    }
-    // acute‐angled triangle
-    if (!normal) {
-        normal = triangle.getNormal(triangleNormal);
-    }
-    v0.crossVectors(v.subVectors(triangle.c, triangle.b), normal);
-    v1.crossVectors(v.subVectors(triangle.c, triangle.a), normal);
-    e0.addVectors(triangle.c, triangle.b).multiplyScalar(.5);
-    e1.addVectors(triangle.c, triangle.a).multiplyScalar(.5);
-    const a = v0.dot(v1);
-    const b = v0.dot(v0);
-    const d = v1.dot(v1);
-    const c = -v.subVectors(e1, e0).dot(v0);
-    const e = -v.subVectors(e1, e0).dot(v1);
-    const div = -a * a + b * d;
-    // t = ( - a * c + b * e ) / div;
-    const s = (-c * d + a * e) / div;
-    bs.center = e0.clone().add(v0.clone().multiplyScalar(s));
-    bs.radius = v.subVectors(bs.center, triangle.a).length();
-    return bs;
-}
-
-const vec3$3 = new Vector3();
 // https://3dkingdoms.com/weekly/weekly.php?a=3
 function intersectsLineBox(line, box, hit) {
     if (line.end.x < box.min.x && line.start.x < box.min.x)
@@ -136,7 +103,7 @@ function intersectsLineBox(line, box, hit) {
         line.start.z > box.min.z && line.start.z < box.max.z) {
         return true;
     }
-    const _hit = vec3$3;
+    const _hit = vec3$4;
     if ((getIntersection(line.start.x - box.min.x, line.end.x - box.min.x, line.start, line.end, _hit) && inBox(_hit, box, 1)) ||
         (getIntersection(line.start.y - box.min.y, line.end.y - box.min.y, line.start, line.end, _hit) && inBox(_hit, box, 2)) ||
         (getIntersection(line.start.z - box.min.z, line.end.z - box.min.z, line.start, line.end, _hit) && inBox(_hit, box, 3)) ||
@@ -153,9 +120,9 @@ function getIntersection(dst1, dst2, p1, p2, hit) {
     if (dst1 == dst2)
         return false;
     if (hit) {
-        vec3$3.subVectors(p2, p1);
-        vec3$3.multiplyScalar(-dst1 / (dst2 - dst1));
-        hit.addVectors(p1, vec3$3);
+        vec3$4.subVectors(p2, p1);
+        vec3$4.multiplyScalar(-dst1 / (dst2 - dst1));
+        hit.addVectors(p1, vec3$4);
     }
     return true;
 }
@@ -169,7 +136,7 @@ function inBox(hit, box, axis) {
     return false;
 }
 
-const vec3$2 = new Vector3();
+const vec3$3 = new Vector3();
 // // based on Real-Time Collision Detection Section 5.3.4
 // // p: <THREE.Vector3>, // line3.start
 // // q: <THREE.Vector3>, // line3.end
@@ -242,7 +209,7 @@ function intersectsLineTriangle(p, q, a, b, c, hit) {
     let v = ac$1.dot(e);
     if (v < 0 || v > d)
         return false;
-    let w = vec3$2.copy(ab$1).dot(e) * -1;
+    let w = vec3$3.copy(ab$1).dot(e) * -1;
     if (w < 0 || v + w > d)
         return false;
     const ood = 1 / d;
@@ -431,39 +398,197 @@ class Octree {
         }
         return distanceSquared < 1e100 ? { distance: Math.sqrt(distanceSquared), triangle, position } : false;
     }
-    addGraphNode(object) {
+}
+
+const vec3$2 = new Vector3();
+class ComputedTriangle extends Triangle {
+    constructor(a, b, c) {
+        super(a, b, c);
+        this.normal = this.getNormal(new Vector3());
+    }
+    computeBoundingSphere() {
+        this.boundingSphere = makeTriangleBoundingSphere(this, this.normal);
+    }
+    // https://math.stackexchange.com/questions/1397456/how-to-scale-a-triangle-such-that-the-distance-between-original-edges-and-new-ed
+    // scale( amount: number ) {
+    // 	const incenter = getIncenter( this, vec3 );
+    // 	this.a.sub( incenter ).multiplyScalar( amount ).add( incenter );
+    // 	this.b.sub( incenter ).multiplyScalar( amount ).add( incenter );
+    // 	this.c.sub( incenter ).multiplyScalar( amount ).add( incenter );
+    // 	拡張したら、過去の boundingSphere はすでに大きさが違うものとなる。破棄する。
+    // 	this.boundingSphere = undefined;
+    // }
+    extend(amount) {
+        const incenter = getIncenter(this, vec3$2);
+        const a = incenter.distanceTo(this.a);
+        const b = incenter.distanceTo(this.b);
+        const c = incenter.distanceTo(this.c);
+        this.a.sub(incenter).normalize().multiplyScalar(a + amount).add(incenter);
+        this.b.sub(incenter).normalize().multiplyScalar(b + amount).add(incenter);
+        this.c.sub(incenter).normalize().multiplyScalar(c + amount).add(incenter);
+        // 拡張したら、過去の boundingSphere はすでに大きさが違うものとなる。破棄する。
+        this.boundingSphere = undefined;
+    }
+}
+// aka Semiperimeter
+function getIncenter(triangle, out) {
+    // https://byjus.com/maths/incenter-of-a-triangle/
+    const a = triangle.a.distanceTo(triangle.b);
+    const b = triangle.b.distanceTo(triangle.c);
+    const c = triangle.c.distanceTo(triangle.a);
+    const p = a + b + c;
+    out.set((a * triangle.a.x + b * triangle.b.x + c * triangle.c.x) / p, (a * triangle.a.y + b * triangle.b.y + c * triangle.c.y) / p, (a * triangle.a.z + b * triangle.b.z + c * triangle.c.z) / p);
+    return out;
+}
+// const edge = new Line3();
+// function getInradius( triangle: Triangle ) {
+// 	const incenter = getIncenter( triangle, vec3 );
+// 	const closestPointToEdge = new Vector3();
+// 	edge.start = triangle.a;
+// 	edge.end = triangle.b;
+// 	edge.closestPointToPoint( incenter, true, closestPointToEdge );
+// 	return incenter.distanceTo( closestPointToEdge );
+// }
+// function makeTriangleBoundingBox( triangle: Triangle ) {
+// 	const bb = new Box3();
+// 	bb.min = bb.min.min( triangle.a );
+// 	bb.min = bb.min.min( triangle.b );
+// 	bb.min = bb.min.min( triangle.c );
+// 	bb.max = bb.max.max( triangle.a );
+// 	bb.max = bb.max.max( triangle.b );
+// 	bb.max = bb.max.max( triangle.c );
+// 	return bb;
+// }
+const v = new Vector3();
+const v0 = new Vector3();
+const v1 = new Vector3();
+const e0 = new Vector3();
+const e1 = new Vector3();
+const triangleNormal = new Vector3();
+function makeTriangleBoundingSphere(triangle, normal) {
+    const bs = new Sphere();
+    // obtuse triangle
+    v0.subVectors(triangle.b, triangle.a);
+    v1.subVectors(triangle.c, triangle.a);
+    if (v0.dot(v1) <= 0) {
+        bs.center.addVectors(triangle.b, triangle.c).divideScalar(2);
+        bs.radius = v.subVectors(triangle.b, triangle.c).length() / 2;
+        return bs;
+    }
+    v0.subVectors(triangle.a, triangle.b);
+    v1.subVectors(triangle.c, triangle.b);
+    if (v0.dot(v1) <= 0) {
+        bs.center.addVectors(triangle.a, triangle.c).divideScalar(2);
+        bs.radius = v.subVectors(triangle.a, triangle.c).length() / 2;
+        return bs;
+    }
+    v0.subVectors(triangle.a, triangle.c);
+    v1.subVectors(triangle.b, triangle.c);
+    if (v0.dot(v1) <= 0) {
+        bs.center.addVectors(triangle.a, triangle.b).divideScalar(2);
+        bs.radius = v.subVectors(triangle.a, triangle.b).length() / 2;
+        return bs;
+    }
+    // acute‐angled triangle
+    if (!normal) {
+        normal = triangle.getNormal(triangleNormal);
+    }
+    v0.crossVectors(v.subVectors(triangle.c, triangle.b), normal);
+    v1.crossVectors(v.subVectors(triangle.c, triangle.a), normal);
+    e0.addVectors(triangle.c, triangle.b).multiplyScalar(.5);
+    e1.addVectors(triangle.c, triangle.a).multiplyScalar(.5);
+    const a = v0.dot(v1);
+    const b = v0.dot(v0);
+    const d = v1.dot(v1);
+    const c = -v.subVectors(e1, e0).dot(v0);
+    const e = -v.subVectors(e1, e0).dot(v1);
+    const div = -a * a + b * d;
+    // t = ( - a * c + b * e ) / div;
+    const s = (-c * d + a * e) / div;
+    bs.center = e0.clone().add(v0.clone().multiplyScalar(s));
+    bs.radius = v.subVectors(bs.center, triangle.a).length();
+    return bs;
+}
+
+/**
+ * 静的な環境コライダー（動かないトライメッシュ）。
+ * three.js の Object3D / BufferGeometry を「形状のソース」として取り込み、
+ * 三角形を内部の Octree に焼き込む。取り込み時点のワールド座標でスナップショットする。
+ *
+ * ```js
+ * const level = MW.StaticBody.fromObject( scene );
+ * world.add( level );
+ * ```
+ */
+class StaticBody extends Body {
+    constructor() {
+        super(...arguments);
+        this._octree = new Octree();
+    }
+    /**
+     * Object3D（graph）から生成する。子孫の全 Mesh を辿って取り込む。
+     */
+    static fromObject(object) {
+        return new StaticBody().addFromObject(object);
+    }
+    /**
+     * Object3D（graph）を辿り、含まれる全 Mesh の三角形をワールド座標で取り込む（加算）。
+     */
+    addFromObject(object) {
         object.updateWorldMatrix(true, true);
-        object.traverse((childObject) => {
-            if (childObject instanceof Mesh) {
-                const mesh = childObject;
-                const geometry = mesh.geometry.clone();
-                geometry.applyMatrix4(mesh.matrix);
-                geometry.computeVertexNormals();
-                if (!!geometry.index) {
-                    const indices = geometry.index.array;
-                    const positions = geometry.attributes.position.array;
-                    const groups = (geometry.groups.length !== 0) ? geometry.groups : [{ start: 0, count: indices.length, materialIndex: 0 }];
-                    for (let i = 0, l = groups.length; i < l; ++i) {
-                        const start = groups[i].start;
-                        const count = groups[i].count;
-                        for (let ii = start, ll = start + count; ii < ll; ii += 3) {
-                            const a = indices[ii];
-                            const b = indices[ii + 1];
-                            const c = indices[ii + 2];
-                            const vA = new Vector3().fromArray(positions, a * 3);
-                            const vB = new Vector3().fromArray(positions, b * 3);
-                            const vC = new Vector3().fromArray(positions, c * 3);
-                            const triangle = new ComputedTriangle(vA, vB, vC);
-                            // ポリゴンの継ぎ目の辺で raycast が交差しない可能性があるので、わずかに拡大する
-                            triangle.extend(1e-10);
-                            triangle.computeBoundingSphere();
-                            this.addTriangle(triangle);
-                        }
-                    }
-                }
-            }
+        object.traverse((child) => {
+            if (child instanceof Mesh)
+                this._addGeometry(child.geometry, child.matrixWorld);
         });
-        this.build();
+        this._octree.build();
+        return this;
+    }
+    /**
+     * BufferGeometry を直接取り込む（事前マージ済みジオメトリ向け・任意で変換行列を適用）。
+     */
+    addFromGeometry(geometry, matrix) {
+        this._addGeometry(geometry, matrix);
+        this._octree.build();
+        return this;
+    }
+    // --- 内部クエリ（World の broad-phase / カメラのレイ判定から使う） ---
+    getSphereTriangles(sphere, result) {
+        return this._octree.getSphereTriangles(sphere, result);
+    }
+    rayIntersect(ray) {
+        return this._octree.rayIntersect(ray);
+    }
+    dispose() {
+        this._octree.triangles.length = 0;
+        this._octree.subTrees.length = 0;
+    }
+    _addGeometry(geometry, matrix) {
+        // geometry を複製して変換行列を焼き込む（元の three.js ジオメトリは変更しない）
+        const geom = geometry.clone();
+        if (matrix)
+            geom.applyMatrix4(matrix);
+        const positions = geom.attributes.position.array;
+        const addTriangle = (a, b, c) => {
+            const vA = new Vector3().fromArray(positions, a * 3);
+            const vB = new Vector3().fromArray(positions, b * 3);
+            const vC = new Vector3().fromArray(positions, c * 3);
+            const triangle = new ComputedTriangle(vA, vB, vC);
+            // ポリゴンの継ぎ目の辺で raycast が交差しない可能性があるので、わずかに拡大する
+            triangle.extend(1e-10);
+            triangle.computeBoundingSphere();
+            this._octree.addTriangle(triangle);
+        };
+        if (geom.index) {
+            const indices = geom.index.array;
+            for (let i = 0, l = indices.length; i < l; i += 3)
+                addTriangle(indices[i], indices[i + 1], indices[i + 2]);
+        }
+        else {
+            const count = positions.length / 3;
+            for (let i = 0; i < count; i += 3)
+                addTriangle(i, i + 1, i + 2);
+        }
+        geom.dispose();
     }
 }
 
@@ -620,66 +745,6 @@ function checkAABBAxis( p1x, p1y, p2x, p2y, minx, maxx, miny, maxy, radius ) {
 	);
 
 }
-
-let EventDispatcher$1 = class EventDispatcher {
-    constructor() {
-        this._listeners = {};
-    }
-    /**
-     * Adds the specified event listener.
-     * @param type event name
-     * @param listener handler function
-     * @category Methods
-     */
-    addEventListener(type, listener) {
-        const listeners = this._listeners;
-        if (listeners[type] === undefined)
-            listeners[type] = [];
-        if (listeners[type].indexOf(listener) === -1)
-            listeners[type].push(listener);
-    }
-    /**
-     * Presence of the specified event listener.
-     * @param type event name
-     * @param listener handler function
-     * @category Methods
-     */
-    hasEventListener(type, listener) {
-        const listeners = this._listeners;
-        return listeners[type] !== undefined && listeners[type].indexOf(listener) !== -1;
-    }
-    /**
-     * Removes the specified event listener
-     * @param type event name
-     * @param listener handler function
-     * @category Methods
-     */
-    removeEventListener(type, listener) {
-        const listeners = this._listeners;
-        const listenerArray = listeners[type];
-        if (listenerArray !== undefined) {
-            const index = listenerArray.indexOf(listener);
-            if (index !== -1)
-                listenerArray.splice(index, 1);
-        }
-    }
-    /**
-     * Fire an event type.
-     * @param event DispatcherEvent
-     * @category Methods
-     */
-    dispatchEvent(event) {
-        const listeners = this._listeners;
-        const listenerArray = listeners[event.type];
-        if (listenerArray !== undefined) {
-            event.target = this;
-            const array = listenerArray.slice(0);
-            for (let i = 0, l = array.length; i < l; i++) {
-                array[i].call(this, event);
-            }
-        }
-    }
-};
 
 class Intersection {
     constructor() {
@@ -910,10 +975,10 @@ const groundContactPoint = new Vector3();
 const translate = new Vector3();
 const capsule = new Capsule(new Vector3(), new Vector3(), 0);
 const intersection = new Intersection();
-class CharacterController extends EventDispatcher$1 {
+class CharacterBody extends Body {
     constructor(object3d, radius, height) {
         super();
-        this.isCharacterController = true;
+        this.isCharacterBody = true;
         this.position = new Vector3();
         this.groundCheckDepth = .2;
         this.maxSlopeGradient = Math.cos(50 * MathUtils.DEG2RAD);
@@ -1230,29 +1295,37 @@ class CharacterController extends EventDispatcher$1 {
 const sphere = new Sphere();
 class World {
     constructor({ fps = 60, stepsPerFrame = 4 } = {}) {
-        this.colliderPool = [];
-        this.characterPool = [];
+        this._staticBodies = [];
+        this._characterBodies = [];
         this._fps = fps;
         this._stepsPerFrame = stepsPerFrame;
     }
-    add(object) {
-        if (object instanceof Octree) {
-            this.colliderPool.push(object);
+    /**
+     * 静的ボディ一覧（読み取り専用）。カメラのレイ衝突など内部処理から参照する。
+     */
+    get colliders() {
+        return this._staticBodies;
+    }
+    add(body) {
+        if (body instanceof StaticBody) {
+            if (this._staticBodies.indexOf(body) === -1)
+                this._staticBodies.push(body);
         }
-        if (object instanceof CharacterController) {
-            this.characterPool.push(object);
+        else if (body instanceof CharacterBody) {
+            if (this._characterBodies.indexOf(body) === -1)
+                this._characterBodies.push(body);
         }
     }
-    remove(object) {
-        if (object instanceof Octree) {
-            const index = this.colliderPool.indexOf(object);
+    remove(body) {
+        if (body instanceof StaticBody) {
+            const index = this._staticBodies.indexOf(body);
             if (index !== -1)
-                this.colliderPool.splice(index, 1);
+                this._staticBodies.splice(index, 1);
         }
-        if (object instanceof CharacterController) {
-            const index = this.characterPool.indexOf(object);
+        else if (body instanceof CharacterBody) {
+            const index = this._characterBodies.indexOf(body);
             if (index !== -1)
-                this.characterPool.splice(index, 1);
+                this._characterBodies.splice(index, 1);
         }
     }
     fixedUpdate() {
@@ -1263,21 +1336,27 @@ class World {
         }
     }
     step(stepDeltaTime) {
-        for (let i = 0, l = this.characterPool.length; i < l; i++) {
-            const character = this.characterPool[i];
-            let triangles = [];
-            // octree で絞られた node に含まれる face だけを
-            // character に渡して判定する
-            for (let ii = 0, ll = this.colliderPool.length; ii < ll; ii++) {
-                const octree = this.colliderPool[ii];
-                // キャラクターのカプセル全体を囲む sphere で broad-phase
+        for (let i = 0, l = this._characterBodies.length; i < l; i++) {
+            const character = this._characterBodies[i];
+            const triangles = [];
+            // キャラクターのカプセル全体を囲む sphere で broad-phase して、
+            // 近傍の三角形だけを character に渡して判定する
+            for (let ii = 0, ll = this._staticBodies.length; ii < ll; ii++) {
                 sphere.center.set(0, character.height / 2, 0).add(character.position);
                 sphere.radius = character.height / 2 + character.groundCheckDepth;
-                triangles.push(...octree.getSphereTriangles(sphere, []));
+                this._staticBodies[ii].getSphereTriangles(sphere, triangles);
             }
             character.setNearTriangles(triangles);
             character.update(stepDeltaTime);
         }
+    }
+    dispose() {
+        for (let i = 0; i < this._staticBodies.length; i++)
+            this._staticBodies[i].dispose();
+        for (let i = 0; i < this._characterBodies.length; i++)
+            this._characterBodies[i].dispose();
+        this._staticBodies.length = 0;
+        this._characterBodies.length = 0;
     }
 }
 
@@ -4233,8 +4312,8 @@ class TPSCameraControls extends CameraControls {
         let distance = Infinity;
         if (!this.world)
             return distance;
-        for (let i = 0, l = this.world.colliderPool.length; i < l; i++) {
-            const octree = this.world.colliderPool[i];
+        for (let i = 0, l = this.world.colliders.length; i < l; i++) {
+            const staticBody = this.world.colliders[i];
             const direction = _v3A.setFromSpherical(this._spherical).divideScalar(this._spherical.radius);
             _rotationMatrix.lookAt(_ORIGIN, direction, this._camera.up);
             for (let i = 0; i < 4; i++) {
@@ -4242,7 +4321,7 @@ class TPSCameraControls extends CameraControls {
                 nearPlaneCorner.applyMatrix4(_rotationMatrix);
                 const origin = _v3C.addVectors(this._target, nearPlaneCorner);
                 _ray.set(origin, direction);
-                const intersect = octree.rayIntersect(_ray);
+                const intersect = staticBody.rayIntersect(_ray);
                 if (intersect && intersect.distance < distance) {
                     distance = intersect.distance;
                 }
@@ -4252,4 +4331,4 @@ class TPSCameraControls extends CameraControls {
     }
 }
 
-export { AnimationController, CharacterController, KeyInputControl, Octree, TPSCameraControls, World };
+export { AnimationController, Body, CharacterBody, KeyInputControl, StaticBody, TPSCameraControls, World };

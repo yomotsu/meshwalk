@@ -89,9 +89,9 @@ export class TPSCameraControls extends CameraControls {
 
 		if ( ! this.world ) return distance;
 
-		for ( let i = 0, l = this.world.colliderPool.length; i < l; i ++ ) {
+		for ( let i = 0, l = this.world.colliders.length; i < l; i ++ ) {
 
-			const octree = this.world.colliderPool[ i ];
+			const staticBody = this.world.colliders[ i ];
 			const direction = _v3A.setFromSpherical( this._spherical ).divideScalar( this._spherical.radius );
 			_rotationMatrix.lookAt( _ORIGIN, direction, this._camera.up );
 
@@ -103,7 +103,7 @@ export class TPSCameraControls extends CameraControls {
 				const origin = _v3C.addVectors( this._target, nearPlaneCorner );
 				_ray.set( origin, direction );
 
-				const intersect = octree.rayIntersect( _ray );
+				const intersect = staticBody.rayIntersect( _ray );
 
 				if ( intersect && intersect.distance < distance ) {
 

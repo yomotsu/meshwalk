@@ -1,6 +1,7 @@
 export { World } from './core/World';
-export { Octree } from './core/Octree';
-export { CharacterController } from './core/CharacterController';
+export { Body } from './core/Body';
+export { StaticBody } from './core/StaticBody';
+export { CharacterBody } from './core/CharacterBody';
 export { AnimationController } from './TPS/AnimationController';
 export { KeyInputControl } from './TPS/KeyInputControl';
 export { TPSCameraControls } from './TPS/TPSCameraControls';

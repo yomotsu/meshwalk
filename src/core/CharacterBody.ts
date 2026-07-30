@@ -1,7 +1,7 @@
 import { MathUtils, Vector2, Vector3 } from 'three';
 import { Capsule } from 'three/examples/jsm/math/Capsule.js';
 import { type Object3D } from 'three';
-import { EventDispatcher } from './EventDispatcher';
+import { Body } from './Body';
 import { Intersection } from '../math/Intersection';
 import { intersectsLineTriangle } from '../math/intersectsLineTriangle';
 import { intersectsCapsuleTriangle } from '../math/intersectsCapsuleTriangle';
@@ -28,9 +28,9 @@ const capsule = new Capsule( new Vector3(), new Vector3(), 0 );
 
 const intersection = new Intersection();
 
-export class CharacterController extends EventDispatcher {
+export class CharacterBody extends Body {
 
-	isCharacterController = true;
+	isCharacterBody = true;
 	object: Object3D;
 	radius: number;
 	height: number;

@@ -40,8 +40,8 @@ import * as MW from '../dist/meshwalk.module.js';
 await init();
 
 const world = new MW.World();
-const octree = new MW.Octree();
-world.add( octree );
+const staticBody = new MW.StaticBody();
+world.add( staticBody );
 
 
 const width = window.innerWidth;
@@ -68,7 +68,7 @@ const playerHeight = 3;
 // capsule.position.y = playerHeight / 2;
 // playerObjectHolder.add( capsule );
 
-const playerController = new MW.CharacterController( playerObjectHolder, playerRadius, playerHeight );
+const playerController = new MW.CharacterBody( playerObjectHolder, playerRadius, playerHeight );
 playerController.teleport( 0, 10, 0 );
 world.add( playerController );
 
@@ -119,12 +119,12 @@ const box = new THREE.Mesh(
 );
 box.position.set( - 3, 7.5, - 13 );
 scene.add( box );
-octree.addGraphNode( box );
+staticBody.addFromObject( box );
 
 const terrain = terrainGltf.scene.children[ 0 ];
 terrain.material = new THREE.MeshNormalMaterial();
 scene.add( terrain );
-octree.addGraphNode( terrain );
+staticBody.addFromObject( terrain );
 
 playerObjectHolder.add( characterGltf.scene );
 

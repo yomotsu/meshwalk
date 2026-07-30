@@ -35,8 +35,8 @@ import * as MW from '../dist/meshwalk.module.js';
 
 // make the world,
 const world = new MW.World();
-const octree = new MW.Octree();
-world.add( octree );
+const staticBody = new MW.StaticBody();
+world.add( staticBody );
 
 
 const width = window.innerWidth;
@@ -49,14 +49,14 @@ renderer.setSize( width, height );
 document.body.appendChild( renderer.domElement );
 
 
-// make a terrain in three.js and import it to the octree
+// make a terrain in three.js and import it to the staticBody
 const ground = new THREE.Mesh(
 	new THREE.PlaneGeometry( 30, 30, 10, 10 ),
 	new THREE.MeshBasicMaterial( { color: 0xffffff,  wireframe: true } )
 );
 ground.rotation.x = - 90 * THREE.MathUtils.DEG2RAD;
 scene.add( ground );
-octree.addGraphNode( ground );
+staticBody.addFromObject( ground );
 
 
 const playerRadius = .5;
@@ -73,7 +73,7 @@ capsule.position.y = playerHeight / 2;
 playerObjectHolder.add( capsule );
 
 // to apply fake gravity and to be controllable object
-const playerController = new MW.CharacterController( playerObjectHolder, playerRadius, playerHeight );
+const playerController = new MW.CharacterBody( playerObjectHolder, playerRadius, playerHeight );
 playerController.teleport( 0, 10, 0 );
 world.add( playerController );
 
