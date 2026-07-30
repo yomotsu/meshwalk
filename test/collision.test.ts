@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import {
 	Object3D,
 	Mesh,
@@ -282,10 +282,10 @@ describe( 'CharacterController capsule collision', () => {
 
 	} );
 
-	it( '[golden] jump() で上昇し、約1秒で頂点→着地して再接地する（現行の時間ベース弧）', () => {
+	it( '[golden] jump() で上昇し、約1秒で頂点→着地して再接地する', () => {
 
-		// 現行 W2 のジャンプは performance.now ベースなので、フェイクタイマーで決定論化して弧を固定する。
-		// Phase 1 で時間源を deltaTime 積算へ置換した後も、この到達高さ・滞空・再接地を維持する。
+		// Phase 1 でジャンプ時間源を deltaTime 積算へ置換したので、フェイクタイマー無しで決定論的。
+		// コサイン弧の形・到達高さ(≈6.3)・滞空(頂点≈0.5s / 再接地≈1s)を維持する基準。
 		const { world, player } = makeScene();
 		player.teleport( 10, 0, 10 );
 		player.velocity.set( 0, 0, 0 );
@@ -293,36 +293,24 @@ describe( 'CharacterController capsule collision', () => {
 		expect( player.isGrounded ).toBe( true );
 		const restY = player.position.y;
 
-		vi.useFakeTimers();
+		player.jump();
+		expect( player.isJumping ).toBe( true );
 
-		try {
+		let maxY = restY;
+		for ( let i = 0; i < 120; i ++ ) {
 
-			player.jump();
-			expect( player.isJumping ).toBe( true );
-
-			let maxY = restY;
-			// 90 フレーム（16ms/フレーム = 実効60fps）で約1.44秒進める
-			for ( let i = 0; i < 90; i ++ ) {
-
-				player.move( STOP );
-				world.fixedUpdate();
-				vi.advanceTimersByTime( 1000 / 60 );
-				if ( player.position.y > maxY ) maxY = player.position.y;
-
-			}
-
-			// 到達高さは現行実測(≈6.8)近傍（コサイン弧・FALL_VELOCITY=20・JUMP_DURATION=1s）
-			expect( maxY - restY, `到達高さが想定外 (rise=${( maxY - restY ).toFixed( 2 )})` ).toBeGreaterThan( 5 );
-			expect( maxY - restY ).toBeLessThan( 9 );
-			// 着地して再接地している
-			expect( player.position.y, '着地して地面に戻っていない' ).toBeCloseTo( restY, 1 );
-			expect( player.isGrounded, '再接地していない' ).toBe( true );
-
-		} finally {
-
-			vi.useRealTimers();
+			player.move( STOP );
+			world.fixedUpdate();
+			if ( player.position.y > maxY ) maxY = player.position.y;
 
 		}
+
+		// 到達高さは現行(≈6.3)近傍（コサイン弧・FALL_VELOCITY=20・JUMP_DURATION=1s）
+		expect( maxY - restY, `到達高さが想定外 (rise=${( maxY - restY ).toFixed( 2 )})` ).toBeGreaterThan( 5 );
+		expect( maxY - restY ).toBeLessThan( 9 );
+		// 着地して再接地している
+		expect( player.position.y, '着地して地面に戻っていない' ).toBeCloseTo( restY, 1 );
+		expect( player.isGrounded, '再接地していない' ).toBe( true );
 
 	} );
 

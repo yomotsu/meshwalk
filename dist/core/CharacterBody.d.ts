@@ -17,7 +17,6 @@ export declare class CharacterBody extends Body {
     isJumping: boolean;
     velocity: Vector3;
     currentJumpPower: number;
-    jumpStartTime: number;
     groundHeight: number;
     groundNormal: Vector3;
     nearTriangles: ComputedTriangle[];
@@ -29,6 +28,7 @@ export declare class CharacterBody extends Body {
     }[];
     private _moveVelocity;
     private _facingAngle;
+    private _jumpElapsed;
     private _events;
     private get _slopeLimitCos();
     constructor(object3d: Object3D, radius: number, height: number);
@@ -46,6 +46,6 @@ export declare class CharacterBody extends Body {
     _collisionDetection(): void;
     _solvePosition(): void;
     jump(): void;
-    _updateJumping(): void;
+    _updateJumping(deltaTime: number): void;
     teleport(x: number, y: number, z: number): void;
 }

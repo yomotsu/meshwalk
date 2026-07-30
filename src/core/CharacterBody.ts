@@ -9,7 +9,7 @@ import { intersectsCapsuleSphere } from '../math/intersectsCapsuleSphere';
 import { type ComputedTriangle } from '../math/triangle';
 
 const FALL_VELOCITY = - 20;
-const JUMP_DURATION = 1000;
+const JUMP_DURATION_SEC = 1; // ジャンプ弧の全長（秒）。旧実装の 1000ms と等価
 const PI_HALF = Math.PI * 0.5;
 const PI_ONE_HALF = Math.PI * 1.5;
 
@@ -44,7 +44,6 @@ export class CharacterBody extends Body {
 	isJumping  = false;
 	velocity = new Vector3( 0, - 9.8, 0 );
 	currentJumpPower = 0;
-	jumpStartTime = 0;
 	groundHeight = 0;
 	groundNormal = new Vector3();
 	nearTriangles: ComputedTriangle[] = [];
@@ -57,6 +56,7 @@ export class CharacterBody extends Body {
 
 	private _moveVelocity = new Vector3(); // move() で設定する望む水平速度
 	private _facingAngle = 0;              // 向き（移動方向から算出）
+	private _jumpElapsed = 0;              // ジャンプ開始からの経過（秒）。deltaTime を積算
 	private _events: () => void;
 
 	private get _slopeLimitCos(): number {
@@ -172,7 +172,7 @@ export class CharacterBody extends Body {
 		this.groundNormal.set( 0, 1, 0 );
 
 		this._checkGround();
-		this._updateJumping();
+		this._updateJumping( deltaTime );
 		this._updatePosition( deltaTime );
 		this._collisionDetection();
 		this._solvePosition();
@@ -508,18 +508,20 @@ export class CharacterBody extends Body {
 
 		if ( this.isJumping || ! this.isGrounded || this.isOnSlope ) return;
 
-		this.jumpStartTime = performance.now();
+		this._jumpElapsed = 0;
 		this.currentJumpPower = 1;
 		this.isJumping = true;
 
 	}
 
-	_updateJumping() {
+	_updateJumping( deltaTime: number ) {
 
 		if ( ! this.isJumping ) return;
 
-		const elapsed = performance.now() - this.jumpStartTime;
-		const progress = elapsed / JUMP_DURATION;
+		// 経過時間を deltaTime で積算する（実時計 performance.now に依存しない＝決定論的）。
+		// コサイン弧の形は従来と同一で、60fps 実行時は旧実装と一致する。
+		this._jumpElapsed += deltaTime;
+		const progress = this._jumpElapsed / JUMP_DURATION_SEC;
 		this.currentJumpPower = Math.cos( Math.min( progress, 1 ) * Math.PI );
 
 	}
