@@ -1,10 +1,13 @@
 import { Vector3, Triangle, Sphere } from 'three';
+import type { Body } from '../core/Body';
 
 const vec3 = new Vector3();
 export class ComputedTriangle extends Triangle {
 
 	boundingSphere: Sphere | undefined;
 	normal: Vector3;
+	// この三角形を所有する Body（動くボディの運搬判定に使う）。静的な焼き込み三角形は null。
+	body: Body | null = null;
 
 	constructor( a: Vector3, b: Vector3, c: Vector3 ) {
 

@@ -9,6 +9,7 @@ import {
 } from 'three';
 import { World } from '../src/core/World';
 import { StaticBody } from '../src/core/StaticBody';
+import { KinematicBody } from '../src/core/KinematicBody';
 import { CharacterController } from '../src/core/CharacterController';
 
 const PLAYER_RADIUS = 0.75;
@@ -477,6 +478,273 @@ describe( 'CharacterController capsule collision', () => {
 		}
 
 		expect( maxY, '天井があるのに登ってしまった' ).toBeLessThan( 0.1 );
+
+	} );
+
+} );
+
+// ---- Phase 1（KinematicBody）ゴールデン ----
+// 動く床の上に立てること、および縦方向（エレベーター）の運搬が接地スナップで
+// 創発的に成立することを数値で固定する。水平運搬はフェーズ2で追加する。
+
+// 床（静的な大平面）＋ 箱の動く床（原点中心・上面 = position.y + height/2）を作る。
+function makeElevatorScene( { platformY = 3, size = [ 6, 1, 6 ] as [ number, number, number ] } = {} ) {
+
+	const world = new World();
+
+	const floor = new Mesh( new PlaneGeometry( 200, 200 ), new MeshBasicMaterial() );
+	floor.rotation.x = - 90 * MathUtils.DEG2RAD;
+	floor.updateMatrixWorld( true );
+	const level = new StaticBody();
+	level.addFromObject( floor );
+	world.add( level );
+
+	const [ w, h, d ] = size;
+	const platform = KinematicBody.fromBox( { width: w, height: h, depth: d } );
+	platform.position.set( 0, platformY, 0 );
+	world.add( platform );
+
+	const player = new CharacterController( { radius: 0.5, height: 2 } );
+	world.add( player );
+
+	const platformTop = () => platform.position.y + h / 2;
+
+	return { world, player, platform, platformTop };
+
+}
+
+describe( 'KinematicBody moving platform', () => {
+
+	it( '[golden] 動く床の上面に立てる（貫通せず接地）', () => {
+
+		const { world, player, platform, platformTop } = makeElevatorScene();
+
+		player.teleport( new Vector3( 0, 8, 0 ) ); // 動く床の真上に落とす
+		player.velocity.set( 0, 0, 0 );
+		for ( let i = 0; i < 120; i ++ ) { player.move( STOP ); world.fixedUpdate(); }
+
+		expect( player.position.y, '上面に着地していない' ).toBeCloseTo( platformTop(), 1 );
+		expect( player.isGrounded, '接地していない' ).toBe( true );
+		expect( player.groundBody, '接地ボディが動く床として認識されていない' ).toBe( platform );
+
+	} );
+
+	it( '[golden] 上昇エレベーターに乗って一緒に上がる', () => {
+
+		const { world, player, platform, platformTop } = makeElevatorScene();
+
+		player.teleport( new Vector3( 0, 8, 0 ) );
+		player.velocity.set( 0, 0, 0 );
+		for ( let i = 0; i < 120; i ++ ) { player.move( STOP ); world.fixedUpdate(); }
+		const startY = player.position.y;
+
+		platform.velocity.set( 0, 2, 0 ); // 上昇
+		for ( let i = 0; i < 120; i ++ ) { // 2 m/s × 2s = +4m
+			player.move( STOP );
+			world.fixedUpdate();
+			// 追随している（常に床上面に乗ったまま）
+			expect( player.position.y ).toBeCloseTo( platformTop(), 1 );
+
+		}
+
+		expect( player.position.y - startY, '一緒に上昇していない' ).toBeGreaterThan( 3.5 );
+		expect( player.isGrounded ).toBe( true );
+
+	} );
+
+	it( '[golden] 下降エレベーターに乗って一緒に下がる（浮かない）', () => {
+
+		const { world, player, platform, platformTop } = makeElevatorScene( { platformY: 6 } );
+
+		player.teleport( new Vector3( 0, 11, 0 ) );
+		player.velocity.set( 0, 0, 0 );
+		for ( let i = 0; i < 120; i ++ ) { player.move( STOP ); world.fixedUpdate(); }
+		const startY = player.position.y;
+
+		platform.velocity.set( 0, - 2, 0 ); // 下降
+		for ( let i = 0; i < 120; i ++ ) {
+			player.move( STOP );
+			world.fixedUpdate();
+			expect( player.position.y, '床から浮いた/沈んだ' ).toBeCloseTo( platformTop(), 1 );
+
+		}
+
+		expect( startY - player.position.y, '一緒に下降していない' ).toBeGreaterThan( 3.5 );
+		expect( player.isGrounded ).toBe( true );
+
+	} );
+
+	it( '[golden] 横移動する床に乗って一緒に運ばれる（Phase 2 運搬）', () => {
+
+		const { world, player, platform, platformTop } = makeElevatorScene();
+
+		player.teleport( new Vector3( 0, 8, 0 ) );
+		player.velocity.set( 0, 0, 0 );
+		for ( let i = 0; i < 120; i ++ ) { player.move( STOP ); world.fixedUpdate(); }
+		expect( player.position.y ).toBeCloseTo( platformTop(), 1 );
+		const startOffsetX = player.position.x - platform.position.x;
+
+		platform.velocity.set( 2, 0, 0 ); // +x へ横移動
+		for ( let i = 0; i < 120; i ++ ) { // 2 m/s × 2s = +4m
+			player.move( STOP );
+			world.fixedUpdate();
+			// 床との相対位置を保ったまま運ばれている（床上から滑り落ちない）
+			expect( player.position.x - platform.position.x, '床に対してずれた' ).toBeCloseTo( startOffsetX, 1 );
+			expect( player.position.y, '床上面から外れた' ).toBeCloseTo( platformTop(), 1 );
+
+		}
+
+		expect( platform.position.x, '床が動いていない' ).toBeGreaterThan( 3.5 );
+		expect( player.position.x, '一緒に運ばれていない' ).toBeGreaterThan( 3.5 );
+		expect( player.isGrounded ).toBe( true );
+
+	} );
+
+	it( '[golden] 横移動する床の上を歩ける（運搬＋入力の合成）', () => {
+
+		// 端から落ちないよう十分大きい床で、ゆっくり歩く
+		const { world, player, platform, platformTop } = makeElevatorScene( { size: [ 30, 1, 30 ] } );
+
+		player.teleport( new Vector3( 0, 8, 0 ) );
+		player.velocity.set( 0, 0, 0 );
+		for ( let i = 0; i < 120; i ++ ) { player.move( STOP ); world.fixedUpdate(); }
+		const startZ = player.position.z;
+
+		platform.velocity.set( 2, 0, 0 ); // 床は +x へ
+		for ( let i = 0; i < 90; i ++ ) { // キャラは床の上で -z へ 4 m/s で歩く
+			player.move( moveVec( DIR.negZ, 4 ) );
+			world.fixedUpdate();
+			expect( player.position.y, '床上面から外れた' ).toBeCloseTo( platformTop(), 1 );
+
+		}
+
+		// 運搬(+x)と入力(-z)が両立している
+		expect( player.position.x, '床と一緒に +x へ運ばれていない' ).toBeGreaterThan( 2.5 );
+		expect( startZ - player.position.z, '入力方向(-z)へ歩けていない' ).toBeGreaterThan( 2 );
+
+	} );
+
+	it( '[golden] 床を position で瞬間移動してもライダーは吹っ飛ばない（テレポート安全）', () => {
+
+		const { world, player, platform } = makeElevatorScene();
+
+		player.teleport( new Vector3( 0, 8, 0 ) );
+		player.velocity.set( 0, 0, 0 );
+		for ( let i = 0; i < 120; i ++ ) { player.move( STOP ); world.fixedUpdate(); }
+		expect( player.groundBody ).toBe( platform );
+
+		// 床を +x へ 100 瞬間移動（velocity は 0 のまま）。運搬 delta は積分ぶんだけなので
+		// ライダーはその場に留まり（＝床が消えて落下）、100 も引きずられない。
+		platform.position.x += 100;
+		for ( let i = 0; i < 10; i ++ ) { player.move( STOP ); world.fixedUpdate(); }
+
+		expect( Math.abs( player.position.x ), 'テレポートに引きずられた' ).toBeLessThan( 1 );
+
+	} );
+
+	it( '[golden] 動く床からジャンプすると水平速度を引き継いで流れる（Phase 4 離脱慣性）', () => {
+
+		const { world, player, platform } = makeElevatorScene();
+
+		player.teleport( new Vector3( 0, 8, 0 ) );
+		player.velocity.set( 0, 0, 0 );
+		for ( let i = 0; i < 120; i ++ ) { player.move( STOP ); world.fixedUpdate(); }
+
+		platform.velocity.set( 3, 0, 0 ); // 床は +x へ
+		for ( let i = 0; i < 10; i ++ ) { player.move( STOP ); world.fixedUpdate(); } // 数フレーム運ばれる
+		const xAtJump = player.position.x;
+
+		player.jump(); // 真上へジャンプ（入力は無し）
+		for ( let i = 0; i < 40; i ++ ) { player.move( STOP ); world.fixedUpdate(); }
+
+		// 入力ゼロでも床の水平速度(+x)を引き継いで確実に流れる（引き継がなければ ~0）
+		expect( player.position.x - xAtJump, '離脱慣性で流れていない' ).toBeGreaterThan( 1.5 );
+
+	} );
+
+	it( '[golden] 静止した床からのジャンプでは流れない（慣性は動床由来のみ）', () => {
+
+		const { world, player, platform } = makeElevatorScene();
+
+		player.teleport( new Vector3( 0, 8, 0 ) );
+		player.velocity.set( 0, 0, 0 );
+		for ( let i = 0; i < 120; i ++ ) { player.move( STOP ); world.fixedUpdate(); }
+
+		platform.velocity.set( 0, 0, 0 ); // 床は静止
+		const xAtJump = player.position.x;
+
+		player.jump();
+		for ( let i = 0; i < 40; i ++ ) { player.move( STOP ); world.fixedUpdate(); }
+
+		expect( Math.abs( player.position.x - xAtJump ), '静止床なのに水平に流れた' ).toBeLessThan( 0.2 );
+
+	} );
+
+	it( '[golden] 回転する床（ターンテーブル）に乗ると軌道運搬される（Phase 5）', () => {
+
+		const { world, player, platform, platformTop } = makeElevatorScene( { size: [ 12, 1, 12 ] } );
+
+		player.teleport( new Vector3( 3, 8, 0 ) ); // 中心から半径3の位置
+		player.velocity.set( 0, 0, 0 );
+		for ( let i = 0; i < 120; i ++ ) { player.move( STOP ); world.fixedUpdate(); }
+		const r0 = Math.hypot( player.position.x, player.position.z );
+		expect( r0 ).toBeCloseTo( 3, 1 );
+
+		platform.angularVelocity.set( 0, Math.PI / 2, 0 ); // 90°/s
+		for ( let i = 0; i < 60; i ++ ) { player.move( STOP ); world.fixedUpdate(); } // 1s = 1/4回転
+
+		const r1 = Math.hypot( player.position.x, player.position.z );
+		expect( r1, '半径が保たれていない（軌道運搬失敗）' ).toBeCloseTo( 3, 0 );
+		expect( Math.abs( player.position.z ), '回転方向へ運ばれていない' ).toBeGreaterThan( 2 );
+		expect( Math.abs( player.position.x ), '1/4回転で x が 0 近傍に来ていない' ).toBeLessThan( 1 );
+		expect( player.position.y, '床上面から外れた' ).toBeCloseTo( platformTop(), 1 );
+
+	} );
+
+	it( '[golden] carryRotation で回転床に乗ると向きも追従する（既定 off では不変）', () => {
+
+		const fwd = ( p: CharacterController ) => new Vector3( 0, 0, 1 ).applyQuaternion( p.quaternion );
+
+		// 既定 off: 向きは変わらない
+		const a = makeElevatorScene();
+		a.player.teleport( new Vector3( 0, 8, 0 ) ); // 中心（軌道並進なし・向きだけ見る）
+		a.player.velocity.set( 0, 0, 0 );
+		for ( let i = 0; i < 120; i ++ ) { a.player.move( STOP ); a.world.fixedUpdate(); }
+		const aBefore = fwd( a.player );
+		a.platform.angularVelocity.set( 0, Math.PI / 2, 0 );
+		for ( let i = 0; i < 60; i ++ ) { a.player.move( STOP ); a.world.fixedUpdate(); }
+		expect( aBefore.angleTo( fwd( a.player ) ), '既定 off なのに向きが回った' ).toBeLessThan( 0.1 );
+
+		// on: 床の yaw に追従（1s で 90°）
+		const b = makeElevatorScene();
+		b.player.carryRotation = true;
+		b.player.teleport( new Vector3( 0, 8, 0 ) );
+		b.player.velocity.set( 0, 0, 0 );
+		for ( let i = 0; i < 120; i ++ ) { b.player.move( STOP ); b.world.fixedUpdate(); }
+		const bBefore = fwd( b.player );
+		b.platform.angularVelocity.set( 0, Math.PI / 2, 0 );
+		for ( let i = 0; i < 60; i ++ ) { b.player.move( STOP ); b.world.fixedUpdate(); }
+		expect( bBefore.angleTo( fwd( b.player ) ), 'carryRotation on で向きが追従していない' ).toBeCloseTo( Math.PI / 2, 1 );
+
+	} );
+
+	it( '[golden] 回転床の外周でジャンプすると接線方向へ飛ばされる（回転の離脱慣性）', () => {
+
+		const { world, player, platform } = makeElevatorScene( { size: [ 12, 1, 12 ] } );
+
+		player.teleport( new Vector3( 3, 8, 0 ) ); // 中心から +x に半径3
+		player.velocity.set( 0, 0, 0 );
+		for ( let i = 0; i < 120; i ++ ) { player.move( STOP ); world.fixedUpdate(); }
+
+		platform.angularVelocity.set( 0, Math.PI / 2, 0 ); // ω×r = (0,0,-3π/2) ≈ -z 方向へ接線
+		for ( let i = 0; i < 4; i ++ ) { player.move( STOP ); world.fixedUpdate(); }
+		const zAtJump = player.position.z;
+
+		player.jump();
+		for ( let i = 0; i < 30; i ++ ) { player.move( STOP ); world.fixedUpdate(); } // 入力なし
+
+		// 接線速度(-z)を引き継いで確実に -z へ飛んだ（引き継がなければ ~0）
+		expect( player.position.z - zAtJump, '接線方向へ飛ばされていない' ).toBeLessThan( - 1.5 );
 
 	} );
 

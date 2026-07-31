@@ -59,6 +59,7 @@ export class CharacterController extends Body<CharacterControllerEventType> {
 	groundCheckDepth = .3; // 接地したまま降りられる段差の上限。stepOffset 以上が望ましい（登り降り対称）
 	slopeLimit = 50; // 度。これより急な面は登れず滑り落ちる（Unity の slopeLimit 相当）
 	stepOffset = 0.3; // これ以下の高さの段差は自動で登る（0 で無効・Unity の stepOffset 相当）
+	carryRotation = false; // true のとき、乗っている回転床の yaw に合わせて自分の向きも回す（既定 off）
 	isGrounded = false;
 	isOnSlope  = false;
 	isIdling   = false;
@@ -67,6 +68,7 @@ export class CharacterController extends Body<CharacterControllerEventType> {
 	velocity = new Vector3( 0, 0, 0 );
 	groundHeight = 0;
 	groundNormal = new Vector3();
+	groundBody: Body | null = null; // 接地している床の所有ボディ（動床なら KinematicBody）。無ければ null
 
 	private _currentJumpPower = 0;
 	private _isStepping = false; // 段差登り中フラグ（壁接触が一時的に消えても登りを継続させるラッチ）
@@ -78,8 +80,9 @@ export class CharacterController extends Body<CharacterControllerEventType> {
 		triangle: ComputedTriangle;
 	}[] = [];
 
-	private _moveVelocity = new Vector3(); // move() で設定する望む水平速度
-	private _facingAngle = 0;              // 向き（移動方向から算出）
+	private _moveVelocity = new Vector3();     // move() で設定する望む水平速度
+	private _externalVelocity = new Vector3(); // 動床から離れる際に引き継いだ水平慣性（着地までの drift）
+	private _facingAngle = 0;                  // 向き（移動方向から算出）
 	private _jumpElapsed = 0;              // ジャンプ開始からの経過（秒）。deltaTime を積算
 	private _events: () => void;
 
@@ -190,6 +193,27 @@ export class CharacterController extends Body<CharacterControllerEventType> {
 
 	}
 
+	/**
+	 * 動く床から離れる瞬間に、その床の水平速度を慣性として引き継ぐ（着地するまで保持）。
+	 * Godot の platform_on_leave（ADD_VELOCITY）/ Unreal の impart base velocity 相当。
+	 * y 成分は無視する（ジャンプ弧と干渉させない）。World が離脱を検出して呼ぶ。
+	 */
+	inheritVelocity( velocity: Vector3 ) {
+
+		this._externalVelocity.set( velocity.x, 0, velocity.z );
+
+	}
+
+	/**
+	 * 向き（facing）を deltaAngle[rad] だけ回す。回転床の運搬で World が呼ぶ（carryRotation 時）。
+	 * 移動入力があるフレームは move() が向きを上書きするので、実質は静止時に効く。
+	 */
+	rotateFacing( deltaAngle: number ) {
+
+		this._facingAngle += deltaAngle;
+
+	}
+
 	update( deltaTime: number ) {
 
 		// 状態をリセットしておく
@@ -197,6 +221,7 @@ export class CharacterController extends Body<CharacterControllerEventType> {
 		this.isOnSlope  = false;
 		this.groundHeight = - Infinity;
 		this.groundNormal.set( 0, 1, 0 );
+		this.groundBody = null;
 
 		this._checkGround();
 		this._updateJumping( deltaTime );
@@ -307,6 +332,18 @@ export class CharacterController extends Body<CharacterControllerEventType> {
 
 		}
 
+		// 動床から引き継いだ慣性（drift）: 接地したらクリア、空中では水平に加算し続ける
+		if ( this.isGrounded ) {
+
+			this._externalVelocity.set( 0, 0, 0 );
+
+		} else {
+
+			this.velocity.x += this._externalVelocity.x;
+			this.velocity.z += this._externalVelocity.z;
+
+		}
+
 	}
 
 	_checkGround() {
@@ -408,6 +445,8 @@ export class CharacterController extends Body<CharacterControllerEventType> {
 		if ( this.isGrounded ) {
 
 			this.isJumping = false;
+			// 乗っている床の所有ボディを覚える（動床の運搬判定に使う）
+			this.groundBody = groundContact.ground.body;
 
 		}
 

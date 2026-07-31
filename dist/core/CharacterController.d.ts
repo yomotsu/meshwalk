@@ -18,6 +18,7 @@ export declare class CharacterController extends Body<CharacterControllerEventTy
     groundCheckDepth: number;
     slopeLimit: number;
     stepOffset: number;
+    carryRotation: boolean;
     isGrounded: boolean;
     isOnSlope: boolean;
     isIdling: boolean;
@@ -26,11 +27,13 @@ export declare class CharacterController extends Body<CharacterControllerEventTy
     velocity: Vector3;
     groundHeight: number;
     groundNormal: Vector3;
+    groundBody: Body | null;
     private _currentJumpPower;
     private _isStepping;
     private _nearTriangles;
     private _contactInfo;
     private _moveVelocity;
+    private _externalVelocity;
     private _facingAngle;
     private _jumpElapsed;
     private _events;
@@ -43,6 +46,17 @@ export declare class CharacterController extends Body<CharacterControllerEventTy
      * 停止させるにはゼロベクトルを渡す。
      */
     move(velocity: Vector3): void;
+    /**
+     * 動く床から離れる瞬間に、その床の水平速度を慣性として引き継ぐ（着地するまで保持）。
+     * Godot の platform_on_leave（ADD_VELOCITY）/ Unreal の impart base velocity 相当。
+     * y 成分は無視する（ジャンプ弧と干渉させない）。World が離脱を検出して呼ぶ。
+     */
+    inheritVelocity(velocity: Vector3): void;
+    /**
+     * 向き（facing）を deltaAngle[rad] だけ回す。回転床の運搬で World が呼ぶ（carryRotation 時）。
+     * 移動入力があるフレームは move() が向きを上書きするので、実質は静止時に効く。
+     */
+    rotateFacing(deltaAngle: number): void;
     update(deltaTime: number): void;
     _updateVelocity(): void;
     _checkGround(): void;

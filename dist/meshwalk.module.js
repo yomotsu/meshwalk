@@ -4,7 +4,7 @@
  * (c) 2017 @yomotsu
  * Released under the MIT License.
  */
-import { Vector3, Box3, Triangle, Sphere, Mesh, Plane, Line3, MathUtils, Vector2, Quaternion, AnimationMixer, Raycaster, Spherical, Matrix4, Vector4, Ray, Object3D } from 'three';
+import { Vector3, Box3, Triangle, Sphere, Mesh, Matrix4, Ray, Quaternion, BoxGeometry, Plane, Line3, MathUtils, Vector2, AnimationMixer, Raycaster, Spherical, Vector4, Object3D } from 'three';
 
 /**
  * イベント発行・購読の基底クラス。
@@ -409,6 +409,8 @@ const vec3$2 = new Vector3();
 class ComputedTriangle extends Triangle {
     constructor(a, b, c) {
         super(a, b, c);
+        // この三角形を所有する Body（動くボディの運搬判定に使う）。静的な焼き込み三角形は null。
+        this.body = null;
         this.normal = this.getNormal(new Vector3());
     }
     computeBoundingSphere() {
@@ -566,6 +568,198 @@ class StaticBody extends Body {
     dispose() {
         this._octree.triangles.length = 0;
         this._octree.subTrees.length = 0;
+    }
+    _addGeometry(geometry, matrix) {
+        // geometry を複製して変換行列を焼き込む（元の three.js ジオメトリは変更しない）
+        const geom = geometry.clone();
+        if (matrix)
+            geom.applyMatrix4(matrix);
+        const positions = geom.attributes.position.array;
+        const addTriangle = (a, b, c) => {
+            const vA = new Vector3().fromArray(positions, a * 3);
+            const vB = new Vector3().fromArray(positions, b * 3);
+            const vC = new Vector3().fromArray(positions, c * 3);
+            const triangle = new ComputedTriangle(vA, vB, vC);
+            // ポリゴンの継ぎ目の辺で raycast が交差しない可能性があるので、わずかに拡大する
+            triangle.extend(1e-10);
+            triangle.computeBoundingSphere();
+            this._octree.addTriangle(triangle);
+        };
+        if (geom.index) {
+            const indices = geom.index.array;
+            for (let i = 0, l = indices.length; i < l; i += 3)
+                addTriangle(indices[i], indices[i + 1], indices[i + 2]);
+        }
+        else {
+            const count = positions.length / 3;
+            for (let i = 0; i < count; i += 3)
+                addTriangle(i, i + 1, i + 2);
+        }
+        geom.dispose();
+    }
+}
+
+const _unitScale = new Vector3(1, 1, 1);
+const _localSphere = new Sphere();
+const _localResult = [];
+const _rootInverse = new Matrix4();
+const _previousInverse = new Matrix4();
+const _localRay = new Ray();
+const _deltaQuaternion = new Quaternion();
+const _axis = new Vector3();
+/**
+ * 速度駆動のキネマティックボディ（動くトライメッシュ = ムービングプラットフォーム）。
+ * 形状はローカル座標で Octree に一度だけ焼き込み、毎サブステップ `velocity` で
+ * `position` を進める。近傍三角形はその都度ワールド座標へ変換してキャラクターへ渡す。
+ *
+ * 反転・停止などの運動ポリシーは利用側が担う（`position` を読んで `velocity` を張り替える）。
+ *
+ * ```js
+ * const platform = MW.KinematicBody.fromBox( { width: 6, height: 1, depth: 6 } );
+ * platform.position.set( 0, 2, 0 );
+ * platform.velocity.set( 0, 2, 0 ); // 上昇するエレベーター
+ * world.add( platform );
+ * // 毎フレーム
+ * if ( platform.position.y > 8 ) platform.velocity.y = - 2;
+ * if ( platform.position.y < 2 ) platform.velocity.y = + 2;
+ * world.update( delta );
+ * mesh.position.copy( platform.position );
+ * ```
+ */
+class KinematicBody extends Body {
+    constructor() {
+        super(...arguments);
+        this.isKinematicBody = true;
+        this.position = new Vector3();
+        this.quaternion = new Quaternion(); // 現在の姿勢（angularVelocity で積分される）
+        this.velocity = new Vector3(); // ワールド座標の並進速度（m/s）
+        this.angularVelocity = new Vector3(); // ワールド軸まわりの角速度（rad/s）。向き=軸・大きさ=速さ。yaw なら (0, ω, 0)
+        // 直近 1 ステップの変換差分（T_new · T_old⁻¹）。乗っているキャラの運搬に使う。
+        // 並進のみの現状は移動量ぶんの平行移動行列。回転はフェーズ5で velocity に接続する。
+        this.deltaMatrix = new Matrix4();
+        this._octree = new Octree();
+        this._matrix = new Matrix4();
+        this._matrixInverse = new Matrix4();
+        this._worldTriangles = []; // ワールド変換した三角形の使い回しプール
+        this._worldTriangleCount = 0;
+    }
+    /**
+     * 箱を直接生成する糖衣（メッシュを組まずに動く床を定義できる）。原点中心。
+     */
+    static fromBox({ width, height, depth }) {
+        const geometry = new BoxGeometry(width, height, depth);
+        const body = new KinematicBody().addFromGeometry(geometry);
+        geometry.dispose();
+        return body;
+    }
+    /**
+     * Object3D（graph）から生成する。子孫の全 Mesh を「object 自身のローカル座標」で取り込む。
+     */
+    static fromObject(object) {
+        return new KinematicBody().addFromObject(object);
+    }
+    /**
+     * Object3D（graph）を辿り、含まれる全 Mesh の三角形を object 自身のローカル座標で取り込む（加算）。
+     * 取り込み時点の各 Mesh のワールド行列を object のワールド行列で割り戻す（＝ボディ原点基準）。
+     */
+    addFromObject(object) {
+        object.updateWorldMatrix(true, true);
+        _rootInverse.copy(object.matrixWorld).invert();
+        object.traverse((child) => {
+            if (child instanceof Mesh) {
+                const relative = new Matrix4().multiplyMatrices(_rootInverse, child.matrixWorld);
+                this._addGeometry(child.geometry, relative);
+            }
+        });
+        this._octree.build();
+        this._updateMatrix();
+        return this;
+    }
+    /**
+     * BufferGeometry を直接取り込む（任意で変換行列を適用・ローカル座標で保持）。
+     */
+    addFromGeometry(geometry, matrix) {
+        this._addGeometry(geometry, matrix);
+        this._octree.build();
+        this._updateMatrix();
+        return this;
+    }
+    /**
+     * 固定サブステップぶん `velocity` で `position` を進める。World が毎ステップ呼ぶ。
+     */
+    step(stepDeltaTime) {
+        // T_old は「現在の公開トランスフォーム」から同期する。利用側が position を直接
+        // 書き換えた（テレポート）場合もここで取り込まれ、運搬 delta には波及しない
+        // （delta はこのステップのエンジン積分ぶんだけになる＝テレポート安全）。
+        this._updateMatrix();
+        _previousInverse.copy(this._matrix).invert();
+        this.position.addScaledVector(this.velocity, stepDeltaTime);
+        // 角速度を姿勢へ積分する（ワールド軸まわり＝body 原点まわりの回転なので premultiply）
+        const angle = this.angularVelocity.length() * stepDeltaTime;
+        if (angle > 1e-9) {
+            _axis.copy(this.angularVelocity).normalize();
+            _deltaQuaternion.setFromAxisAngle(_axis, angle);
+            this.quaternion.premultiply(_deltaQuaternion);
+        }
+        this._updateMatrix(); // T_new
+        // このステップの変換差分（運搬用）: delta = T_new · T_old⁻¹
+        this.deltaMatrix.multiplyMatrices(this._matrix, _previousInverse);
+    }
+    // --- 内部クエリ（World の broad-phase から使う。StaticBody と同じ signature） ---
+    getSphereTriangles(sphere, result) {
+        this._updateMatrix(); // 現在の公開トランスフォームを反映
+        // ワールドのクエリ球をボディローカルへ移す（並進＋回転のみ＝半径は不変）
+        _localSphere.center.copy(sphere.center).applyMatrix4(this._matrixInverse);
+        _localSphere.radius = sphere.radius;
+        _localResult.length = 0;
+        this._octree.getSphereTriangles(_localSphere, _localResult);
+        this._worldTriangleCount = 0;
+        for (let i = 0, l = _localResult.length; i < l; i++) {
+            const local = _localResult[i];
+            const world = this._acquireWorldTriangle();
+            world.a.copy(local.a).applyMatrix4(this._matrix);
+            world.b.copy(local.b).applyMatrix4(this._matrix);
+            world.c.copy(local.c).applyMatrix4(this._matrix);
+            world.normal.copy(local.normal).applyQuaternion(this.quaternion).normalize();
+            world.boundingSphere = undefined; // 利用側 (_collisionDetection) がワールド座標で再計算する
+            world.body = this;
+            result.push(world);
+        }
+        return result;
+    }
+    /**
+     * ワールド座標のレイと交差判定する（カメラの衝突回避などから使う。StaticBody と同じ signature）。
+     * レイをボディローカルへ移して Octree に問い合わせ、交点をワールドへ戻す。
+     * 剛体変換（並進＋回転）なので距離は不変。
+     */
+    rayIntersect(ray) {
+        this._updateMatrix(); // 現在の公開トランスフォームを反映
+        _localRay.origin.copy(ray.origin).applyMatrix4(this._matrixInverse);
+        _localRay.direction.copy(ray.direction).transformDirection(this._matrixInverse);
+        const result = this._octree.rayIntersect(_localRay);
+        if (!result)
+            return result;
+        if (result.position)
+            result.position.applyMatrix4(this._matrix);
+        return result;
+    }
+    dispose() {
+        this._octree.triangles.length = 0;
+        this._octree.subTrees.length = 0;
+        this._worldTriangles.length = 0;
+    }
+    _acquireWorldTriangle() {
+        let triangle = this._worldTriangles[this._worldTriangleCount];
+        if (!triangle) {
+            triangle = new ComputedTriangle(new Vector3(), new Vector3(), new Vector3());
+            this._worldTriangles[this._worldTriangleCount] = triangle;
+        }
+        this._worldTriangleCount++;
+        return triangle;
+    }
+    _updateMatrix() {
+        this._matrix.compose(this.position, this.quaternion, _unitScale);
+        this._matrixInverse.copy(this._matrix).invert();
     }
     _addGeometry(geometry, matrix) {
         // geometry を複製して変換行列を焼き込む（元の three.js ジオメトリは変更しない）
@@ -999,6 +1193,7 @@ class CharacterController extends Body {
         this.groundCheckDepth = .3; // 接地したまま降りられる段差の上限。stepOffset 以上が望ましい（登り降り対称）
         this.slopeLimit = 50; // 度。これより急な面は登れず滑り落ちる（Unity の slopeLimit 相当）
         this.stepOffset = 0.3; // これ以下の高さの段差は自動で登る（0 で無効・Unity の stepOffset 相当）
+        this.carryRotation = false; // true のとき、乗っている回転床の yaw に合わせて自分の向きも回す（既定 off）
         this.isGrounded = false;
         this.isOnSlope = false;
         this.isIdling = false;
@@ -1007,11 +1202,13 @@ class CharacterController extends Body {
         this.velocity = new Vector3(0, 0, 0);
         this.groundHeight = 0;
         this.groundNormal = new Vector3();
+        this.groundBody = null; // 接地している床の所有ボディ（動床なら KinematicBody）。無ければ null
         this._currentJumpPower = 0;
         this._isStepping = false; // 段差登り中フラグ（壁接触が一時的に消えても登りを継続させるラッチ）
         this._nearTriangles = [];
         this._contactInfo = [];
         this._moveVelocity = new Vector3(); // move() で設定する望む水平速度
+        this._externalVelocity = new Vector3(); // 動床から離れる際に引き継いだ水平慣性（着地までの drift）
         this._facingAngle = 0; // 向き（移動方向から算出）
         this._jumpElapsed = 0; // ジャンプ開始からの経過（秒）。deltaTime を積算
         if (slopeLimit !== undefined)
@@ -1084,12 +1281,28 @@ class CharacterController extends Body {
         if (this.isRunning)
             this._facingAngle = Math.atan2(-this._moveVelocity.x, -this._moveVelocity.z);
     }
+    /**
+     * 動く床から離れる瞬間に、その床の水平速度を慣性として引き継ぐ（着地するまで保持）。
+     * Godot の platform_on_leave（ADD_VELOCITY）/ Unreal の impart base velocity 相当。
+     * y 成分は無視する（ジャンプ弧と干渉させない）。World が離脱を検出して呼ぶ。
+     */
+    inheritVelocity(velocity) {
+        this._externalVelocity.set(velocity.x, 0, velocity.z);
+    }
+    /**
+     * 向き（facing）を deltaAngle[rad] だけ回す。回転床の運搬で World が呼ぶ（carryRotation 時）。
+     * 移動入力があるフレームは move() が向きを上書きするので、実質は静止時に効く。
+     */
+    rotateFacing(deltaAngle) {
+        this._facingAngle += deltaAngle;
+    }
     update(deltaTime) {
         // 状態をリセットしておく
         this.isGrounded = false;
         this.isOnSlope = false;
         this.groundHeight = -Infinity;
         this.groundNormal.set(0, 1, 0);
+        this.groundBody = null;
         this._checkGround();
         this._updateJumping(deltaTime);
         this._updatePosition(deltaTime);
@@ -1157,6 +1370,14 @@ class CharacterController extends Body {
             this.velocity.y = Math.min(0, this.velocity.y);
             this.isJumping = false;
         }
+        // 動床から引き継いだ慣性（drift）: 接地したらクリア、空中では水平に加算し続ける
+        if (this.isGrounded) {
+            this._externalVelocity.set(0, 0, 0);
+        }
+        else {
+            this.velocity.x += this._externalVelocity.x;
+            this.velocity.z += this._externalVelocity.z;
+        }
     }
     _checkGround() {
         // "頭上からほぼ無限に下方向までの線 (segment)" vs "フェイス (triangle)" の
@@ -1221,6 +1442,8 @@ class CharacterController extends Body {
         this.isOnSlope = (this.groundNormal.y <= this._slopeLimitCos);
         if (this.isGrounded) {
             this.isJumping = false;
+            // 乗っている床の所有ボディを覚える（動床の運搬判定に使う）
+            this.groundBody = groundContact.ground.body;
         }
     }
     // 低い段差 (<= stepOffset) を自動で登る（Unity CharacterController.stepOffset 相当）。
@@ -1411,13 +1634,17 @@ class CharacterController extends Body {
 }
 
 const sphere = new Sphere();
+const _leaveVelocity = new Vector3();
 // 巨大な deltaTime（タブ復帰・ブレークポイント復帰など）で追いつき処理が暴走
 // （spiral of death）しないよう、1回の update で進める固定ステップ数の上限。
 const MAX_CATCH_UP_FRAMES = 5;
 class World {
     constructor({ fps = 60, stepsPerFrame = 4 } = {}) {
         this._staticBodies = [];
+        this._kinematicBodies = [];
         this._characterControllers = [];
+        // カメラのレイ衝突など「レイを当てる対象」。静的＋動的ボディ（キャラは含めない）。
+        this._colliders = [];
         this._accumulatedTime = 0;
         this._fps = fps;
         this._stepsPerFrame = stepsPerFrame;
@@ -1426,12 +1653,20 @@ class World {
      * 静的ボディ一覧（読み取り専用）。カメラのレイ衝突など内部処理から参照する。
      */
     get colliders() {
-        return this._staticBodies;
+        return this._colliders;
     }
     add(body) {
         if (body instanceof StaticBody) {
-            if (this._staticBodies.indexOf(body) === -1)
+            if (this._staticBodies.indexOf(body) === -1) {
                 this._staticBodies.push(body);
+                this._colliders.push(body);
+            }
+        }
+        else if (body instanceof KinematicBody) {
+            if (this._kinematicBodies.indexOf(body) === -1) {
+                this._kinematicBodies.push(body);
+                this._colliders.push(body);
+            }
         }
         else if (body instanceof CharacterController) {
             if (this._characterControllers.indexOf(body) === -1)
@@ -1443,6 +1678,17 @@ class World {
             const index = this._staticBodies.indexOf(body);
             if (index !== -1)
                 this._staticBodies.splice(index, 1);
+            const colliderIndex = this._colliders.indexOf(body);
+            if (colliderIndex !== -1)
+                this._colliders.splice(colliderIndex, 1);
+        }
+        else if (body instanceof KinematicBody) {
+            const index = this._kinematicBodies.indexOf(body);
+            if (index !== -1)
+                this._kinematicBodies.splice(index, 1);
+            const colliderIndex = this._colliders.indexOf(body);
+            if (colliderIndex !== -1)
+                this._colliders.splice(colliderIndex, 1);
         }
         else if (body instanceof CharacterController) {
             const index = this._characterControllers.indexOf(body);
@@ -1473,27 +1719,62 @@ class World {
         }
     }
     step(stepDeltaTime) {
+        // キャラクターの broad-phase より前に動的ボディを進める（キャラが新位置の床を見るため）
+        for (let i = 0, l = this._kinematicBodies.length; i < l; i++) {
+            this._kinematicBodies[i].step(stepDeltaTime);
+        }
         for (let i = 0, l = this._characterControllers.length; i < l; i++) {
             const character = this._characterControllers[i];
             const triangles = [];
+            // 前ステップで接地していた床（運搬・離脱慣性の判定に使う「1つ前の土台」）
+            const previousGroundBody = character.groundBody;
+            // 運搬: 前ステップで動く床に接地していたら、その床のこのステップの変換差分を
+            // キャラ位置へ適用してから接地判定する（Unreal の MovementBase / Godod の
+            // move_and_slide と同じく「1つ前の土台」を使う）。縦成分は直後の接地スナップが
+            // 再確定し、横成分だけが実質の運搬になる。
+            if (previousGroundBody instanceof KinematicBody) {
+                // 位置の運搬（並進＋回転床の軌道）。deltaMatrix が回転を含むので軌道運搬は自動。
+                character.position.applyMatrix4(previousGroundBody.deltaMatrix);
+                // 任意: 乗員の向きも床の yaw に追従させる
+                if (character.carryRotation) {
+                    character.rotateFacing(previousGroundBody.angularVelocity.y * stepDeltaTime);
+                }
+            }
             // キャラクターのカプセル全体を囲む sphere で broad-phase して、
             // 近傍の三角形だけを character に渡して判定する
+            sphere.center.set(0, character.height / 2, 0).add(character.position);
+            sphere.radius = character.height / 2 + character.groundCheckDepth;
             for (let ii = 0, ll = this._staticBodies.length; ii < ll; ii++) {
-                sphere.center.set(0, character.height / 2, 0).add(character.position);
-                sphere.radius = character.height / 2 + character.groundCheckDepth;
                 this._staticBodies[ii].getSphereTriangles(sphere, triangles);
+            }
+            // 動的ボディの近傍三角形は現在位置でワールド座標へ変換して混ぜる（所有ボディ tag 付き）
+            for (let ii = 0, ll = this._kinematicBodies.length; ii < ll; ii++) {
+                this._kinematicBodies[ii].getSphereTriangles(sphere, triangles);
             }
             character.setNearTriangles(triangles);
             character.update(stepDeltaTime);
+            // 離脱慣性: 動く床に乗っていたが、このステップで空中に出た（ジャンプ・端から落下）
+            // なら、足元での床面速度を引き継ぐ。静的な地面へ歩き移った場合は接地したままなので
+            // 引き継がない。床面速度は deltaMatrix から算出する: v = (deltaMatrix·p − p) / dt。
+            // これは並進も回転（接線 ω×r）も乗員の位置で正しく含む。
+            if (previousGroundBody instanceof KinematicBody && !character.isGrounded) {
+                _leaveVelocity.copy(character.position).applyMatrix4(previousGroundBody.deltaMatrix);
+                _leaveVelocity.sub(character.position).divideScalar(stepDeltaTime);
+                character.inheritVelocity(_leaveVelocity);
+            }
         }
     }
     dispose() {
         for (let i = 0; i < this._staticBodies.length; i++)
             this._staticBodies[i].dispose();
+        for (let i = 0; i < this._kinematicBodies.length; i++)
+            this._kinematicBodies[i].dispose();
         for (let i = 0; i < this._characterControllers.length; i++)
             this._characterControllers[i].dispose();
         this._staticBodies.length = 0;
+        this._kinematicBodies.length = 0;
         this._characterControllers.length = 0;
+        this._colliders.length = 0;
     }
 }
 
@@ -4453,4 +4734,4 @@ class ThirdPersonCameraControls extends CameraControls {
     }
 }
 
-export { AnimationController, Body, CharacterController, KeyboardControls, StaticBody, ThirdPersonCameraControls, World };
+export { AnimationController, Body, CharacterController, KeyboardControls, KinematicBody, StaticBody, ThirdPersonCameraControls, World };

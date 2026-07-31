@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>=^.^=</title>
+<style>
+body{margin: 0;padding: 0; background: #000;}
+canvas{display: block;}
+.info{
+	color: #fff;
+	position: absolute;
+	top: 0;
+	left: 0;
+	font-family: monospace;
+	padding: 8px;
+	line-height: 1.5;
+}
+</style>
+</head>
+<body>
+<div class="info">
+	WASD to move, Space to jump.<br>
+	<span style="color:#4f4">GREEN = elevator</span>: ride up/down (vertical carry).<br>
+	<span style="color:#48f">BLUE = sliding floor</span>: ride left/right (horizontal carry).<br>
+	<span style="color:#fc4">ORANGE = turntable</span>: stand off-center to orbit around it (rotational carry).
+</div>
+
+<script async src="https://unpkg.com/es-module-shims@2.8.4/dist/es-module-shims.js"></script>
+<script type="importmap">
+	{
+		"imports": {
+			"three": "https://unpkg.com/three@0.185.1/build/three.module.js",
+			"three/addons/": "https://unpkg.com/three@0.185.1/examples/jsm/",
+			"three/examples/": "https://unpkg.com/three@0.185.1/examples/"
+		}
+	}
+</script>
+<script type="module">
+import * as THREE from 'three';
+import * as MW from '../dist/meshwalk.module.js';
+
+const world = new MW.World();
+const staticBody = new MW.StaticBody();
+world.add( staticBody );
+
+
+const width = window.innerWidth;
+const height = window.innerHeight;
+const clock = new THREE.Clock();
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera( 40, width / height, 1, 1000 );
+camera.position.set( 0, 0, 8 );
+const renderer = new THREE.WebGLRenderer();
+renderer.setSize( width, height );
+document.body.appendChild( renderer.domElement );
+
+
+const ground = new THREE.Mesh(
+	new THREE.PlaneGeometry( 60, 60, 20, 20 ),
+	new THREE.MeshBasicMaterial( { color: 0x444444, wireframe: true } )
+);
+ground.rotation.x = - 90 * THREE.MathUtils.DEG2RAD;
+scene.add( ground );
+staticBody.addFromObject( ground );
+
+
+// --- elevator (moves vertically) ---
+const elevatorSize = { width: 6, height: 0.5, depth: 6 };
+const elevatorMesh = new THREE.Mesh(
+	new THREE.BoxGeometry( elevatorSize.width, elevatorSize.height, elevatorSize.depth ),
+	new THREE.MeshBasicMaterial( { color: 0x44ff44, wireframe: true } )
+);
+scene.add( elevatorMesh );
+
+const elevator = MW.KinematicBody.fromBox( elevatorSize );
+elevator.position.set( - 10, 0.25, 0 );
+elevator.velocity.set( 0, 2.5, 0 );
+world.add( elevator );
+
+
+// --- sliding floor (moves horizontally) ---
+const sliderSize = { width: 8, height: 0.5, depth: 8 };
+const sliderMesh = new THREE.Mesh(
+	new THREE.BoxGeometry( sliderSize.width, sliderSize.height, sliderSize.depth ),
+	new THREE.MeshBasicMaterial( { color: 0x4488ff, wireframe: true } )
+);
+scene.add( sliderMesh );
+
+const slider = MW.KinematicBody.fromBox( sliderSize );
+slider.position.set( 0, 0.25, 12 );
+slider.velocity.set( 3, 0, 0 );
+world.add( slider );
+
+
+// --- turntable (rotates about Y) ---
+const turntableSize = { width: 10, height: 0.5, depth: 10 };
+const turntableMesh = new THREE.Mesh(
+	new THREE.BoxGeometry( turntableSize.width, turntableSize.height, turntableSize.depth ),
+	new THREE.MeshBasicMaterial( { color: 0xffcc44, wireframe: true } )
+);
+scene.add( turntableMesh );
+
+const turntable = MW.KinematicBody.fromBox( turntableSize );
+turntable.position.set( 0, 0.25, 0 );
+turntable.angularVelocity.set( 0, Math.PI / 4, 0 ); // 45°/s
+world.add( turntable );
+
+
+const playerRadius = .5;
+const playerHeight = 2;
+const playerObjectHolder = new THREE.Object3D();
+scene.add( playerObjectHolder );
+
+const capsule = new THREE.Mesh(
+	new THREE.CapsuleGeometry( playerRadius, playerHeight - playerRadius * 2, 4, 16 ),
+	new THREE.MeshBasicMaterial( { color: 0xff0000, wireframe: true } )
+);
+capsule.position.y = playerHeight / 2;
+playerObjectHolder.add( capsule );
+
+const playerController = new MW.CharacterController( { radius: playerRadius, height: playerHeight } );
+playerController.teleport( new THREE.Vector3( - 10, 5, 0 ) ); // drop onto the elevator
+world.add( playerController );
+
+const keyInputControl = new MW.KeyboardControls();
+
+const tpsCameraControls = new MW.ThirdPersonCameraControls(
+	camera,
+	playerObjectHolder,
+	world,
+	renderer.domElement
+);
+
+
+const _moveDir = new THREE.Vector3();
+const _yAxis = new THREE.Vector3( 0, 1, 0 );
+const applyMove = () => {
+
+	const input = keyInputControl.inputVector;
+	playerController.move( _moveDir.set( input.x, 0, - input.y ).applyAxisAngle( _yAxis, tpsCameraControls.frontAngle ).multiplyScalar( 10 ) );
+
+};
+
+keyInputControl.addEventListener( 'movekeyon',     applyMove );
+keyInputControl.addEventListener( 'movekeychange', applyMove );
+keyInputControl.addEventListener( 'movekeyoff',    () => playerController.move( _moveDir.set( 0, 0, 0 ) ) );
+keyInputControl.addEventListener( 'jumpkeypress',  () => playerController.jump() );
+
+tpsCameraControls.addEventListener( 'update', () => {
+
+	if ( playerController.isRunning ) applyMove();
+
+} );
+
+
+( function update () {
+
+	const delta = clock.getDelta();
+
+	requestAnimationFrame( update );
+
+	// 運動ポリシー（反転）は利用側の責務: 端に来たら velocity を張り替える
+	if ( elevator.position.y > 7 ) elevator.velocity.y = - 2.5;
+	if ( elevator.position.y < 0.25 ) elevator.velocity.y = + 2.5;
+	if ( slider.position.x > 6 ) slider.velocity.x = - 3;
+	if ( slider.position.x < - 6 ) slider.velocity.x = + 3;
+
+	world.update( delta );
+
+	// 物理(Body)からメッシュへ transform を同期する
+	playerObjectHolder.position.copy( playerController.position );
+	playerObjectHolder.quaternion.copy( playerController.quaternion );
+	elevatorMesh.position.copy( elevator.position );
+	sliderMesh.position.copy( slider.position );
+	turntableMesh.position.copy( turntable.position );
+	turntableMesh.quaternion.copy( turntable.quaternion );
+
+	tpsCameraControls.update( delta );
+	renderer.render( scene, camera );
+
+} )();
+</script>
+
+</body>
+</html>

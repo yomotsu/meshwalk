@@ -1,6 +1,7 @@
 export { World } from './core/World';
 export { Body } from './core/Body';
 export { StaticBody } from './core/StaticBody';
+export { KinematicBody } from './core/KinematicBody';
 export { CharacterController, type CharacterControllerOptions, type CharacterControllerEventType } from './core/CharacterController';
 export { AnimationController } from './TPS/AnimationController';
 export { KeyboardControls, type KeyboardControlsEventType } from './TPS/KeyboardControls';
