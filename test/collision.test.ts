@@ -38,7 +38,7 @@ function makeScene( { boxSize = [ 5, 5, 10 ] as [ number, number, number ] } = {
 	level.addFromObject( box );
 	world.add( level );
 
-	const player = new CharacterController( PLAYER_RADIUS, PLAYER_HEIGHT );
+	const player = new CharacterController( { radius: PLAYER_RADIUS, height: PLAYER_HEIGHT } );
 	world.add( player );
 
 	// 箱の水平フットプリント（中心がこの内側に入る = 箱にめり込み）
@@ -58,7 +58,7 @@ function isInsideFootprint( p: { x: number; z: number }, fp: ReturnType<typeof m
 // startX, startZ に着地させてから dir 方向へ iterations フレーム移動させ、最小 y を返す。
 function drive( world: World, player: CharacterController, startX: number, startZ: number, dir: number, iterations: number ) {
 
-	player.teleport( startX, 0, startZ );
+	player.teleport( new Vector3( startX, 0, startZ ) );
 	player.velocity.set( 0, 0, 0 );
 	for ( let i = 0; i < 20; i ++ ) {
 
@@ -88,7 +88,7 @@ describe( 'CharacterController capsule collision', () => {
 	it( '平らな地面の上で接地したまま静止する', () => {
 
 		const { world, player } = makeScene();
-		player.teleport( 10, 5, 10 ); // 箱から離れた床の上、少し高い位置
+		player.teleport( new Vector3( 10, 5, 10 ) ); // 箱から離れた床の上、少し高い位置
 		player.velocity.set( 0, 0, 0 );
 		for ( let i = 0; i < 120; i ++ ) {
 
@@ -107,7 +107,7 @@ describe( 'CharacterController capsule collision', () => {
 
 		for ( let z = - 4; z <= 4.0001; z += 0.5 ) {
 
-			player.teleport( - 6, 0, z );
+			player.teleport( new Vector3( - 6, 0, z ) );
 			player.velocity.set( 0, 0, 0 );
 			for ( let i = 0; i < 20; i ++ ) {
 
@@ -137,7 +137,7 @@ describe( 'CharacterController capsule collision', () => {
 		for ( let k = 0; k < 16; k ++ ) {
 
 			const dir = ( Math.PI * 2 ) * k / 16;
-			player.teleport( - 6, 0, 0 );
+			player.teleport( new Vector3( - 6, 0, 0 ) );
 			player.velocity.set( 0, 0, 0 );
 			for ( let i = 0; i < 20; i ++ ) {
 
@@ -190,7 +190,7 @@ describe( 'CharacterController capsule collision', () => {
 
 		for ( const x of [ - 2, - 1, 0, 1, 2 ] ) {
 
-			player.teleport( x, 10, 0 ); // 箱の上に落とす
+			player.teleport( new Vector3( x, 10, 0 ) ); // 箱の上に落とす
 			player.velocity.set( 0, 0, 0 );
 			for ( let i = 0; i < 60; i ++ ) {
 
@@ -222,7 +222,7 @@ describe( 'CharacterController capsule collision', () => {
 		const { world, player, footprint } = makeScene();
 
 		// 箱の左面(x=-2.5)へ斜めに押し当てつつ +z へ滑らせる
-		player.teleport( - 6, 0, - 3 );
+		player.teleport( new Vector3( - 6, 0, - 3 ) );
 		player.velocity.set( 0, 0, 0 );
 		for ( let i = 0; i < 20; i ++ ) { player.move( STOP ); world.fixedUpdate(); }
 
@@ -256,9 +256,9 @@ describe( 'CharacterController capsule collision', () => {
 		level.addFromObject( ramp );
 		world.add( level );
 
-		const player = new CharacterController( PLAYER_RADIUS, PLAYER_HEIGHT );
+		const player = new CharacterController( { radius: PLAYER_RADIUS, height: PLAYER_HEIGHT } );
 		world.add( player );
-		player.teleport( 0, 3, 0 );
+		player.teleport( new Vector3( 0, 3, 0 ) );
 		player.velocity.set( 0, 0, 0 );
 
 		let maxFall = 0;
@@ -286,7 +286,7 @@ describe( 'CharacterController capsule collision', () => {
 		// Phase 1 でジャンプ時間源を deltaTime 積算へ置換したので、フェイクタイマー無しで決定論的。
 		// コサイン弧の形・到達高さ(≈6.3)・滞空(頂点≈0.5s / 再接地≈1s)を維持する基準。
 		const { world, player } = makeScene();
-		player.teleport( 10, 0, 10 );
+		player.teleport( new Vector3( 10, 0, 10 ) );
 		player.velocity.set( 0, 0, 0 );
 		for ( let i = 0; i < 60; i ++ ) { player.move( STOP ); world.fixedUpdate(); }
 		expect( player.isGrounded ).toBe( true );
@@ -319,8 +319,8 @@ describe( 'CharacterController capsule collision', () => {
 
 		const a = makeScene();
 		const b = makeScene();
-		a.player.teleport( 10, 8, 10 ); a.player.velocity.set( 0, 0, 0 );
-		b.player.teleport( 10, 8, 10 ); b.player.velocity.set( 0, 0, 0 );
+		a.player.teleport( new Vector3( 10, 8, 10 ) ); a.player.velocity.set( 0, 0, 0 );
+		b.player.teleport( new Vector3( 10, 8, 10 ) ); b.player.velocity.set( 0, 0, 0 );
 
 		for ( let i = 0; i < 150; i ++ ) { a.player.move( STOP ); a.world.fixedUpdate(); }
 		for ( let i = 0; i < 150; i ++ ) { b.player.move( STOP ); b.world.update( 1 / 60 ); }
@@ -334,7 +334,7 @@ describe( 'CharacterController capsule collision', () => {
 	it( '[golden] 端数 delta は蓄積され、固定ステップ(1/60)到達時のみ進む', () => {
 
 		const { world, player } = makeScene();
-		player.teleport( 10, 8, 10 ); // 空中
+		player.teleport( new Vector3( 10, 8, 10 ) ); // 空中
 		player.velocity.set( 0, 0, 0 );
 
 		// 1/120 は閾値 1/60 未満 → まだ 1 ステップも実行されず位置は不変
@@ -351,8 +351,8 @@ describe( 'CharacterController capsule collision', () => {
 
 		const a = makeScene();
 		const b = makeScene();
-		a.player.teleport( 10, 50, 10 ); a.player.velocity.set( 0, 0, 0 );
-		b.player.teleport( 10, 50, 10 ); b.player.velocity.set( 0, 0, 0 );
+		a.player.teleport( new Vector3( 10, 50, 10 ) ); a.player.velocity.set( 0, 0, 0 );
+		b.player.teleport( new Vector3( 10, 50, 10 ) ); b.player.velocity.set( 0, 0, 0 );
 
 		// a: fixedUpdate 5回 / b: update(100) 1回（上限5フレームに丸められる）
 		for ( let i = 0; i < 5; i ++ ) { a.player.move( STOP ); a.world.fixedUpdate(); }

@@ -79,8 +79,8 @@ const capsule = new THREE.Mesh(
 capsule.position.y = playerHeight / 2;
 playerObjectHolder.add( capsule );
 
-const playerController = new MW.CharacterController( playerRadius, playerHeight );
-playerController.teleport( 0, 10, 0 );
+const playerController = new MW.CharacterController( { radius: playerRadius, height: playerHeight } );
+playerController.teleport( new THREE.Vector3( 0, 10, 0 ) );
 world.add( playerController );
 
 const keyInputControl = new MW.KeyboardControls();

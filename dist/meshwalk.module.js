@@ -985,7 +985,7 @@ class CharacterController extends Body {
     get _slopeLimitCos() {
         return Math.cos(this.slopeLimit * MathUtils.DEG2RAD);
     }
-    constructor(radius, height) {
+    constructor({ radius, height, slopeLimit, groundCheckDepth }) {
         super();
         this.isCharacterController = true;
         this.position = new Vector3();
@@ -1006,6 +1006,10 @@ class CharacterController extends Body {
         this._moveVelocity = new Vector3(); // move() で設定する望む水平速度
         this._facingAngle = 0; // 向き（移動方向から算出）
         this._jumpElapsed = 0; // ジャンプ開始からの経過（秒）。deltaTime を積算
+        if (slopeLimit !== undefined)
+            this.slopeLimit = slopeLimit;
+        if (groundCheckDepth !== undefined)
+            this.groundCheckDepth = groundCheckDepth;
         this.radius = radius;
         // カプセルの全高（先端から先端まで）。幾何学的に最小でも球の直径（2 * radius）
         this.height = Math.max(height, radius * 2);
@@ -1308,8 +1312,8 @@ class CharacterController extends Body {
         const progress = this._jumpElapsed / JUMP_DURATION_SEC;
         this._currentJumpPower = Math.cos(Math.min(progress, 1) * Math.PI);
     }
-    teleport(x, y, z) {
-        this.position.set(x, y, z);
+    teleport(position) {
+        this.position.copy(position);
     }
     dispose() {
         this._nearTriangles.length = 0;

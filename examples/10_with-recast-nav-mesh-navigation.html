@@ -72,8 +72,8 @@ const playerHeight = 2;
 // capsule.position.y = playerHeight / 2;
 // playerObjectHolder.add( capsule );
 
-const playerController = new MW.CharacterController( playerRadius, playerHeight );
-playerController.teleport( 0, 10, 0 );
+const playerController = new MW.CharacterController( { radius: playerRadius, height: playerHeight } );
+playerController.teleport( new THREE.Vector3( 0, 10, 0 ) );
 world.add( playerController );
 
 const tpsCameraControls = new MW.ThirdPersonCameraControls(
@@ -233,7 +233,7 @@ const checkAutoPilotState = () => {
 		const agentVelocity = crowd.getAgentVelocity( agentIndex )
 		direction.set( - agentVelocity.z, - agentVelocity.x ).normalize();
 		if ( Math.abs( agentVelocity.x ) > 1e-10 || Math.abs( agentVelocity.y ) > 1e-10 ) { const a = direction.angle(); playerController.move( _moveDir.set( - Math.sin( a ), 0, - Math.cos( a ) ) ); }
-		playerController.teleport( agentPosition.x, agentPosition.y - 0.25, agentPosition.z );
+		playerController.teleport( new THREE.Vector3( agentPosition.x, agentPosition.y - 0.25, agentPosition.z ) );
 
 	}
 

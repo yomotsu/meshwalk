@@ -28,6 +28,13 @@ const capsule = new Capsule( new Vector3(), new Vector3(), 0 );
 
 const intersection = new Intersection();
 
+export interface CharacterControllerOptions {
+	radius: number;
+	height: number;
+	slopeLimit?: number;      // 度。既定 50
+	groundCheckDepth?: number; // 既定 0.2
+}
+
 export type CharacterControllerEventType =
 	| 'startIdling'
 	| 'startWalking'
@@ -73,9 +80,12 @@ export class CharacterController extends Body<CharacterControllerEventType> {
 
 	}
 
-	constructor( radius: number, height: number ) {
+	constructor( { radius, height, slopeLimit, groundCheckDepth }: CharacterControllerOptions ) {
 
 		super();
+
+		if ( slopeLimit !== undefined ) this.slopeLimit = slopeLimit;
+		if ( groundCheckDepth !== undefined ) this.groundCheckDepth = groundCheckDepth;
 
 		this.radius = radius;
 		// カプセルの全高（先端から先端まで）。幾何学的に最小でも球の直径（2 * radius）
@@ -538,9 +548,9 @@ export class CharacterController extends Body<CharacterControllerEventType> {
 
 	}
 
-	teleport( x: number, y: number, z: number ) {
+	teleport( position: Vector3 ) {
 
-		this.position.set( x, y, z );
+		this.position.copy( position );
 
 	}
 
