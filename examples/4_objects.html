@@ -158,6 +158,32 @@ const object6Helper = new THREE.LineSegments( new THREE.WireframeGeometry( objec
 object6Helper.position.copy( object6.position );
 scene.add( object6Helper );
 
+// stepOffset テスト用の階段（段差が徐々に高くなる。stepOffset=0.3 を超える段で登れなくなる）
+const stairRises = [ 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45 ];
+let stairTop = 0;
+let stairZ = 2;
+const stairDepth = 1.6;
+
+for ( let i = 0; i < stairRises.length; i ++ ) {
+
+	stairTop += stairRises[ i ];
+	const step = new THREE.Mesh(
+		new THREE.BoxGeometry( 8, stairTop, stairDepth ),
+		new THREE.MeshNormalMaterial()
+	);
+	step.position.set( - 24, stairTop / 2, stairZ - stairDepth / 2 );
+	step.updateMatrixWorld( true );
+	scene.add( step );
+	staticBody.addFromObject( step );
+
+	const stepHelper = new THREE.LineSegments( new THREE.WireframeGeometry( step.geometry ) );
+	stepHelper.position.copy( step.position );
+	scene.add( stepHelper );
+
+	stairZ -= stairDepth;
+
+}
+
 
 
 const playerRadius = .5;

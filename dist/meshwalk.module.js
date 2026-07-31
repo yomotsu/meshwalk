@@ -979,19 +979,26 @@ const groundContactPoint = new Vector3();
 // const translateScoped = new Vector3();
 const translate = new Vector3();
 const _yAxis = new Vector3(0, 1, 0);
+const STEP_EPS = 1e-4;
+const stepProbeFrom = new Vector3();
+const stepProbeTo = new Vector3();
+const stepProbePoint = new Vector3();
+const headroomFrom = new Vector3();
+const headroomTo = new Vector3();
 const capsule = new Capsule(new Vector3(), new Vector3(), 0);
 const intersection = new Intersection();
 class CharacterController extends Body {
     get _slopeLimitCos() {
         return Math.cos(this.slopeLimit * MathUtils.DEG2RAD);
     }
-    constructor({ radius, height, slopeLimit, groundCheckDepth }) {
+    constructor({ radius, height, slopeLimit, stepOffset, groundCheckDepth }) {
         super();
         this.isCharacterController = true;
         this.position = new Vector3();
         this.quaternion = new Quaternion(); // 向き（利用側がメッシュへ同期する）
-        this.groundCheckDepth = .2;
+        this.groundCheckDepth = .3; // 接地したまま降りられる段差の上限。stepOffset 以上が望ましい（登り降り対称）
         this.slopeLimit = 50; // 度。これより急な面は登れず滑り落ちる（Unity の slopeLimit 相当）
+        this.stepOffset = 0.3; // これ以下の高さの段差は自動で登る（0 で無効・Unity の stepOffset 相当）
         this.isGrounded = false;
         this.isOnSlope = false;
         this.isIdling = false;
@@ -1001,6 +1008,7 @@ class CharacterController extends Body {
         this.groundHeight = 0;
         this.groundNormal = new Vector3();
         this._currentJumpPower = 0;
+        this._isStepping = false; // 段差登り中フラグ（壁接触が一時的に消えても登りを継続させるラッチ）
         this._nearTriangles = [];
         this._contactInfo = [];
         this._moveVelocity = new Vector3(); // move() で設定する望む水平速度
@@ -1008,6 +1016,8 @@ class CharacterController extends Body {
         this._jumpElapsed = 0; // ジャンプ開始からの経過（秒）。deltaTime を積算
         if (slopeLimit !== undefined)
             this.slopeLimit = slopeLimit;
+        if (stepOffset !== undefined)
+            this.stepOffset = stepOffset;
         if (groundCheckDepth !== undefined)
             this.groundCheckDepth = groundCheckDepth;
         this.radius = radius;
@@ -1202,13 +1212,92 @@ class CharacterController extends Body {
         if (this.isJumping && 0 < this._currentJumpPower) {
             this.isOnSlope = false;
             this.isGrounded = false;
+            this._isStepping = false;
             return;
         }
+        // 低い段差を groundHeight に反映（接地スナップで滑らかに登る）
+        this._stepLookAhead();
         this.isGrounded = (bottom <= this.groundHeight && this.groundHeight <= top);
         this.isOnSlope = (this.groundNormal.y <= this._slopeLimitCos);
         if (this.isGrounded) {
             this.isJumping = false;
         }
+    }
+    // 低い段差 (<= stepOffset) を自動で登る（Unity CharacterController.stepOffset 相当）。
+    // 進行方向を塞ぐ壁があるとき、前縁の少し先・上（stepOffset 以内）に歩ける面があれば、
+    // それを groundHeight として採用する。接地スナップ（_updatePosition）が y を段差へ
+    // 滑らかに持ち上げ、その高さでは段差の垂直面がクリアされるので前進できる。
+    //
+    // ラッチ (_isStepping): 持ち上げると壁接触が一瞬消えてゲートが外れてしまうため、
+    // 「一度登り始めたら、前方に段差が無くなる（＝上面に乗り切る）まで登りを継続」する。
+    // 連続斜面では壁接触が起きないので発動しない（斜面で浮かせない）。
+    _stepLookAhead() {
+        if (this.stepOffset <= 0)
+            return;
+        // 望む入力方向を使う（velocity は壁ずりで壁方向成分が 0 にされるため段差判定に使えない）
+        const vx = this._moveVelocity.x;
+        const vz = this._moveVelocity.z;
+        const hSq = vx * vx + vz * vz;
+        if (hSq < 1e-8) {
+            this._isStepping = false;
+            return;
+        } // 水平移動していない
+        const walkableCos = this._slopeLimitCos;
+        // 進行方向を塞ぐ「壁」接触が（直前フレームに）あるか
+        let wallAhead = false;
+        for (let i = 0, l = this._contactInfo.length; i < l; i++) {
+            const n = this._contactInfo[i].triangle.normal;
+            if (n.y > walkableCos)
+                continue; // 歩ける面は壁ではない
+            if (vx * n.x + vz * n.z < 0) {
+                wallAhead = true;
+                break;
+            } // 進行方向に対向する面
+        }
+        // 壁に当たったら登り開始。登り中は壁が一瞬消えても継続（ラッチ）
+        if (!wallAhead && !this._isStepping)
+            return;
+        const foot = this.position.y;
+        // カプセル前縁（進行方向へ radius）の真下で、足元〜stepOffset の歩ける面の最高点を探す
+        const inv = this.radius / Math.sqrt(hSq);
+        const px = this.position.x + vx * inv;
+        const pz = this.position.z + vz * inv;
+        stepProbeFrom.set(px, foot + this.stepOffset + STEP_EPS, pz);
+        stepProbeTo.set(px, foot - STEP_EPS, pz);
+        let stepTop = -Infinity;
+        let stepTriangle = null;
+        const triangles = this._nearTriangles;
+        for (let i = 0, l = triangles.length; i < l; i++) {
+            const triangle = triangles[i];
+            if (triangle.normal.y <= walkableCos)
+                continue; // 歩ける面のみ
+            if (!intersectsLineTriangle(stepProbeFrom, stepProbeTo, triangle.a, triangle.b, triangle.c, stepProbePoint))
+                continue;
+            if (stepProbePoint.y > stepTop) {
+                stepTop = stepProbePoint.y;
+                stepTriangle = triangle;
+            }
+        }
+        // 現在の地面より高い段差で、かつ stepOffset 以内でなければ登れない（＝壁のまま）
+        const valid = (stepTop > this.groundHeight + STEP_EPS) && (stepTop - foot <= this.stepOffset);
+        if (!valid) {
+            this._isStepping = false;
+            return;
+        }
+        // 頭上チェック: 持ち上げでカプセル頭が天井等に当たるなら登らない
+        headroomFrom.set(this.position.x, foot + this.height, this.position.z);
+        headroomTo.set(this.position.x, stepTop + this.height, this.position.z);
+        for (let i = 0, l = triangles.length; i < l; i++) {
+            const triangle = triangles[i];
+            if (intersectsLineTriangle(headroomFrom, headroomTo, triangle.a, triangle.b, triangle.c, stepProbePoint)) {
+                this._isStepping = false;
+                return;
+            }
+        }
+        this._isStepping = true;
+        this.groundHeight = stepTop;
+        if (stepTriangle)
+            this.groundNormal.copy(stepTriangle.normal);
     }
     _updatePosition(deltaTime) {
         // 壁などを無視してひとまず(速度 * 時間)だけ

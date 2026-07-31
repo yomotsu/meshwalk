@@ -5,6 +5,7 @@ export interface CharacterControllerOptions {
     radius: number;
     height: number;
     slopeLimit?: number;
+    stepOffset?: number;
     groundCheckDepth?: number;
 }
 export type CharacterControllerEventType = 'startIdling' | 'startWalking' | 'startJumping' | 'startSliding' | 'startFalling';
@@ -16,6 +17,7 @@ export declare class CharacterController extends Body<CharacterControllerEventTy
     quaternion: Quaternion;
     groundCheckDepth: number;
     slopeLimit: number;
+    stepOffset: number;
     isGrounded: boolean;
     isOnSlope: boolean;
     isIdling: boolean;
@@ -25,6 +27,7 @@ export declare class CharacterController extends Body<CharacterControllerEventTy
     groundHeight: number;
     groundNormal: Vector3;
     private _currentJumpPower;
+    private _isStepping;
     private _nearTriangles;
     private _contactInfo;
     private _moveVelocity;
@@ -32,7 +35,7 @@ export declare class CharacterController extends Body<CharacterControllerEventTy
     private _jumpElapsed;
     private _events;
     private get _slopeLimitCos();
-    constructor({ radius, height, slopeLimit, groundCheckDepth }: CharacterControllerOptions);
+    constructor({ radius, height, slopeLimit, stepOffset, groundCheckDepth }: CharacterControllerOptions);
     setNearTriangles(nearTriangles: ComputedTriangle[]): void;
     /**
      * 望む水平移動速度をワールド座標で指定する（Unity CharacterController.Move / Godot velocity 相当）。
@@ -43,6 +46,7 @@ export declare class CharacterController extends Body<CharacterControllerEventTy
     update(deltaTime: number): void;
     _updateVelocity(): void;
     _checkGround(): void;
+    _stepLookAhead(): void;
     _updatePosition(deltaTime: number): void;
     _collisionDetection(): void;
     _solvePosition(): void;

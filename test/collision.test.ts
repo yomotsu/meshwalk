@@ -83,6 +83,45 @@ function drive( world: World, player: CharacterController, startX: number, start
 // dir: 0=-z, 0.5PI=-x, 1.0PI=+z, 1.5PI=+x
 const DIR = { negZ: 0, negX: Math.PI * 0.5, posZ: Math.PI, posX: Math.PI * 1.5 };
 
+// 階段シーン: 床 + 段 box 列（+z 方向に並ぶ）。tops[k] は k 段目の上面 y。
+// 各段は box( 10, top, 2 ) を z=1+2k（span [2k, 2k+2]）に置く。ceilingY 指定時は天井板を足す。
+function makeStairScene( tops: number[], { ceilingY }: { ceilingY?: number } = {} ) {
+
+	const world = new World();
+	const level = new StaticBody();
+
+	const floor = new Mesh( new PlaneGeometry( 200, 200 ), new MeshBasicMaterial() );
+	floor.rotation.x = - 90 * MathUtils.DEG2RAD;
+	floor.updateMatrixWorld( true );
+	level.addFromObject( floor );
+
+	tops.forEach( ( top, k ) => {
+
+		const box = new Mesh( new BoxGeometry( 10, top, 2 ), new MeshBasicMaterial() );
+		box.position.set( 0, top / 2, 1 + 2 * k );
+		box.updateMatrixWorld( true );
+		level.addFromObject( box );
+
+	} );
+
+	if ( ceilingY !== undefined ) {
+
+		const ceiling = new Mesh( new BoxGeometry( 40, 0.2, 40 ), new MeshBasicMaterial() );
+		ceiling.position.set( 0, ceilingY + 0.1, 0 ); // 板下面が ceilingY
+		ceiling.updateMatrixWorld( true );
+		level.addFromObject( ceiling );
+
+	}
+
+	world.add( level );
+
+	const player = new CharacterController( { radius: 0.5, height: 2 } );
+	world.add( player );
+
+	return { world, player };
+
+}
+
 describe( 'CharacterController capsule collision', () => {
 
 	it( '平らな地面の上で接地したまま静止する', () => {
@@ -359,6 +398,85 @@ describe( 'CharacterController capsule collision', () => {
 		b.player.move( STOP ); b.world.update( 100 );
 
 		expect( b.player.position.y, '上限を超えて（または未満で）進んだ' ).toBeCloseTo( a.player.position.y, 6 );
+
+	} );
+
+	// ---- stepOffset ゴールデン ----
+
+	it( '[golden] stepOffset 以下の段差を登って上面に乗る', () => {
+
+		const { world, player } = makeStairScene( [ 0.25 ] ); // rise 0.25 <= 0.3
+		player.teleport( new Vector3( 0, 1, - 2 ) );
+		player.velocity.set( 0, 0, 0 );
+		for ( let i = 0; i < 40; i ++ ) { player.move( STOP ); world.fixedUpdate(); }
+
+		// 段(奥行き2)を登り→上を歩き→奥端から降りる。登った瞬間の最大高さで判定する。
+		let maxY = 0;
+		let maxZ = - Infinity;
+		for ( let i = 0; i < 120; i ++ ) {
+
+			player.move( moveVec( DIR.posZ ) );
+			world.fixedUpdate();
+			maxY = Math.max( maxY, player.position.y );
+			maxZ = Math.max( maxZ, player.position.z );
+
+		}
+
+		expect( maxY, '段差を登れていない' ).toBeCloseTo( 0.25, 1 );
+		expect( maxZ, '段差の上へ前進していない' ).toBeGreaterThan( 0.5 );
+
+	} );
+
+	it( '[golden] stepOffset を超える段差は登れず壁として止まる', () => {
+
+		const { world, player } = makeStairScene( [ 0.6 ] ); // rise 0.6 > 0.3
+		player.teleport( new Vector3( 0, 1, - 2 ) );
+		player.velocity.set( 0, 0, 0 );
+		for ( let i = 0; i < 40; i ++ ) { player.move( STOP ); world.fixedUpdate(); }
+
+		for ( let i = 0; i < 120; i ++ ) { player.move( moveVec( DIR.posZ ) ); world.fixedUpdate(); }
+
+		expect( player.position.y, '高い段差を登ってしまった' ).toBeLessThan( 0.1 );
+		expect( player.position.z, '壁（段差前面 z=0）を越えて前進してしまった' ).toBeLessThan( 0 );
+
+	} );
+
+	it( '[golden] 階段: 低い段は登り、stepOffset 超の段で止まる', () => {
+
+		// tops 0.2,0.45,0.75,1.15 => rise 0.2,0.25,0.30(=stepOffset),0.40(超)
+		const { world, player } = makeStairScene( [ 0.2, 0.45, 0.75, 1.15 ] );
+		player.teleport( new Vector3( 0, 1, - 2 ) );
+		player.velocity.set( 0, 0, 0 );
+		for ( let i = 0; i < 40; i ++ ) { player.move( STOP ); world.fixedUpdate(); }
+
+		for ( let i = 0; i < 300; i ++ ) { player.move( moveVec( DIR.posZ ) ); world.fixedUpdate(); }
+
+		// 3段目(top 0.75)まで登り、4段目(rise 0.4 > 0.3)で停止
+		expect( player.position.y, '3段目まで登れていない' ).toBeCloseTo( 0.75, 1 );
+		expect( player.position.z, '4段目手前(z=6)で停止していない' ).toBeLessThan( 6 );
+		expect( player.position.z, '3段目(z>=4)に到達していない' ).toBeGreaterThan( 4 );
+
+	} );
+
+	it( '[golden] 段差の頭上に天井があると登らない', () => {
+
+		// 0.25 の登れる段だが、頭上 2.1 に天井 → 登ると頭(2.25)が当たるので登らない。
+		// プレイヤー身長 2 なので足元 0 で頭 2.0 <天井 2.1 に収まる（頭を天井に貫通させない）。
+		const { world, player } = makeStairScene( [ 0.25 ], { ceilingY: 2.1 } );
+		player.teleport( new Vector3( 0, 0, - 2 ) );
+		player.velocity.set( 0, 0, 0 );
+		for ( let i = 0; i < 40; i ++ ) { player.move( STOP ); world.fixedUpdate(); }
+
+		let maxY = 0;
+		for ( let i = 0; i < 120; i ++ ) {
+
+			player.move( moveVec( DIR.posZ ) );
+			world.fixedUpdate();
+			maxY = Math.max( maxY, player.position.y );
+
+		}
+
+		expect( maxY, '天井があるのに登ってしまった' ).toBeLessThan( 0.1 );
 
 	} );
 
