@@ -94,8 +94,8 @@ const keyInputControl = new MW.KeyboardControls();
 const _moveDir = new THREE.Vector3();
 const applyMove = () => {
 
-	const angle = keyInputControl.frontAngle;
-	playerController.move( _moveDir.set( - Math.sin( angle ), 0, - Math.cos( angle ) ).multiplyScalar( 10 ) );
+	const input = keyInputControl.inputVector;
+	playerController.move( _moveDir.set( input.x, 0, - input.y ).multiplyScalar( 10 ) );
 
 };
 

@@ -83,10 +83,11 @@ const tpsCameraControls = new MW.ThirdPersonCameraControls(
 const keyInputControl = new MW.KeyboardControls();
 // キー入力 + カメラの向きから、望む水平移動速度ベクトルを作って move() に渡す
 const _moveDir = new THREE.Vector3();
+const _yAxis = new THREE.Vector3( 0, 1, 0 );
 const applyMove = () => {
 
-	const angle = tpsCameraControls.frontAngle + keyInputControl.frontAngle;
-	playerController.move( _moveDir.set( - Math.sin( angle ), 0, - Math.cos( angle ) ).multiplyScalar( 10 ) );
+	const input = keyInputControl.inputVector;
+	playerController.move( _moveDir.set( input.x, 0, - input.y ).applyAxisAngle( _yAxis, tpsCameraControls.frontAngle ).multiplyScalar( 10 ) );
 
 };
 

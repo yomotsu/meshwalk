@@ -1497,15 +1497,6 @@ const KEY_LEFT = 'ArrowLeft';
 const KEY_D = 'KeyD';
 const KEY_RIGHT = 'ArrowRight';
 const KEY_SPACE = 'Space';
-const DEG2RAD$1 = Math.PI / 180;
-const DEG_0 = 0 * DEG2RAD$1;
-const DEG_45 = 45 * DEG2RAD$1;
-const DEG_90 = 90 * DEG2RAD$1;
-const DEG_135 = 135 * DEG2RAD$1;
-const DEG_180 = 180 * DEG2RAD$1;
-const DEG_225 = 225 * DEG2RAD$1;
-const DEG_270 = 270 * DEG2RAD$1;
-const DEG_315 = 315 * DEG2RAD$1;
 class KeyboardControls extends EventDispatcher$1 {
     constructor() {
         super();
@@ -1515,7 +1506,9 @@ class KeyboardControls extends EventDispatcher$1 {
         this.isLeft = false;
         this.isRight = false;
         this.isMoveKeyHolding = false;
-        this.frontAngle = 0;
+        // 望む移動入力。x = 右(+)/左(-)、y = 前(+)/後(-)。大きさ 0〜1（斜めは正規化）。
+        // 無入力は長さ 0。利用側でカメラ向きに回して CharacterController.move() へ渡す。
+        this.inputVector = new Vector2();
         this._keydownListener = (event) => {
             if (this.isDisabled)
                 return;
@@ -1544,9 +1537,10 @@ class KeyboardControls extends EventDispatcher$1 {
                 default:
                     return;
             }
-            const prevAngle = this.frontAngle;
-            this.updateAngle();
-            if (prevAngle !== this.frontAngle) {
+            const prevX = this.inputVector.x;
+            const prevY = this.inputVector.y;
+            this._updateInputVector();
+            if (prevX !== this.inputVector.x || prevY !== this.inputVector.y) {
                 this.dispatchEvent({ type: 'movekeychange' });
             }
             if ((this.isUp || this.isDown || this.isLeft || this.isRight) &&
@@ -1580,9 +1574,10 @@ class KeyboardControls extends EventDispatcher$1 {
                 default:
                     return;
             }
-            const prevAngle = this.frontAngle;
-            this.updateAngle();
-            if (prevAngle !== this.frontAngle) {
+            const prevX = this.inputVector.x;
+            const prevY = this.inputVector.y;
+            this._updateInputVector();
+            if (prevX !== this.inputVector.x || prevY !== this.inputVector.y) {
                 this.dispatchEvent({ type: 'movekeychange' });
             }
             if (!this.isUp && !this.isDown && !this.isLeft && !this.isRight &&
@@ -1603,6 +1598,7 @@ class KeyboardControls extends EventDispatcher$1 {
             this.isDown = false;
             this.isLeft = false;
             this.isRight = false;
+            this._updateInputVector();
             if (this.isMoveKeyHolding) {
                 this.isMoveKeyHolding = false;
                 this.dispatchEvent({ type: 'movekeyoff' });
@@ -1626,27 +1622,11 @@ class KeyboardControls extends EventDispatcher$1 {
     jump() {
         this.dispatchEvent({ type: 'jumpkeypress' });
     }
-    updateAngle() {
-        const up = this.isUp;
-        const down = this.isDown;
-        const left = this.isLeft;
-        const right = this.isRight;
-        if (up && !left && !down && !right)
-            this.frontAngle = DEG_0;
-        else if (up && left && !down && !right)
-            this.frontAngle = DEG_45;
-        else if (!up && left && !down && !right)
-            this.frontAngle = DEG_90;
-        else if (!up && left && down && !right)
-            this.frontAngle = DEG_135;
-        else if (!up && !left && down && !right)
-            this.frontAngle = DEG_180;
-        else if (!up && !left && down && right)
-            this.frontAngle = DEG_225;
-        else if (!up && !left && !down && right)
-            this.frontAngle = DEG_270;
-        else if (up && !left && !down && right)
-            this.frontAngle = DEG_315;
+    // 押下フラグから inputVector を再計算する（対向キーは相殺、斜めは正規化して長さ 1）。
+    _updateInputVector() {
+        this.inputVector.set((this.isRight ? 1 : 0) - (this.isLeft ? 1 : 0), (this.isUp ? 1 : 0) - (this.isDown ? 1 : 0));
+        if (this.inputVector.lengthSq() > 1)
+            this.inputVector.normalize();
     }
     dispose() {
         window.removeEventListener('keydown', this._keydownListener);

@@ -1,3 +1,4 @@
+import { Vector2 } from 'three';
 import { EventDispatcher } from '../core/EventDispatcher';
 export type KeyboardControlsEventType = 'movekeyon' | 'movekeyoff' | 'movekeychange' | 'jumpkeypress';
 export declare class KeyboardControls extends EventDispatcher<KeyboardControlsEventType> {
@@ -7,12 +8,12 @@ export declare class KeyboardControls extends EventDispatcher<KeyboardControlsEv
     private isLeft;
     private isRight;
     private isMoveKeyHolding;
-    frontAngle: number;
+    inputVector: Vector2;
     private _keydownListener;
     private _keyupListener;
     private _blurListener;
     constructor();
     jump(): void;
-    updateAngle(): void;
+    private _updateInputVector;
     dispose(): void;
 }
