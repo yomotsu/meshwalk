@@ -7,8 +7,8 @@ import { intersectsCapsuleTriangle } from '../math/intersectsCapsuleTriangle';
 import { intersectsCapsuleSphere } from '../math/intersectsCapsuleSphere';
 import { type ComputedTriangle } from '../math/triangle';
 
-const FALL_VELOCITY = - 20;
-const JUMP_DURATION_SEC = 1; // ジャンプ弧の全長（秒）。旧実装の 1000ms と等価
+const FALL_VELOCITY = - 20; // 自由落下、崖滑り時の下向きの速度。単位は m/s。
+const JUMP_DURATION_SEC = 1; // ジャンプ弧の全長（秒）。
 const PI_HALF = Math.PI * 0.5;
 const PI_ONE_HALF = Math.PI * 1.5;
 
@@ -49,7 +49,7 @@ export class CharacterController extends Body<CharacterControllerEventType> {
 	isIdling   = false;
 	isRunning  = false; // 派生状態: move() で移動が指定されているとき true
 	isJumping  = false;
-	velocity = new Vector3( 0, - 9.8, 0 );
+	velocity = new Vector3( 0, 0, 0 );
 	groundHeight = 0;
 	groundNormal = new Vector3();
 

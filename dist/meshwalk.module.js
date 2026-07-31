@@ -963,8 +963,8 @@ function intersectsCapsuleSphere(capsule, sphere) {
     return vec3.distanceToSquared(sphere.center) <= r * r;
 }
 
-const FALL_VELOCITY = -20;
-const JUMP_DURATION_SEC = 1; // ジャンプ弧の全長（秒）。旧実装の 1000ms と等価
+const FALL_VELOCITY = -20; // 自由落下、崖滑り時の下向きの速度。単位は m/s。
+const JUMP_DURATION_SEC = 1; // ジャンプ弧の全長（秒）。
 const PI_HALF$1 = Math.PI * 0.5;
 const PI_ONE_HALF = Math.PI * 1.5;
 const direction2D = new Vector2();
@@ -997,7 +997,7 @@ class CharacterController extends Body {
         this.isIdling = false;
         this.isRunning = false; // 派生状態: move() で移動が指定されているとき true
         this.isJumping = false;
-        this.velocity = new Vector3(0, -9.8, 0);
+        this.velocity = new Vector3(0, 0, 0);
         this.groundHeight = 0;
         this.groundNormal = new Vector3();
         this._currentJumpPower = 0;
