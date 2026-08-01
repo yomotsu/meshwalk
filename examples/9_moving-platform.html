@@ -22,7 +22,8 @@ canvas{display: block;}
 	WASD to move, Space to jump.<br>
 	<span style="color:#4f4">GREEN = elevator</span>: ride up/down (vertical carry).<br>
 	<span style="color:#48f">BLUE = sliding floor</span>: ride left/right (horizontal carry).<br>
-	<span style="color:#fc4">ORANGE = turntable</span>: stand off-center to orbit around it (rotational carry).
+	<span style="color:#fc4">ORANGE = turntable</span>: stand off-center to orbit around it (rotational carry).<br>
+	<label><input type="checkbox" id="cameraSync"> sync camera front angle to platform rotation</label>
 </div>
 
 <script async src="https://unpkg.com/es-module-shims@2.8.4/dist/es-module-shims.js"></script>
@@ -118,7 +119,18 @@ const capsule = new THREE.Mesh(
 capsule.position.y = playerHeight / 2;
 playerObjectHolder.add( capsule );
 
+// 正面（facing）を可視化する鼻。キャラの forward（ローカル +Z）に突き出す。
+// カプセルは Y 軸まわりに対称なので、これが無いと yaw の変化が見えない。
+const nose = new THREE.Mesh(
+	new THREE.ConeGeometry( 0.2, 0.5, 8 ),
+	new THREE.MeshBasicMaterial( { color: 0xffff00, wireframe: true } )
+);
+nose.rotation.x = 90 * THREE.MathUtils.DEG2RAD; // 円錐の先端を +Z へ向ける
+nose.position.set( 0, playerHeight / 2, playerRadius + 0.25 );
+playerObjectHolder.add( nose );
+
 const playerController = new MW.CharacterController( { radius: playerRadius, height: playerHeight } );
+// carryRotation は既定 on: 回転床（turntable）の yaw に合わせて正面方向も回る
 playerController.teleport( new THREE.Vector3( - 10, 5, 0 ) ); // drop onto the elevator
 world.add( playerController );
 
@@ -128,8 +140,18 @@ const tpsCameraControls = new MW.ThirdPersonCameraControls(
 	camera,
 	playerObjectHolder,
 	world,
-	renderer.domElement
+	renderer.domElement,
+	playerController // カメラの正面角度同期に使う（回転床上で方位角を追従）
 );
+
+// チェックボックスでカメラ正面角度の同期を on/off して違いを確認できる
+const cameraSyncCheckbox = document.getElementById( 'cameraSync' );
+cameraSyncCheckbox.checked = tpsCameraControls.syncFrontAngleToPlatform; // 既定 on
+cameraSyncCheckbox.addEventListener( 'change', () => {
+
+	tpsCameraControls.syncFrontAngleToPlatform = cameraSyncCheckbox.checked;
+
+} );
 
 
 const _moveDir = new THREE.Vector3();

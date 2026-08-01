@@ -16,6 +16,8 @@ import {
 } from 'three';
 import CameraControls from 'camera-controls';
 import { World } from 'core/World';
+import { CharacterController } from 'core/CharacterController';
+import { KinematicBody } from 'core/KinematicBody';
 
 const subsetOfTHREE = {
 	Vector2   : Vector2,
@@ -41,8 +43,13 @@ const _rotationMatrix = new Matrix4();
 export class ThirdPersonCameraControls extends CameraControls {
 
 	world: World;
+	character: CharacterController | null;
+	// true のとき、追従キャラが回転床に乗っている間はカメラの正面角度（方位角）も
+	// 床の yaw に合わせて回す（肩越し視点が床に対して一定に保たれる）。既定 on。
+	// character を渡していない場合は無効（no-op）。
+	syncFrontAngleToPlatform = true;
 
-	constructor( camera: PerspectiveCamera, trackObject: Object3D, world: World, domElement: HTMLElement ) {
+	constructor( camera: PerspectiveCamera, trackObject: Object3D, world: World, domElement: HTMLElement, character: CharacterController | null = null ) {
 
 		super( camera, domElement );
 		this.minDistance = 1;
@@ -59,6 +66,7 @@ export class ThirdPersonCameraControls extends CameraControls {
 		this.touches.three = CameraControls.ACTION.TOUCH_DOLLY;
 
 		this.world = world;
+		this.character = character;
 		this.colliderMeshes = [ new Object3D() ];
 
 		// this._trackObject = trackObject;
@@ -66,6 +74,20 @@ export class ThirdPersonCameraControls extends CameraControls {
 		const offset = new Vector3( 0, 2, 0 );
 
 		this.update = ( delta ) => {
+
+			// 回転床に乗っている間、床の yaw ぶんだけ方位角を回してキャラへの相対視点を保つ
+			const character = this.character;
+
+			if (
+				this.syncFrontAngleToPlatform &&
+				character &&
+				character.isGrounded &&
+				character.groundBody instanceof KinematicBody
+			) {
+
+				this.rotate( character.groundBody.angularVelocity.y * delta, 0, false );
+
+			}
 
 			const x = trackObject.position.x + offset.x;
 			const y = trackObject.position.y + offset.y;

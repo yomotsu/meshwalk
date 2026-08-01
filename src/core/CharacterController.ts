@@ -59,7 +59,7 @@ export class CharacterController extends Body<CharacterControllerEventType> {
 	groundCheckDepth = .3; // 接地したまま降りられる段差の上限。stepOffset 以上が望ましい（登り降り対称）
 	slopeLimit = 50; // 度。これより急な面は登れず滑り落ちる（Unity の slopeLimit 相当）
 	stepOffset = 0.3; // これ以下の高さの段差は自動で登る（0 で無効・Unity の stepOffset 相当）
-	carryRotation = false; // true のとき、乗っている回転床の yaw に合わせて自分の向きも回す（既定 off）
+	carryRotation = true; // true のとき、乗っている回転床の yaw に合わせて自分の向きも回す（既定 on）
 	isGrounded = false;
 	isOnSlope  = false;
 	isIdling   = false;

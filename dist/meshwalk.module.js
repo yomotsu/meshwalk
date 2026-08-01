@@ -1193,7 +1193,7 @@ class CharacterController extends Body {
         this.groundCheckDepth = .3; // 接地したまま降りられる段差の上限。stepOffset 以上が望ましい（登り降り対称）
         this.slopeLimit = 50; // 度。これより急な面は登れず滑り落ちる（Unity の slopeLimit 相当）
         this.stepOffset = 0.3; // これ以下の高さの段差は自動で登る（0 で無効・Unity の stepOffset 相当）
-        this.carryRotation = false; // true のとき、乗っている回転床の yaw に合わせて自分の向きも回す（既定 off）
+        this.carryRotation = true; // true のとき、乗っている回転床の yaw に合わせて自分の向きも回す（既定 on）
         this.isGrounded = false;
         this.isOnSlope = false;
         this.isIdling = false;
@@ -4682,8 +4682,12 @@ const _v3C = new Vector3();
 const _ray = new Ray();
 const _rotationMatrix = new Matrix4();
 class ThirdPersonCameraControls extends CameraControls {
-    constructor(camera, trackObject, world, domElement) {
+    constructor(camera, trackObject, world, domElement, character = null) {
         super(camera, domElement);
+        // true のとき、追従キャラが回転床に乗っている間はカメラの正面角度（方位角）も
+        // 床の yaw に合わせて回す（肩越し視点が床に対して一定に保たれる）。既定 on。
+        // character を渡していない場合は無効（no-op）。
+        this.syncFrontAngleToPlatform = true;
         this.minDistance = 1;
         this.maxDistance = 30;
         this.azimuthRotateSpeed = 0.3; // negative value to invert rotation direction
@@ -4696,11 +4700,20 @@ class ThirdPersonCameraControls extends CameraControls {
         this.touches.two = CameraControls.ACTION.TOUCH_DOLLY;
         this.touches.three = CameraControls.ACTION.TOUCH_DOLLY;
         this.world = world;
+        this.character = character;
         this.colliderMeshes = [new Object3D()];
         // this._trackObject = trackObject;
         // this.offset = new Vector3( 0, 1, 0 );
         const offset = new Vector3(0, 2, 0);
         this.update = (delta) => {
+            // 回転床に乗っている間、床の yaw ぶんだけ方位角を回してキャラへの相対視点を保つ
+            const character = this.character;
+            if (this.syncFrontAngleToPlatform &&
+                character &&
+                character.isGrounded &&
+                character.groundBody instanceof KinematicBody) {
+                this.rotate(character.groundBody.angularVelocity.y * delta, 0, false);
+            }
             const x = trackObject.position.x + offset.x;
             const y = trackObject.position.y + offset.y;
             const z = trackObject.position.z + offset.z;

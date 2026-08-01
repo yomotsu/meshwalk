@@ -701,23 +701,23 @@ describe( 'KinematicBody moving platform', () => {
 
 	} );
 
-	it( '[golden] carryRotation で回転床に乗ると向きも追従する（既定 off では不変）', () => {
+	it( '[golden] carryRotation で回転床に乗ると向きも追従する（off にすると不変）', () => {
 
 		const fwd = ( p: CharacterController ) => new Vector3( 0, 0, 1 ).applyQuaternion( p.quaternion );
 
-		// 既定 off: 向きは変わらない
+		// off: 向きは変わらない
 		const a = makeElevatorScene();
+		a.player.carryRotation = false;
 		a.player.teleport( new Vector3( 0, 8, 0 ) ); // 中心（軌道並進なし・向きだけ見る）
 		a.player.velocity.set( 0, 0, 0 );
 		for ( let i = 0; i < 120; i ++ ) { a.player.move( STOP ); a.world.fixedUpdate(); }
 		const aBefore = fwd( a.player );
 		a.platform.angularVelocity.set( 0, Math.PI / 2, 0 );
 		for ( let i = 0; i < 60; i ++ ) { a.player.move( STOP ); a.world.fixedUpdate(); }
-		expect( aBefore.angleTo( fwd( a.player ) ), '既定 off なのに向きが回った' ).toBeLessThan( 0.1 );
+		expect( aBefore.angleTo( fwd( a.player ) ), 'off なのに向きが回った' ).toBeLessThan( 0.1 );
 
-		// on: 床の yaw に追従（1s で 90°）
+		// 既定 on: 床の yaw に追従（1s で 90°）
 		const b = makeElevatorScene();
-		b.player.carryRotation = true;
 		b.player.teleport( new Vector3( 0, 8, 0 ) );
 		b.player.velocity.set( 0, 0, 0 );
 		for ( let i = 0; i < 120; i ++ ) { b.player.move( STOP ); b.world.fixedUpdate(); }
