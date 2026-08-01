@@ -135,6 +135,8 @@ animationController.actions.slide.clampWhenFinished = true;
 // player motion
 playerController.addEventListener( 'startIdling',  () => animationController.play( 'idle'  ) );
 playerController.addEventListener( 'startWalking', () => animationController.play( 'run'   ) );
+playerController.addEventListener( 'startLanding', () => animationController.play( 'idle'  ) );
+playerController.addEventListener( 'endLanding',   () => animationController.play( 'idle'  ) );
 playerController.addEventListener( 'startJumping', () => animationController.play( 'jump'  ) );
 playerController.addEventListener( 'startSliding', () => animationController.play( 'slide' ) );
 playerController.addEventListener( 'startFalling', () => animationController.play( 'slide' ) );

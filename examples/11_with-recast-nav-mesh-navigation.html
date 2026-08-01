@@ -138,6 +138,8 @@ animationController.actions.slide.clampWhenFinished = true;
 
 // player motion
 playerController.addEventListener( 'startIdling',  () => animationController.play( 'idle'  ) );
+playerController.addEventListener( 'startLanding', () => animationController.play( 'idle'  ) );
+playerController.addEventListener( 'endLanding',   () => animationController.play( 'idle'  ) );
 playerController.addEventListener( 'startWalking', () => animationController.play( 'run'   ) );
 playerController.addEventListener( 'startJumping', () => animationController.play( 'jump'  ) );
 playerController.addEventListener( 'startSliding', () => animationController.play( 'slide' ) );
@@ -247,11 +249,15 @@ const cancelAutoPilot = () => {
 	isAutoPilotActive = false;
 	crowd.removeAgent( agentIndex );
 	agentIndex = null;
-	animationController.play( 'idle' );
 
 }
 
-keyInputControl.addEventListener( 'movekeyon', cancelAutoPilot );
+keyInputControl.addEventListener( 'movekeyon', () => {
+
+	cancelAutoPilot();
+	animationController.play( 'run' );
+
+} );
 keyInputControl.addEventListener( 'jumpkeypress', cancelAutoPilot );
 
 const navigateToRed    = () => navigateTo( points[ 0 ].x, points[ 0 ].y, points[ 0 ].z );
