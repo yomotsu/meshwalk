@@ -64,9 +64,14 @@ const playerController = new MW.CharacterController( { radius: playerRadius, hei
 playerController.teleport( new THREE.Vector3( 0, 10, 0 ) );
 world.add( playerController );
 
+// カメラの追従点。上方向だけ遅れて追従し、下方向はプレイヤーと同期させる。
+const cameraTrackObject = new THREE.Object3D();
+cameraTrackObject.position.copy( playerController.position );
+const cameraUpwardDamping = 5;
+
 const tpsCameraControls = new MW.ThirdPersonCameraControls(
 	camera, // three.js camera
-	playerObjectHolder, // tracking object
+	cameraTrackObject, // tracking object
 	world,
 	renderer.domElement
 );
@@ -144,6 +149,11 @@ animationController.play( 'slide'  );
 	// 物理(Body)からメッシュへ transform を同期する
 	playerObjectHolder.position.copy( playerController.position );
 	playerObjectHolder.quaternion.copy( playerController.quaternion );
+	cameraTrackObject.position.x = playerController.position.x;
+	cameraTrackObject.position.z = playerController.position.z;
+	cameraTrackObject.position.y = playerController.position.y > cameraTrackObject.position.y
+		? THREE.MathUtils.damp( cameraTrackObject.position.y, playerController.position.y, cameraUpwardDamping, delta )
+		: playerController.position.y;
 	tpsCameraControls.update( delta );
 	animationController.update( delta );
 	renderer.render( scene, camera );
