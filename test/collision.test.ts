@@ -353,6 +353,62 @@ describe( 'CharacterController capsule collision', () => {
 
 	} );
 
+	it( '自由落下からの着地で startLanding を発火し、指定時間は移動とジャンプを抑止する', () => {
+
+		const { world, player } = makeScene();
+		player.landingLockDuration = 0.2;
+		player.teleport( new Vector3( 10, 5, 10 ) );
+		player.move( new Vector3( 4, 0, 0 ) );
+
+		let landingCount = 0;
+		player.addEventListener( 'startLanding', () => landingCount ++ );
+
+		for ( let i = 0; i < 120 && landingCount === 0; i ++ ) world.fixedUpdate();
+
+		expect( landingCount ).toBe( 1 );
+		expect( player.isLanding ).toBe( true );
+		const landingX = player.position.x;
+
+		player.jump();
+		expect( player.isJumping ).toBe( false );
+
+		// 入力を渡し続けても、硬直時間の前半はその場から動かない。
+		for ( let i = 0; i < 6; i ++ ) {
+
+			player.move( new Vector3( 4, 0, 0 ) );
+			world.fixedUpdate();
+
+		}
+		expect( player.position.x ).toBeCloseTo( landingX, 6 );
+
+		// 入力は保持されているため、硬直終了後は再入力なしでも移動を再開する。
+		for ( let i = 0; i < 12; i ++ ) world.fixedUpdate();
+		expect( player.isLanding ).toBe( false );
+		expect( player.position.x ).toBeGreaterThan( landingX );
+		expect( landingCount ).toBe( 1 );
+
+	} );
+
+	it( '通常のジャンプ着地でも startLanding を発火し、硬直解除時に endLanding を発火する', () => {
+
+		const { world, player } = makeScene();
+		player.teleport( new Vector3( 10, 0, 10 ) );
+		for ( let i = 0; i < 10; i ++ ) world.fixedUpdate();
+
+		let landingCount = 0;
+		let endLandingCount = 0;
+		player.addEventListener( 'startLanding', () => landingCount ++ );
+		player.addEventListener( 'endLanding', () => endLandingCount ++ );
+		player.jump();
+		for ( let i = 0; i < 120; i ++ ) world.fixedUpdate();
+
+		expect( player.isGrounded ).toBe( true );
+		expect( player.isLanding ).toBe( false );
+		expect( landingCount ).toBe( 1 );
+		expect( endLandingCount ).toBe( 1 );
+
+	} );
+
 	// ---- Phase 4 ゴールデン（固定ステップ・アキュムレータ world.update(dt)）----
 
 	it( '[golden] update(1/60) を N 回は fixedUpdate() を N 回と同一軌跡', () => {

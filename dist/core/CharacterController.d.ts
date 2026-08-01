@@ -7,8 +7,9 @@ export interface CharacterControllerOptions {
     slopeLimit?: number;
     stepOffset?: number;
     groundCheckDepth?: number;
+    landingLockDuration?: number;
 }
-export type CharacterControllerEventType = 'startIdling' | 'startWalking' | 'startJumping' | 'startSliding' | 'startFalling';
+export type CharacterControllerEventType = 'startIdling' | 'startWalking' | 'startJumping' | 'startSliding' | 'startFalling' | 'startLanding' | 'endLanding';
 export declare class CharacterController extends Body<CharacterControllerEventType> {
     isCharacterController: boolean;
     radius: number;
@@ -18,12 +19,14 @@ export declare class CharacterController extends Body<CharacterControllerEventTy
     groundCheckDepth: number;
     slopeLimit: number;
     stepOffset: number;
+    landingLockDuration: number;
     carryRotation: boolean;
     isGrounded: boolean;
     isOnSlope: boolean;
     isIdling: boolean;
     isRunning: boolean;
     isJumping: boolean;
+    isLanding: boolean;
     velocity: Vector3;
     groundHeight: number;
     groundNormal: Vector3;
@@ -36,9 +39,11 @@ export declare class CharacterController extends Body<CharacterControllerEventTy
     private _externalVelocity;
     private _facingAngle;
     private _jumpElapsed;
+    private _landingTimeRemaining;
+    private _fallElapsed;
     private _events;
     private get _slopeLimitCos();
-    constructor({ radius, height, slopeLimit, stepOffset, groundCheckDepth }: CharacterControllerOptions);
+    constructor({ radius, height, slopeLimit, stepOffset, groundCheckDepth, landingLockDuration }: CharacterControllerOptions);
     setNearTriangles(nearTriangles: ComputedTriangle[]): void;
     /**
      * 望む水平移動速度をワールド座標で指定する（Unity CharacterController.Move / Godot velocity 相当）。
@@ -67,6 +72,7 @@ export declare class CharacterController extends Body<CharacterControllerEventTy
     private _updateQuaternion;
     jump(): void;
     _updateJumping(deltaTime: number): void;
+    private _updateLanding;
     teleport(position: Vector3): void;
     dispose(): void;
 }

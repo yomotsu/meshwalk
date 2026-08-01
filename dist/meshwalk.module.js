@@ -1159,6 +1159,7 @@ function intersectsCapsuleSphere(capsule, sphere) {
 
 const FALL_VELOCITY = -20; // 自由落下、崖滑り時の下向きの速度。単位は m/s。
 const JUMP_DURATION_SEC = 1; // ジャンプ弧の全長（秒）。
+const LANDING_MIN_FALL_DURATION_SEC = 0.1; // 段差補正などの瞬間的な非接地を着地衝撃として扱わない。
 const PI_HALF$1 = Math.PI * 0.5;
 const PI_ONE_HALF = Math.PI * 1.5;
 const direction2D = new Vector2();
@@ -1185,7 +1186,7 @@ class CharacterController extends Body {
     get _slopeLimitCos() {
         return Math.cos(this.slopeLimit * MathUtils.DEG2RAD);
     }
-    constructor({ radius, height, slopeLimit, stepOffset, groundCheckDepth }) {
+    constructor({ radius, height, slopeLimit, stepOffset, groundCheckDepth, landingLockDuration }) {
         super();
         this.isCharacterController = true;
         this.position = new Vector3();
@@ -1193,12 +1194,14 @@ class CharacterController extends Body {
         this.groundCheckDepth = .3; // 接地したまま降りられる段差の上限。stepOffset 以上が望ましい（登り降り対称）
         this.slopeLimit = 50; // 度。これより急な面は登れず滑り落ちる（Unity の slopeLimit 相当）
         this.stepOffset = 0.3; // これ以下の高さの段差は自動で登る（0 で無効・Unity の stepOffset 相当）
+        this.landingLockDuration = 0.2; // ジャンプ・自由落下から着地した直後、移動・ジャンプ入力を抑止する時間（秒）
         this.carryRotation = true; // true のとき、乗っている回転床の yaw に合わせて自分の向きも回す（既定 on）
         this.isGrounded = false;
         this.isOnSlope = false;
         this.isIdling = false;
         this.isRunning = false; // 派生状態: move() で移動が指定されているとき true
         this.isJumping = false;
+        this.isLanding = false;
         this.velocity = new Vector3(0, 0, 0);
         this.groundHeight = 0;
         this.groundNormal = new Vector3();
@@ -1211,12 +1214,16 @@ class CharacterController extends Body {
         this._externalVelocity = new Vector3(); // 動床から離れる際に引き継いだ水平慣性（着地までの drift）
         this._facingAngle = 0; // 向き（移動方向から算出）
         this._jumpElapsed = 0; // ジャンプ開始からの経過（秒）。deltaTime を積算
+        this._landingTimeRemaining = 0;
+        this._fallElapsed = 0;
         if (slopeLimit !== undefined)
             this.slopeLimit = slopeLimit;
         if (stepOffset !== undefined)
             this.stepOffset = stepOffset;
         if (groundCheckDepth !== undefined)
             this.groundCheckDepth = groundCheckDepth;
+        if (landingLockDuration !== undefined)
+            this.landingLockDuration = Math.max(0, landingLockDuration);
         this.radius = radius;
         // カプセルの全高（先端から先端まで）。幾何学的に最小でも球の直径（2 * radius）
         this.height = Math.max(height, radius * 2);
@@ -1227,7 +1234,9 @@ class CharacterController extends Body {
         // let wasIdling = false;
         let wasRunning = false;
         let wasJumping = false;
-        this._events = () => {
+        this._events = (deltaTime) => {
+            if (!this.isGrounded && !this.isJumping && !this.isOnSlope)
+                this._fallElapsed += deltaTime;
             // 初回のみ、過去状態を作るだけで終わり
             if (isFirstUpdate) {
                 isFirstUpdate = false;
@@ -1238,13 +1247,30 @@ class CharacterController extends Body {
                 wasJumping = this.isJumping;
                 return;
             }
-            if (!wasRunning && !this.isRunning && this.isGrounded && !this.isIdling) {
+            const startedLanding = !wasGrounded &&
+                this.isGrounded &&
+                !this.isOnSlope &&
+                (wasJumping || LANDING_MIN_FALL_DURATION_SEC <= this._fallElapsed);
+            if (startedLanding) {
+                this.isIdling = false;
+                this.isLanding = 0 < this.landingLockDuration;
+                this._landingTimeRemaining = this.landingLockDuration;
+                this.isRunning = !this.isLanding && this._moveVelocity.lengthSq() > 1e-8;
+                if (this.isLanding) {
+                    this.velocity.x = 0;
+                    this.velocity.z = 0;
+                }
+                this.dispatchEvent({ type: 'startLanding' });
+                if (!this.isLanding)
+                    this.dispatchEvent({ type: 'endLanding' });
+            }
+            else if (!this.isLanding && !wasRunning && !this.isRunning && this.isGrounded && !this.isIdling) {
                 this.isIdling = true;
                 this.dispatchEvent({ type: 'startIdling' });
             }
-            else if ((!wasRunning && this.isRunning && !this.isJumping && this.isGrounded) ||
+            else if (!this.isLanding && ((!wasRunning && this.isRunning && !this.isJumping && this.isGrounded) ||
                 (!wasGrounded && this.isGrounded && this.isRunning) ||
-                (wasOnSlope && !this.isOnSlope && this.isRunning && this.isGrounded)) {
+                (wasOnSlope && !this.isOnSlope && this.isRunning && this.isGrounded))) {
                 this.isIdling = false;
                 this.dispatchEvent({ type: 'startWalking' });
             }
@@ -1258,12 +1284,14 @@ class CharacterController extends Body {
             else if (wasGrounded && !this.isGrounded && !this.isJumping) {
                 this.dispatchEvent({ type: 'startFalling' });
             }
-            if (!wasGrounded && this.isGrounded) ;
             wasGrounded = this.isGrounded;
             wasOnSlope = this.isOnSlope;
             // wasIdling   = this.isIdling;
-            wasRunning = this.isRunning;
+            // landingLockDuration=0 でも、次の更新で現在の入力に応じた歩行／待機イベントへ遷移させる。
+            wasRunning = startedLanding ? false : this.isRunning;
             wasJumping = this.isJumping;
+            if (this.isGrounded)
+                this._fallElapsed = 0;
         };
     }
     setNearTriangles(nearTriangles) {
@@ -1276,7 +1304,7 @@ class CharacterController extends Body {
      */
     move(velocity) {
         this._moveVelocity.set(velocity.x, 0, velocity.z);
-        this.isRunning = this._moveVelocity.lengthSq() > 1e-8;
+        this.isRunning = !this.isLanding && this._moveVelocity.lengthSq() > 1e-8;
         // 向きは移動方向に合わせる（移動している間のみ更新）
         if (this.isRunning)
             this._facingAngle = Math.atan2(-this._moveVelocity.x, -this._moveVelocity.z);
@@ -1297,6 +1325,7 @@ class CharacterController extends Body {
         this._facingAngle += deltaAngle;
     }
     update(deltaTime) {
+        this._updateLanding(deltaTime);
         // 状態をリセットしておく
         this.isGrounded = false;
         this.isOnSlope = false;
@@ -1309,11 +1338,11 @@ class CharacterController extends Body {
         this._collisionDetection();
         this._solvePosition();
         this._updateVelocity();
-        this._events();
+        this._events(deltaTime);
     }
     _updateVelocity() {
         let isHittingCeiling = false;
-        this.velocity.set(this._moveVelocity.x, FALL_VELOCITY, this._moveVelocity.z);
+        this.velocity.set(this.isLanding ? 0 : this._moveVelocity.x, FALL_VELOCITY, this.isLanding ? 0 : this._moveVelocity.z);
         // 急勾配や自由落下など、自動で付与される速度の処理
         if (this._contactInfo.length === 0 && !this.isJumping) {
             // 何とも衝突していないので、自由落下
@@ -1335,7 +1364,7 @@ class CharacterController extends Body {
         }
         // 壁に向かった場合、壁方向の速度を0にする処理
         // vs walls and sliding on the wall
-        direction2D.set(this._moveVelocity.x, this._moveVelocity.z);
+        direction2D.set(this.velocity.x, this.velocity.z);
         // const frontAngle = Math.atan2( direction2D.y, direction2D.x );
         const negativeFrontAngle = Math.atan2(-direction2D.y, -direction2D.x);
         for (let i = 0, l = this._contactInfo.length; i < l; i++) {
@@ -1455,7 +1484,7 @@ class CharacterController extends Body {
     // 「一度登り始めたら、前方に段差が無くなる（＝上面に乗り切る）まで登りを継続」する。
     // 連続斜面では壁接触が起きないので発動しない（斜面で浮かせない）。
     _stepLookAhead() {
-        if (this.stepOffset <= 0)
+        if (this.stepOffset <= 0 || this.isLanding)
             return;
         // 望む入力方向を使う（velocity は壁ずりで壁方向成分が 0 にされるため段差判定に使えない）
         const vx = this._moveVelocity.x;
@@ -1609,7 +1638,7 @@ class CharacterController extends Body {
         this.quaternion.setFromAxisAngle(_yAxis, this._facingAngle + Math.PI);
     }
     jump() {
-        if (this.isJumping || !this.isGrounded || this.isOnSlope)
+        if (this.isLanding || this.isJumping || !this.isGrounded || this.isOnSlope)
             return;
         this._jumpElapsed = 0;
         this._currentJumpPower = 1;
@@ -1624,8 +1653,24 @@ class CharacterController extends Body {
         const progress = this._jumpElapsed / JUMP_DURATION_SEC;
         this._currentJumpPower = Math.cos(Math.min(progress, 1) * Math.PI);
     }
+    _updateLanding(deltaTime) {
+        if (!this.isLanding)
+            return;
+        this._landingTimeRemaining = Math.max(0, this._landingTimeRemaining - deltaTime);
+        if (0 < this._landingTimeRemaining)
+            return;
+        this.isLanding = false;
+        this.isRunning = this._moveVelocity.lengthSq() > 1e-8;
+        if (this.isRunning)
+            this._facingAngle = Math.atan2(-this._moveVelocity.x, -this._moveVelocity.z);
+        this.dispatchEvent({ type: 'endLanding' });
+    }
     teleport(position) {
         this.position.copy(position);
+        this.isLanding = false;
+        this._landingTimeRemaining = 0;
+        this._fallElapsed = 0;
+        this.isRunning = this._moveVelocity.lengthSq() > 1e-8;
     }
     dispose() {
         this._nearTriangles.length = 0;
