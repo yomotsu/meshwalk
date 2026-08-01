@@ -47,7 +47,8 @@ import * as MW from '../dist/meshwalk.module.js';
 
 const width = window.innerWidth;
 const height = window.innerHeight;
-const clock = new THREE.Clock();
+const timer = new THREE.Timer();
+timer.connect( document );
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera( 40, width / height, 1, 1000 );
 camera.position.set( 0, 1, 4 );
@@ -74,7 +75,8 @@ animationController.actions.slide.clampWhenFinished = true;
 ( function update () {
 
 	requestAnimationFrame( update );
-	const delta = clock.getDelta();
+	timer.update();
+	const delta = timer.getDelta();
 	animationController.update( delta );
 	renderer.render( scene, camera );
 

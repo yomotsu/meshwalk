@@ -27,17 +27,20 @@ canvas{display: block;}
 	{
 		"imports": {
 			"three": "https://unpkg.com/three@0.185.1/build/three.module.js",
+			"three/addons/": "https://unpkg.com/three@0.185.1/examples/jsm/",
 			"three/examples/": "https://unpkg.com/three@0.185.1/examples/",
-			"@recast-navigation/core": "https://unpkg.com/@recast-navigation/core@0.0.4/dist/index.es.js",
-			"@recast-navigation/three": "https://unpkg.com/@recast-navigation/three@0.0.4/dist/index.es.js"
+			"@recast-navigation/core": "https://unpkg.com/@recast-navigation/core@0.43.1/dist/index.mjs",
+			"@recast-navigation/generators": "https://unpkg.com/@recast-navigation/generators@0.43.1/dist/index.mjs",
+			"@recast-navigation/three": "https://unpkg.com/@recast-navigation/three@0.43.1/dist/index.mjs",
+			"@recast-navigation/wasm": "https://unpkg.com/@recast-navigation/wasm@0.43.1/dist/recast-navigation.wasm-compat.js"
 		}
 	}
 </script>
 <script type="module">
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import { init, NavMesh, Crowd } from "@recast-navigation/core";
-import { threeToNavMesh, NavMeshHelper, CrowdHelper } from "@recast-navigation/three";
+import { init, Crowd } from '@recast-navigation/core';
+import { threeToSoloNavMesh, NavMeshHelper, CrowdHelper } from '@recast-navigation/three';
 import * as MW from '../dist/meshwalk.module.js';
 
 await init();
@@ -49,7 +52,8 @@ world.add( staticBody );
 
 const width = window.innerWidth;
 const height = window.innerHeight;
-const clock = new THREE.Clock();
+const timer = new THREE.Timer();
+timer.connect( document );
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera( 40, width / height, 1, 1000 );
 camera.position.set( 0, 0, 8 );
@@ -168,26 +172,36 @@ scene.add( pointBlue );
 
 
 // nav mesh and agents
-const navMesh = threeToNavMesh( [ navGltf.scene.children[ 0 ] ] );
-const navMeshHelper = new NavMeshHelper( { navMesh } );
-scene.add( navMeshHelper.navMesh );
+const navMeshResult = threeToSoloNavMesh( [ navGltf.scene.children[ 0 ] ] );
+if ( ! navMeshResult.success ) throw new Error( `Failed to build nav mesh: ${ navMeshResult.error }` );
+const navMesh = navMeshResult.navMesh;
+const navMeshMaterial = new THREE.MeshBasicMaterial( { color: 0x0000ff, wireframe: true } );
+const navMeshHelper = new NavMeshHelper( navMesh, { navMeshMaterial } );
+scene.add( navMeshHelper );
 
-const crowd = new Crowd( { navMesh, maxAgents: 1, maxAgentRadius: .5 } );
+const crowd = new Crowd( navMesh, { maxAgents: 1, maxAgentRadius: .5 } );
 const agentMaterial = new THREE.MeshBasicMaterial( { color: 0x0000ff, wireframe: true } );
-const crowdHelper = new CrowdHelper( { crowd, agentMaterial } );
-scene.add( crowdHelper.agents );
+const crowdHelper = new CrowdHelper( crowd, { agentMaterial } );
+scene.add( crowdHelper );
 
-const initialAgentPosition = navMesh.getClosestPoint( { x: 0, y: 0, z: 0 } );
-let agentIndex = null;
+const getClosestNavMeshPoint = ( position ) => {
+
+	const result = crowd.navMeshQuery.findClosestPoint( position );
+	if ( ! result.success ) throw new Error( 'Failed to find a point on the nav mesh' );
+	return result.point;
+
+};
+const initialAgentPosition = getClosestNavMeshPoint( { x: 0, y: 0, z: 0 } );
+let agent = null;
 let isAutoPilotActive = false;
 const goalPosition = new THREE.Vector3();
 const navigateTo = ( x, y, z ) => {
 
 	isAutoPilotActive = true;
 
-	if ( agentIndex === null ) {
+	if ( agent === null ) {
 
-		agentIndex = crowd.addAgent( initialAgentPosition, {
+		agent = crowd.addAgent( initialAgentPosition, {
 			radius: 0.5,
 			height: 1.5,
 			maxAcceleration: 1e10,
@@ -199,43 +213,40 @@ const navigateTo = ( x, y, z ) => {
 
 	}
 
-	const currentPosition = navMesh.getClosestPoint( {
+	const currentPosition = getClosestNavMeshPoint( {
 		x: playerController.position.x,
 		y: playerController.position.y,
 		z: playerController.position.z,
 	} );
-	const targetPosition = navMesh.getClosestPoint( { x, y, z } );
+	const targetPosition = getClosestNavMeshPoint( { x, y, z } );
 	goalPosition.copy( targetPosition );
-	crowd.teleport( agentIndex, currentPosition );
-	crowd.goto(
-		agentIndex,
-		navMesh.getClosestPoint( targetPosition ),
-	);
+	agent.teleport( currentPosition );
+	agent.requestMoveTarget( targetPosition );
 
 }
 
 const direction = new THREE.Vector2();
 const checkAutoPilotState = () => {
 
-	if ( agentIndex === null ) return;
+	if ( agent === null ) return;
 
-	const agentPosition = crowd.getAgentPosition( agentIndex );
+	const agentPosition = agent.position();
 	const distanceToGoal = goalPosition.distanceToSquared( agentPosition );
 
 	if ( distanceToGoal < 1 ) {
 
 		isAutoPilotActive = false;
-		crowd.removeAgent( agentIndex );
-		agentIndex = null;
+		crowd.removeAgent( agent );
+		agent = null;
 		playerController.move( _moveDir.set( 0, 0, 0 ) );
 		animationController.play( 'idle' );
 
 	} else {
 
 		animationController.play( 'run' );
-		const agentVelocity = crowd.getAgentVelocity( agentIndex )
+		const agentVelocity = agent.velocity();
 		direction.set( - agentVelocity.z, - agentVelocity.x ).normalize();
-		if ( Math.abs( agentVelocity.x ) > 1e-10 || Math.abs( agentVelocity.y ) > 1e-10 ) { const a = direction.angle(); playerController.move( _moveDir.set( - Math.sin( a ), 0, - Math.cos( a ) ) ); }
+		if ( Math.abs( agentVelocity.x ) > 1e-10 || Math.abs( agentVelocity.z ) > 1e-10 ) { const a = direction.angle(); playerController.move( _moveDir.set( - Math.sin( a ), 0, - Math.cos( a ) ) ); }
 		playerController.teleport( new THREE.Vector3( agentPosition.x, agentPosition.y - 0.25, agentPosition.z ) );
 
 	}
@@ -244,11 +255,11 @@ const checkAutoPilotState = () => {
 
 const cancelAutoPilot = () => {
 
-	if ( agentIndex === null ) return;
+	if ( agent === null ) return;
 
 	isAutoPilotActive = false;
-	crowd.removeAgent( agentIndex );
-	agentIndex = null;
+	crowd.removeAgent( agent );
+	agent = null;
 
 }
 
@@ -266,7 +277,8 @@ const navigateToBlue   = () => navigateTo( points[ 2 ].x, points[ 2 ].y, points[
 
 ( function update () {
 
-	const delta = clock.getDelta();
+	timer.update();
+	const delta = timer.getDelta();
 
 	requestAnimationFrame( update );
 	world.update( delta );

@@ -95,7 +95,7 @@ export class World {
 	/**
 	 * 可変フレーム時間 deltaTime（秒）を受け取り、内部の固定ステップ（1/fps）へ
 	 * 分解して実行する。物理はフレームレートに依存せず一定速度で進む。
-	 * 毎フレーム `clock.getDelta()` などの実 delta を渡す。
+	 * 毎フレーム `timer.update()` 後の `timer.getDelta()` など、実時間の delta を渡す。
 	 * 決定論的にちょうど1フレーム進めたい場合（テスト等）は `fixedUpdate()` を直接使う。
 	 */
 	update( deltaTime: number ): void {

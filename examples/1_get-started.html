@@ -80,12 +80,14 @@ world.add( playerController );
 document.getElementById( 'retryButton' ).addEventListener( 'click', () => playerController.teleport( new THREE.Vector3( 0, 10, 0 ) ) );
 
 
-const clock = new THREE.Clock();
+const timer = new THREE.Timer();
+timer.connect( document );
 
 ( function update () {
 
 	requestAnimationFrame( update );
-	const delta = clock.getDelta();
+	timer.update();
+	const delta = timer.getDelta();
 	world.update( delta );
 	// 物理(Body)からメッシュへ transform を同期する
 	playerObjectHolder.position.copy( playerController.position );
