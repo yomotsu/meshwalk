@@ -5,8 +5,12 @@ import {
 	Vector2,
 	Vector3,
 	Box3,
+	Sphere,
 	PlaneGeometry,
 	BoxGeometry,
+	BufferGeometry,
+	BufferAttribute,
+	Matrix4,
 	MeshBasicMaterial,
 	MathUtils,
 } from 'three';
@@ -1371,6 +1375,80 @@ describe( 'CharacterController ladder climbing', () => {
 		}
 
 		expect( player.isClimbing, '離れる入力なのに取り付いた' ).toBe( false );
+
+	} );
+
+} );
+
+describe( 'StaticBody quantized geometry (KHR_mesh_quantization)', () => {
+
+	// 正規化 Int16 の POSITION（KHR_mesh_quantization 相当）で ±100 の床を作る。
+	// 実座標は scale 100 の行列で復元される（int / 32767 * 100）。
+	function makeQuantizedFloor() {
+
+		const S = 32767;
+		const positions = new Int16Array( [
+			- S, 0, - S,
+			  S, 0, - S,
+			  S, 0,   S,
+			- S, 0,   S,
+		] );
+		const attribute = new BufferAttribute( positions, 3 );
+		attribute.normalized = true;
+
+		const geometry = new BufferGeometry();
+		geometry.setAttribute( 'position', attribute );
+		geometry.setIndex( [ 0, 2, 1, 0, 3, 2 ] );
+
+		const body = new StaticBody();
+		body.addFromGeometry( geometry, new Matrix4().makeScale( 100, 100, 100 ) );
+		return body;
+
+	}
+
+	it( '正規化整数の頂点を復元して取り込む（生の整数値のままにならない）', () => {
+
+		const triangles = makeQuantizedFloor().getSphereTriangles( new Sphere( new Vector3( 0, 0, 0 ), 5 ), [] );
+
+		expect( triangles.length ).toBe( 2 );
+
+		for ( const triangle of triangles ) {
+
+			for ( const v of [ triangle.a, triangle.b, triangle.c ] ) {
+
+				// 復元されていれば ±100 前後。バグ時は ±32767 相当の巨大値になる。
+				expect( Math.abs( v.x ) ).toBeLessThanOrEqual( 101 );
+				expect( Math.abs( v.z ) ).toBeLessThanOrEqual( 101 );
+				expect( Math.abs( v.y ) ).toBeLessThan( 1e-3 );
+
+			}
+
+			// 水平な床なので法線は鉛直
+			expect( Math.abs( triangle.normal.y ) ).toBeGreaterThan( 0.99 );
+
+		}
+
+	} );
+
+	it( 'キャラクターが量子化された床に接地する（すり抜けて落下しない）', () => {
+
+		const world = new World();
+		world.add( makeQuantizedFloor() );
+
+		const player = new CharacterController( { radius: PLAYER_RADIUS, height: PLAYER_HEIGHT } );
+		world.add( player );
+		player.teleport( new Vector3( 0, 5, 0 ) );
+		player.velocity.set( 0, 0, 0 );
+
+		for ( let i = 0; i < 120; i ++ ) {
+
+			player.move( STOP );
+			world.fixedUpdate();
+
+		}
+
+		expect( player.isGrounded ).toBe( true );
+		expect( player.position.y ).toBeCloseTo( 0, 1 );
 
 	} );
 

@@ -84,17 +84,25 @@ export class StaticBody extends Body {
 
 	private _addGeometry( geometry: BufferGeometry, matrix?: Matrix4 ): void {
 
-		// geometry を複製して変換行列を焼き込む（元の three.js ジオメトリは変更しない）
-		const geom = geometry.clone();
-		if ( matrix ) geom.applyMatrix4( matrix );
-
-		const positions = geom.attributes.position.array;
+		// position は fromBufferAttribute 経由で読む。これにより KHR_mesh_quantization
+		// などの正規化整数（normalized）属性も正しくデノーマライズされる。変換は頂点ごとに
+		// matrix を適用する（元の three.js ジオメトリは変更しない）。
+		const position = geometry.attributes.position;
+		const index = geometry.index;
 
 		const addTriangle = ( a: number, b: number, c: number ) => {
 
-			const vA = new Vector3().fromArray( positions, a * 3 );
-			const vB = new Vector3().fromArray( positions, b * 3 );
-			const vC = new Vector3().fromArray( positions, c * 3 );
+			const vA = new Vector3().fromBufferAttribute( position, a );
+			const vB = new Vector3().fromBufferAttribute( position, b );
+			const vC = new Vector3().fromBufferAttribute( position, c );
+
+			if ( matrix ) {
+
+				vA.applyMatrix4( matrix );
+				vB.applyMatrix4( matrix );
+				vC.applyMatrix4( matrix );
+
+			}
 
 			const triangle = new ComputedTriangle( vA, vB, vC );
 			// ポリゴンの継ぎ目の辺で raycast が交差しない可能性があるので、わずかに拡大する
@@ -104,19 +112,15 @@ export class StaticBody extends Body {
 
 		};
 
-		if ( geom.index ) {
+		if ( index ) {
 
-			const indices = geom.index.array;
-			for ( let i = 0, l = indices.length; i < l; i += 3 ) addTriangle( indices[ i ], indices[ i + 1 ], indices[ i + 2 ] );
+			for ( let i = 0, l = index.count; i < l; i += 3 ) addTriangle( index.getX( i ), index.getX( i + 1 ), index.getX( i + 2 ) );
 
 		} else {
 
-			const count = positions.length / 3;
-			for ( let i = 0; i < count; i += 3 ) addTriangle( i, i + 1, i + 2 );
+			for ( let i = 0, l = position.count; i < l; i += 3 ) addTriangle( i, i + 1, i + 2 );
 
 		}
-
-		geom.dispose();
 
 	}
 
