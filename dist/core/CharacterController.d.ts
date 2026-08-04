@@ -1,6 +1,7 @@
-import { Quaternion, Vector3 } from 'three';
+import { Quaternion, Vector2, Vector3 } from 'three';
 import { Body } from './Body';
 import { type ComputedTriangle } from '../math/triangle';
+import { type ClimbableBody } from './ClimbableBody';
 export interface CharacterControllerOptions {
     radius: number;
     height: number;
@@ -9,7 +10,7 @@ export interface CharacterControllerOptions {
     groundCheckDepth?: number;
     landingLockDuration?: number;
 }
-export type CharacterControllerEventType = 'startIdling' | 'startWalking' | 'startJumping' | 'startSliding' | 'startFalling' | 'startLanding' | 'endLanding';
+export type CharacterControllerEventType = 'startIdling' | 'startWalking' | 'startJumping' | 'startSliding' | 'startFalling' | 'startLanding' | 'endLanding' | 'startClimbing' | 'endClimbing';
 export declare class CharacterController extends Body<CharacterControllerEventType> {
     isCharacterController: boolean;
     radius: number;
@@ -27,6 +28,7 @@ export declare class CharacterController extends Body<CharacterControllerEventTy
     isRunning: boolean;
     isJumping: boolean;
     isLanding: boolean;
+    isClimbing: boolean;
     velocity: Vector3;
     groundHeight: number;
     groundNormal: Vector3;
@@ -36,6 +38,12 @@ export declare class CharacterController extends Body<CharacterControllerEventTy
     private _nearTriangles;
     private _contactInfo;
     private _moveVelocity;
+    private _climbInput;
+    private _nearClimbables;
+    private _activeClimbable;
+    private _climbMountCooldown;
+    private _isMantling;
+    private _mantleRemaining;
     private _externalVelocity;
     private _facingAngle;
     private _jumpElapsed;
@@ -45,6 +53,13 @@ export declare class CharacterController extends Body<CharacterControllerEventTy
     private get _slopeLimitCos();
     constructor({ radius, height, slopeLimit, stepOffset, groundCheckDepth, landingLockDuration }: CharacterControllerOptions);
     setNearTriangles(nearTriangles: ComputedTriangle[]): void;
+    setNearClimbables(nearClimbables: ClimbableBody[]): void;
+    /**
+     * 登り入力を指定する（梯子・壁面に貼り付いている間だけ効く）。
+     * x = 横（面に平行、フリークライム用）、y = 上（前方入力を上下へ写す）。範囲は概ね [-1, 1]。
+     * 停止させるにはゼロベクトルを渡す。登り中でないときは無視される。
+     */
+    climb(input: Vector2): void;
     /**
      * 望む水平移動速度をワールド座標で指定する（Unity CharacterController.Move / Godot velocity 相当）。
      * y 成分は無視する（上下は重力・ジャンプ・接地が扱う）。次に move() を呼ぶまで保持される。
@@ -70,6 +85,14 @@ export declare class CharacterController extends Body<CharacterControllerEventTy
     _collisionDetection(): void;
     _solvePosition(): void;
     private _updateQuaternion;
+    private _tryStartClimb;
+    private _overlapsClimbBody;
+    private _isAtopClimbable;
+    private _startClimb;
+    private _updateClimb;
+    private _approachHorizontally;
+    private _updateMantle;
+    private _endClimb;
     jump(): void;
     _updateJumping(deltaTime: number): void;
     private _updateLanding;

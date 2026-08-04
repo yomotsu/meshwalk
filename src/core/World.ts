@@ -4,6 +4,7 @@ import { Body } from './Body';
 import { StaticBody } from './StaticBody';
 import { KinematicBody } from './KinematicBody';
 import { CharacterController } from './CharacterController';
+import { ClimbableBody } from './ClimbableBody';
 
 const sphere = new Sphere();
 const _leaveVelocity = new Vector3();
@@ -17,6 +18,7 @@ export class World {
 	private _staticBodies: StaticBody[] = [];
 	private _kinematicBodies: KinematicBody[] = [];
 	private _characterControllers: CharacterController[] = [];
+	private _climbableBodies: ClimbableBody[] = [];
 	// カメラのレイ衝突など「レイを当てる対象」。静的＋動的ボディ（キャラは含めない）。
 	private _colliders: ( StaticBody | KinematicBody )[] = [];
 	private _fps: number;
@@ -63,6 +65,10 @@ export class World {
 
 			if ( this._characterControllers.indexOf( body ) === - 1 ) this._characterControllers.push( body );
 
+		} else if ( body instanceof ClimbableBody ) {
+
+			if ( this._climbableBodies.indexOf( body ) === - 1 ) this._climbableBodies.push( body );
+
 		}
 
 	}
@@ -87,6 +93,11 @@ export class World {
 
 			const index = this._characterControllers.indexOf( body );
 			if ( index !== - 1 ) this._characterControllers.splice( index, 1 );
+
+		} else if ( body instanceof ClimbableBody ) {
+
+			const index = this._climbableBodies.indexOf( body );
+			if ( index !== - 1 ) this._climbableBodies.splice( index, 1 );
 
 		}
 
@@ -181,6 +192,16 @@ export class World {
 			}
 
 			character.setNearTriangles( triangles );
+
+			// 近傍の登れる領域（梯子・壁面）を渡す。broad-phase はキャラの sphere と box の交差。
+			const climbables: ClimbableBody[] = [];
+			for ( let ii = 0, ll = this._climbableBodies.length; ii < ll; ii ++ ) {
+
+				if ( this._climbableBodies[ ii ].box.intersectsSphere( sphere ) ) climbables.push( this._climbableBodies[ ii ] );
+
+			}
+			character.setNearClimbables( climbables );
+
 			character.update( stepDeltaTime );
 
 			// 離脱慣性: 動く床に乗っていたが、このステップで空中に出た（ジャンプ・端から落下）
@@ -204,9 +225,11 @@ export class World {
 		for ( let i = 0; i < this._staticBodies.length; i ++ ) this._staticBodies[ i ].dispose();
 		for ( let i = 0; i < this._kinematicBodies.length; i ++ ) this._kinematicBodies[ i ].dispose();
 		for ( let i = 0; i < this._characterControllers.length; i ++ ) this._characterControllers[ i ].dispose();
+		for ( let i = 0; i < this._climbableBodies.length; i ++ ) this._climbableBodies[ i ].dispose();
 		this._staticBodies.length = 0;
 		this._kinematicBodies.length = 0;
 		this._characterControllers.length = 0;
+		this._climbableBodies.length = 0;
 		this._colliders.length = 0;
 
 	}

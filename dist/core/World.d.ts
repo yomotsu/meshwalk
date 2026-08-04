@@ -5,6 +5,7 @@ export declare class World {
     private _staticBodies;
     private _kinematicBodies;
     private _characterControllers;
+    private _climbableBodies;
     private _colliders;
     private _fps;
     private _stepsPerFrame;

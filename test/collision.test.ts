@@ -2,7 +2,9 @@ import { describe, it, expect } from 'vitest';
 import {
 	Mesh,
 	Object3D,
+	Vector2,
 	Vector3,
+	Box3,
 	PlaneGeometry,
 	BoxGeometry,
 	MeshBasicMaterial,
@@ -12,6 +14,7 @@ import { World } from '../src/core/World';
 import { StaticBody } from '../src/core/StaticBody';
 import { KinematicBody } from '../src/core/KinematicBody';
 import { CharacterController } from '../src/core/CharacterController';
+import { ClimbableBody } from '../src/core/ClimbableBody';
 
 const PLAYER_RADIUS = 0.75;
 const PLAYER_HEIGHT = 3;
@@ -943,6 +946,431 @@ describe( 'KinematicBody moving platform', () => {
 		expect( maxY, '斜面をほとんど登れていない' ).toBeGreaterThan( 5 );
 		expect( detachedAtTop, '上端で固着し離脱していない（板ポリゴンの狙いが崩れた）' ).toBe( true );
 		expect( player.position.y, '最終的に降りていない（上端に張り付いたまま）' ).toBeLessThan( 1 );
+
+	} );
+
+} );
+
+// 梯子（ClimbableBody mode:'ladder'）: 面へ入力して取り付き、上下に登り、上端で天面へ乗り移る。
+// シーン: 床 + 上部プラットフォーム（上面 y=6・前面 z=0・x[-3,3]・z[-6,0]）＋
+// その前面に取り付いた梯子（box z[0,0.3]・y[0,6]・faceDirection +Z）。
+function makeLadderScene() {
+
+	const world = new World();
+
+	const floor = new Mesh( new PlaneGeometry( 198, 198, 66, 66 ), new MeshBasicMaterial() );
+	floor.rotation.x = - 90 * MathUtils.DEG2RAD;
+	floor.updateMatrixWorld( true );
+
+	const platform = new Mesh( new BoxGeometry( 6, 6, 6 ), new MeshBasicMaterial() );
+	platform.position.set( 0, 3, - 3 ); // x[-3,3], y[0,6], z[-6,0]
+	platform.updateMatrixWorld( true );
+
+	const level = new StaticBody();
+	level.addFromObject( floor );
+	level.addFromObject( platform );
+	world.add( level );
+
+	const ladder = new ClimbableBody( {
+		mode: 'ladder',
+		box: new Box3( new Vector3( - 0.5, 0, 0 ), new Vector3( 0.5, 6, 0.3 ) ),
+		faceDirection: new Vector3( 0, 0, 1 ),
+		speed: 3,
+	} );
+	world.add( ladder );
+
+	const player = new CharacterController( { radius: PLAYER_RADIUS, height: PLAYER_HEIGHT } );
+	world.add( player );
+
+	return { world, player, ladder };
+
+}
+
+// 梯子の前に着地させ、面へ押し込んで取り付くまで進める。取り付いたら true。
+function mountLadder( world: World, player: CharacterController ): boolean {
+
+	player.teleport( new Vector3( 0, 0, 3 ) );
+	for ( let i = 0; i < 20; i ++ ) {
+
+		player.move( STOP );
+		world.fixedUpdate();
+
+	}
+
+	for ( let i = 0; i < 60; i ++ ) {
+
+		player.move( moveVec( DIR.negZ ) ); // -Z（梯子へ押し込む）
+		world.fixedUpdate();
+		if ( player.isClimbing ) return true;
+
+	}
+
+	return false;
+
+}
+
+describe( 'CharacterController ladder climbing', () => {
+
+	it( '面へ入力すると梯子に取り付き、上へ登れる', () => {
+
+		const { world, player } = makeLadderScene();
+		expect( mountLadder( world, player ), '梯子に取り付けていない' ).toBe( true );
+
+		const yAtMount = player.position.y;
+		for ( let i = 0; i < 30; i ++ ) {
+
+			player.climb( new Vector2( 0, 1 ) ); // 上へ
+			world.fixedUpdate();
+			if ( ! player.isClimbing ) break;
+
+		}
+
+		expect( player.position.y, '登って高くなっていない' ).toBeGreaterThan( yAtMount + 1 );
+
+	} );
+
+	it( '上端でマントルして天面へ乗り移り、接地する', () => {
+
+		const { world, player } = makeLadderScene();
+		expect( mountLadder( world, player ), '梯子に取り付けていない' ).toBe( true );
+
+		for ( let i = 0; i < 400; i ++ ) {
+
+			player.climb( new Vector2( 0, 1 ) );
+			world.fixedUpdate();
+			if ( ! player.isClimbing ) break;
+
+		}
+
+		expect( player.isClimbing, '登り状態から抜けていない' ).toBe( false );
+
+		for ( let i = 0; i < 20; i ++ ) {
+
+			player.move( STOP );
+			world.fixedUpdate();
+
+		}
+
+		expect( player.isGrounded, '天面に接地していない' ).toBe( true );
+		expect( player.position.y, '天面(y=6)付近にいない' ).toBeGreaterThan( 5.5 );
+		expect( player.position.z, '天面(z<=0)へ乗り移れていない' ).toBeLessThan( 0 );
+
+	} );
+
+	it( '上端→歩行の遷移で瞬間移動しない（カメラのカクつき防止）', () => {
+
+		// マントル（天面への乗り移り）を 1 フレームでテレポートすると、位置追従のカメラがカクつく。
+		// 登り〜天面到達の間、1 フレームあたりの水平移動が小さく保たれること（滑らかに前進）を固定する。
+		const { world, player } = makeLadderScene();
+		expect( mountLadder( world, player ), '梯子に取り付けていない' ).toBe( true );
+
+		let maxHorizStep = 0;
+		let reachedTop = false;
+		let prevX = player.position.x;
+		let prevZ = player.position.z;
+		let prevY = player.position.y;
+
+		for ( let i = 0; i < 400; i ++ ) {
+
+			if ( player.isClimbing ) player.climb( new Vector2( 0, 1 ) ); // 上へ
+			player.move( STOP );
+			world.fixedUpdate();
+
+			// 接地高さ付近のグラブ地点は除外し、登り〜天面遷移だけを測る
+			if ( player.position.y > 1 && prevY > 1 ) {
+
+				const d = Math.hypot( player.position.x - prevX, player.position.z - prevZ );
+				maxHorizStep = Math.max( maxHorizStep, d );
+
+			}
+
+			prevX = player.position.x;
+			prevZ = player.position.z;
+			prevY = player.position.y;
+
+			if ( ! player.isClimbing && player.position.y > 5 ) reachedTop = true;
+
+		}
+
+		expect( reachedTop, '天面に到達していない' ).toBe( true );
+		// 旧実装は radius*2（≈1.5m）を 1 フレームで瞬間移動していた。滑らかなら 1 フレーム移動は十分小さい。
+		expect( maxHorizStep, '上端の遷移で位置が瞬間移動している' ).toBeLessThan( 0.3 );
+
+	} );
+
+	it( '下入力で降りると最下端で接地して離脱する', () => {
+
+		const { world, player } = makeLadderScene();
+		expect( mountLadder( world, player ), '梯子に取り付けていない' ).toBe( true );
+
+		// いったん少し登ってから
+		for ( let i = 0; i < 20; i ++ ) {
+
+			player.climb( new Vector2( 0, 1 ) );
+			world.fixedUpdate();
+
+		}
+
+		// 下入力で降りる
+		for ( let i = 0; i < 60; i ++ ) {
+
+			player.climb( new Vector2( 0, - 1 ) );
+			world.fixedUpdate();
+			if ( ! player.isClimbing ) break;
+
+		}
+
+		expect( player.isClimbing, '最下端で離脱していない' ).toBe( false );
+		expect( player.position.y, '地面付近まで降りていない' ).toBeLessThan( 0.5 );
+
+	} );
+
+	it( '登り中にジャンプすると離脱して外向き(+Z)へポップする', () => {
+
+		const { world, player } = makeLadderScene();
+		expect( mountLadder( world, player ), '梯子に取り付けていない' ).toBe( true );
+
+		for ( let i = 0; i < 20; i ++ ) {
+
+			player.climb( new Vector2( 0, 1 ) );
+			world.fixedUpdate();
+
+		}
+
+		const zBefore = player.position.z;
+		player.jump();
+
+		expect( player.isClimbing, 'ジャンプで登りを抜けていない' ).toBe( false );
+		expect( player.isJumping, 'ジャンプが始まっていない' ).toBe( true );
+
+		for ( let i = 0; i < 10; i ++ ) {
+
+			player.move( STOP );
+			world.fixedUpdate();
+
+		}
+
+		expect( player.position.z, '外向き(+Z)へ離れていない' ).toBeGreaterThan( zBefore );
+
+	} );
+
+	it( 'ジャンプで梯子へ向かうと空中で貼り付ける', () => {
+
+		const { world, player } = makeLadderScene();
+		player.teleport( new Vector3( 0, 0, 2.5 ) ); // 梯子の手前の床
+		for ( let i = 0; i < 20; i ++ ) {
+
+			player.move( STOP );
+			world.fixedUpdate();
+
+		}
+
+		expect( player.isGrounded, '床に接地していない' ).toBe( true );
+
+		player.jump();
+		let grabbedAirborne = false;
+		let grabY = - 1;
+		for ( let i = 0; i < 60; i ++ ) {
+
+			player.move( moveVec( DIR.negZ ) ); // 梯子(-Z)へ向かう
+			world.fixedUpdate();
+			if ( player.isClimbing ) { grabbedAirborne = true; grabY = player.position.y; break; }
+
+		}
+
+		expect( grabbedAirborne, 'ジャンプ中に梯子へ貼り付けていない' ).toBe( true );
+		expect( grabY, '接地せず空中で掴めていない' ).toBeGreaterThan( 1 );
+
+	} );
+
+	it( '自由落下中に梯子へ向かうと空中で貼り付ける', () => {
+
+		const { world, player } = makeLadderScene();
+		player.teleport( new Vector3( 0, 4, 1.5 ) ); // 梯子前面の外側・空中
+
+		let grabbedFalling = false;
+		let grabY = - 1;
+		for ( let i = 0; i < 60; i ++ ) {
+
+			player.move( moveVec( DIR.negZ ) ); // 梯子(-Z)へ向かう
+			world.fixedUpdate();
+			if ( player.isClimbing ) { grabbedFalling = true; grabY = player.position.y; break; }
+
+		}
+
+		expect( grabbedFalling, '落下中に梯子へ貼り付けていない' ).toBe( true );
+		expect( grabY, '接地せず空中で掴めていない' ).toBeGreaterThan( 1 );
+
+	} );
+
+	it( '天面から梯子の上端に取り付いて降りられる', () => {
+
+		const { world, player } = makeLadderScene();
+		player.teleport( new Vector3( 0, 6, - 0.4 ) ); // 天面（y=6）の縁付近
+		for ( let i = 0; i < 20; i ++ ) {
+
+			player.move( STOP );
+			world.fixedUpdate();
+
+		}
+
+		expect( player.isGrounded, '天面に接地していない' ).toBe( true );
+
+		// 縁（外向き +Z）へ向かって押す → 天面から取り付く
+		let mounted = false;
+		for ( let i = 0; i < 30 && ! mounted; i ++ ) {
+
+			player.move( moveVec( DIR.posZ ) );
+			world.fixedUpdate();
+			if ( player.isClimbing ) mounted = true;
+
+		}
+
+		expect( mounted, '天面から梯子に取り付けていない' ).toBe( true );
+		const yAtMount = player.position.y;
+
+		// 下入力（S）で降りる。デモでは「縁へ歩く」も「降りる」も同じ S キー
+		// （move はカメラ相対で +Z、climb は生入力 -1）なので押しっぱなしで繋がる。
+		for ( let i = 0; i < 400; i ++ ) {
+
+			player.climb( new Vector2( 0, - 1 ) );
+			player.move( STOP );
+			world.fixedUpdate();
+			if ( ! player.isClimbing ) break;
+
+		}
+
+		expect( player.position.y, '降りて低くなっていない' ).toBeLessThan( yAtMount - 1 );
+		expect( player.isClimbing, '降り切って離脱していない' ).toBe( false );
+
+		for ( let i = 0; i < 20; i ++ ) {
+
+			player.move( STOP );
+			world.fixedUpdate();
+
+		}
+
+		expect( player.position.y, '地面まで降りていない' ).toBeLessThan( 0.5 );
+
+	} );
+
+	it( '天面から梯子に掴まる遷移で瞬間移動しない（カメラのカクつき防止）', () => {
+
+		// 天面グラブ時、縁 → 梯子前面（attach）へ x/z を 1 フレームでスナップするとカメラがカクつく。
+		// グラブ〜降り始めの間、1 フレームあたりの水平移動が小さく保たれること（滑らかに寄せる）を固定する。
+		const { world, player } = makeLadderScene();
+		player.teleport( new Vector3( 0, 6, - 0.4 ) ); // 天面の縁付近
+		for ( let i = 0; i < 20; i ++ ) {
+
+			player.move( STOP );
+			world.fixedUpdate();
+
+		}
+
+		let maxHorizStep = 0;
+		let mounted = false;
+		let prevX = player.position.x;
+		let prevZ = player.position.z;
+
+		for ( let i = 0; i < 200; i ++ ) {
+
+			if ( player.isClimbing ) player.climb( new Vector2( 0, - 1 ) ); // 降りる
+			player.move( moveVec( DIR.posZ ) ); // 縁（外向き +Z）へ
+			world.fixedUpdate();
+
+			if ( player.isClimbing ) {
+
+				mounted = true;
+				const d = Math.hypot( player.position.x - prevX, player.position.z - prevZ );
+				maxHorizStep = Math.max( maxHorizStep, d );
+
+			}
+
+			prevX = player.position.x;
+			prevZ = player.position.z;
+			if ( ! player.isClimbing && mounted ) break; // 降り切ったら終了
+
+		}
+
+		expect( mounted, '天面から梯子に取り付けていない' ).toBe( true );
+		// 旧実装は縁→前面（≈0.8m）を 1 フレームで瞬間移動していた。滑らかなら 1 フレーム移動は十分小さい。
+		expect( maxHorizStep, '天面グラブの遷移で位置が瞬間移動している' ).toBeLessThan( 0.3 );
+
+	} );
+
+	it( '上端で前方入力を押し続けても再取り付きせず暴れない', () => {
+
+		// demo と同じ入力ルーティングを再現する:
+		//   登り中   -> climb(0,1) で上へ、move は停止
+		//   非登り中 -> move(前方=梯子/天面側 -Z)
+		// 修正前は、上端でマントルした直後に「前方入力」が再取り付きを誘発し、
+		// 掴む → 即マントル → 掴む… を繰り返して位置が振動していた。
+		const { world, player } = makeLadderScene();
+		player.teleport( new Vector3( 0, 0, 3 ) );
+		for ( let i = 0; i < 20; i ++ ) {
+
+			player.move( STOP );
+			world.fixedUpdate();
+
+		}
+
+		let everMounted = false;
+		let didTop = false;
+		let topped = false; // 「上端到達フレームより後」の測定を始めるフラグ（マントルの一度きりの跳びを除外）
+		let remountedAfterTop = false;
+		let maxZStep = 0;
+		let prevZ = player.position.z;
+
+		for ( let i = 0; i < 400; i ++ ) {
+
+			if ( player.isClimbing ) {
+
+				everMounted = true;
+				player.climb( new Vector2( 0, 1 ) );
+				player.move( STOP );
+
+			} else {
+
+				player.move( moveVec( DIR.negZ ) ); // 前方（梯子・天面側 -Z）
+
+			}
+
+			world.fixedUpdate();
+
+			// 上端到達の「次フレーム以降」だけを測る（マントル自体の一度きりの水平跳びは正常なので除外）
+			if ( topped ) {
+
+				if ( player.isClimbing ) remountedAfterTop = true; // 再び掴んだ = ガクガクの再取り付き
+				maxZStep = Math.max( maxZStep, Math.abs( player.position.z - prevZ ) );
+
+			}
+
+			if ( everMounted && ! player.isClimbing && player.position.y > 5 ) { didTop = true; topped = true; }
+
+			prevZ = player.position.z;
+
+		}
+
+		expect( everMounted, '梯子に取り付けていない' ).toBe( true );
+		expect( didTop, '上端まで登り切れていない' ).toBe( true );
+		expect( remountedAfterTop, '上端で再取り付きしている（ガクガクの原因）' ).toBe( false );
+		// 天面では滑らかに歩くだけ（1ステップの z 変位は移動量程度）。振動時は取り付き点へ跳ね戻り大きく変位する。
+		expect( maxZStep, '上端で z が跳ねている（振動）' ).toBeLessThan( 0.3 );
+
+	} );
+
+	it( '背を向けて入力しても取り付かない（誤発動しない）', () => {
+
+		const { world, player } = makeLadderScene();
+		player.teleport( new Vector3( 0, 0, 1 ) ); // 梯子の直前
+		for ( let i = 0; i < 30; i ++ ) {
+
+			player.move( moveVec( DIR.posZ ) ); // +Z（梯子から離れる向き）
+			world.fixedUpdate();
+
+		}
+
+		expect( player.isClimbing, '離れる入力なのに取り付いた' ).toBe( false );
 
 	} );
 

@@ -6,10 +6,14 @@ import { intersectsLineTriangle } from '../math/intersectsLineTriangle';
 import { intersectsCapsuleTriangle } from '../math/intersectsCapsuleTriangle';
 import { intersectsCapsuleSphere } from '../math/intersectsCapsuleSphere';
 import { type ComputedTriangle } from '../math/triangle';
+import { type ClimbableBody } from './ClimbableBody';
 
 const FALL_VELOCITY = - 20; // 自由落下、崖滑り時の下向きの速度。単位は m/s。
 const JUMP_DURATION_SEC = 1; // ジャンプ弧の全長（秒）。
 const LANDING_MIN_FALL_DURATION_SEC = 0.1; // 段差補正などの瞬間的な非接地を着地衝撃として扱わない。
+const CLIMB_REMOUNT_COOLDOWN_SEC = 0.25; // 天面へマントル後、再取り付きを抑止する時間。縁で W 押しっぱなしのチラつき防止。
+const MANTLE_DURATION_SEC = 0.2; // 上端から天面へ乗り移る（マントル）の所要時間。瞬間移動でカメラがカクつくのを防ぐ。
+const CLIMB_ALIGN_SPEED_MPS = 6; // グラブ時に取り付き軸へ寄せる水平速度。1フレームの移動量を制限し、位置スナップを滑らかにする。
 const PI_HALF = Math.PI * 0.5;
 const PI_ONE_HALF = Math.PI * 1.5;
 
@@ -32,6 +36,7 @@ const stepProbePoint = new Vector3();
 const headroomFrom = new Vector3();
 const headroomTo = new Vector3();
 const capsule = new Capsule( new Vector3(), new Vector3(), 0 );
+const attachPoint = new Vector3();
 
 const intersection = new Intersection();
 
@@ -51,7 +56,9 @@ export type CharacterControllerEventType =
 	| 'startSliding'
 	| 'startFalling'
 	| 'startLanding'
-	| 'endLanding';
+	| 'endLanding'
+	| 'startClimbing'
+	| 'endClimbing';
 
 export class CharacterController extends Body<CharacterControllerEventType> {
 
@@ -71,6 +78,7 @@ export class CharacterController extends Body<CharacterControllerEventType> {
 	isRunning  = false; // 派生状態: move() で移動が指定されているとき true
 	isJumping  = false;
 	isLanding  = false;
+	isClimbing = false; // 梯子・壁面に貼り付いて登っている間 true。重力・ジャンプ・接地をバイパスする
 	velocity = new Vector3( 0, 0, 0 );
 	groundHeight = 0;
 	groundNormal = new Vector3();
@@ -87,6 +95,12 @@ export class CharacterController extends Body<CharacterControllerEventType> {
 	}[] = [];
 
 	private _moveVelocity = new Vector3();     // move() で設定する望む水平速度
+	private _climbInput = new Vector2();       // climb() で設定する登り入力（x=横, y=上）
+	private _nearClimbables: ClimbableBody[] = []; // World が渡す近傍の登れる領域
+	private _activeClimbable: ClimbableBody | null = null; // 現在貼り付いている領域
+	private _climbMountCooldown = 0;           // 天面へマントルした直後、再取り付きを抑止する残り時間（秒）
+	private _isMantling = false;               // 上端→天面へ乗り移り中（数フレームかけて滑らかに前進）
+	private _mantleRemaining = 0;              // マントルで前進する残り距離（m）
 	private _externalVelocity = new Vector3(); // 動床から離れる際に引き継いだ水平慣性（着地までの drift）
 	private _facingAngle = 0;                  // 向き（移動方向から算出）
 	private _jumpElapsed = 0;              // ジャンプ開始からの経過（秒）。deltaTime を積算
@@ -208,6 +222,23 @@ export class CharacterController extends Body<CharacterControllerEventType> {
 
 	}
 
+	setNearClimbables( nearClimbables: ClimbableBody[] ) {
+
+		this._nearClimbables = nearClimbables;
+
+	}
+
+	/**
+	 * 登り入力を指定する（梯子・壁面に貼り付いている間だけ効く）。
+	 * x = 横（面に平行、フリークライム用）、y = 上（前方入力を上下へ写す）。範囲は概ね [-1, 1]。
+	 * 停止させるにはゼロベクトルを渡す。登り中でないときは無視される。
+	 */
+	climb( input: Vector2 ) {
+
+		this._climbInput.set( input.x, input.y );
+
+	}
+
 	/**
 	 * 望む水平移動速度をワールド座標で指定する（Unity CharacterController.Move / Godot velocity 相当）。
 	 * y 成分は無視する（上下は重力・ジャンプ・接地が扱う）。次に move() を呼ぶまで保持される。
@@ -246,6 +277,25 @@ export class CharacterController extends Body<CharacterControllerEventType> {
 	update( deltaTime: number ) {
 
 		this._updateLanding( deltaTime );
+
+		if ( this._climbMountCooldown > 0 ) this._climbMountCooldown = Math.max( 0, this._climbMountCooldown - deltaTime );
+
+		// 登り中は専用ループ（重力・接地・ジャンプをバイパスし、面に沿って動かす）
+		if ( this.isClimbing ) {
+
+			this._updateClimb( deltaTime );
+			return;
+
+		}
+
+		// 梯子に取り付けるか判定（領域に重なり、入力が面へ向かっていれば取り付く）
+		this._tryStartClimb();
+		if ( this.isClimbing ) {
+
+			this._updateClimb( deltaTime );
+			return;
+
+		}
 
 		// 状態をリセットしておく
 		this.isGrounded = false;
@@ -685,7 +735,247 @@ export class CharacterController extends Body<CharacterControllerEventType> {
 
 	}
 
+	// 近傍の梯子に取り付けるか判定する。取り付き方は 2 通り:
+	//  1) 下・側面から: 面へ向かって（into）押し、足元が上端より下 → 掴んで登る（fromTop=false）。
+	//  2) 天面から:     上端付近に立ち、縁へ向かって（外向き faceDirection）押す → 掴んで降りる（fromTop=true）。
+	// （フリークライム mode:'free' は Phase B で対応。ここでは 'ladder' のみ扱う）
+	private _tryStartClimb() {
+
+		// ジャンプ中・自由落下中でも掴める（空中グラブ）。飛び降り直後の即・再グラブは
+		// クールダウン（jump() で設定）で抑止する。
+		if ( this._nearClimbables.length === 0 || this.isLanding || this._climbMountCooldown > 0 ) return;
+
+		for ( let i = 0, l = this._nearClimbables.length; i < l; i ++ ) {
+
+			const climbable = this._nearClimbables[ i ];
+			if ( climbable.mode !== 'ladder' ) continue;
+
+			const into = climbable.intoDirection;
+			const mvDotInto = this._moveVelocity.x * into.x + this._moveVelocity.z * into.z;
+
+			// 下・側面から登る: 面へ向かって入力し、上端の縁より下にいる
+			if ( mvDotInto > 0 && this._overlapsClimbBody( climbable ) ) {
+
+				this._startClimb( climbable, false );
+				return;
+
+			}
+
+			// 天面から降りる: 縁（外向き）へ向かって入力し、上端付近に立っている
+			if ( mvDotInto < 0 && this._isAtopClimbable( climbable ) ) {
+
+				this._startClimb( climbable, true );
+				return;
+
+			}
+
+		}
+
+	}
+
+	// キャラの足元が梯子の胴体（上端の縁より下）に重なっているか。水平は radius ぶんの余裕を持つ。
+	private _overlapsClimbBody( climbable: ClimbableBody ): boolean {
+
+		const box = climbable.box;
+		const r = this.radius;
+		const px = this.position.x;
+		const py = this.position.y;
+		const pz = this.position.z;
+
+		if ( px < box.min.x - r || px > box.max.x + r ) return false;
+		if ( pz < box.min.z - r || pz > box.max.z + r ) return false;
+		// 上端（天面）に立っている／それより上にいるときは、この判定では掴まない。
+		// これがないと、上端でマントルした直後に「面へ向かう入力」が再取り付きを誘発し、
+		// 掴む → 即マントル → 掴む… を繰り返してガクガクする。天面からの降りは _isAtopClimbable が扱う。
+		if ( py < box.min.y - this.height || py > box.max.y - r ) return false;
+
+		return true;
+
+	}
+
+	// キャラが梯子の上端（天面）付近に立ち、水平に梯子と重なっているか（天面から降りる取り付き用）。
+	private _isAtopClimbable( climbable: ClimbableBody ): boolean {
+
+		const box = climbable.box;
+		const r = this.radius;
+		const px = this.position.x;
+		const py = this.position.y;
+		const pz = this.position.z;
+
+		if ( px < box.min.x - r || px > box.max.x + r ) return false;
+		if ( pz < box.min.z - r || pz > box.max.z + r ) return false;
+		// 足元が上端（box.max.y）付近にある = 天面に立っている
+		if ( Math.abs( py - box.max.y ) > r ) return false;
+
+		return true;
+
+	}
+
+	private _startClimb( climbable: ClimbableBody, fromTop: boolean ) {
+
+		this.isClimbing = true;
+		this._activeClimbable = climbable;
+
+		// 接地・ジャンプ系の状態を解除する
+		this.isGrounded = false;
+		this.isOnSlope  = false;
+		this.isJumping  = false;
+		this.isRunning  = false;
+		this.isIdling   = false;
+		this.groundBody = null;
+		this._currentJumpPower = 0;
+		this._isStepping = false;
+		this._externalVelocity.set( 0, 0, 0 );
+		this._climbInput.set( 0, 0 );
+
+		// 天面から取り付いたら、上端の高さから始める
+		if ( fromTop ) this.position.y = climbable.box.max.y;
+
+		// 面へ正対する
+		const into = climbable.intoDirection;
+		this._facingAngle = Math.atan2( - into.x, - into.z );
+		this._updateQuaternion();
+
+		this.dispatchEvent( { type: 'startClimbing' } );
+
+	}
+
+	// 登り中の移動。梯子は 1D（上下のみ）。横位置は軸へロックする。
+	// 上端に達したら天面へ乗り移り（マントル）、下端に達したら接地して離脱する。
+	private _updateClimb( deltaTime: number ) {
+
+		const climbable = this._activeClimbable!;
+		const box = climbable.box;
+
+		// 天面への乗り移り中は、軸ロックせず滑らかに前進させる
+		if ( this._isMantling ) {
+
+			this._updateMantle( deltaTime );
+			return;
+
+		}
+
+		// 横位置を梯子の取り付き軸へ寄せて面へ正対し続ける。初回グラブ時の位置スナップを
+		// 1 フレームでやらず、移動量を制限して滑らかに寄せる（カメラのカクつき防止）。
+		// 軸に乗り切ったあとは毎フレーム目標＝現在位置となり、そのまま軸上にロックされる。
+		climbable.getAttachPoint( attachPoint, this.radius );
+		this._approachHorizontally( attachPoint.x, attachPoint.z, CLIMB_ALIGN_SPEED_MPS * deltaTime );
+
+		const into = climbable.intoDirection;
+		this._facingAngle = Math.atan2( - into.x, - into.z );
+		this._updateQuaternion();
+
+		// 前方入力（y）を上下速度へ写す（W=前=上 / S=後=下、カメラ非依存で一貫）。
+		const verticalSpeed = this._climbInput.y * climbable.speed;
+		const nextY = this.position.y + verticalSpeed * deltaTime;
+
+		// 下端: 下方向に降りて底へ着いたら接地状態へ戻して離脱する。
+		// （静止時や base ちょうどでの誤離脱を避けるため「降下中」に限定する）
+		if ( verticalSpeed < 0 && nextY <= box.min.y ) {
+
+			this.position.y = box.min.y;
+			this.velocity.set( 0, 0, 0 );
+			this._endClimb();
+			return;
+
+		}
+
+		// 上端: 上方向に登り切ったら、天面へ乗り移る（マントル）を開始する。
+		// 面の向こう側へ radius*2 進むと天面に乗り、次フレームの接地判定が拾う。
+		// 瞬間移動するとカメラがカクつくため、_updateMantle で数フレームに分けて滑らかに前進させる。
+		if ( verticalSpeed > 0 && nextY >= box.max.y ) {
+
+			this.position.y = box.max.y;
+			this._isMantling = true;
+			this._mantleRemaining = this.radius * 2;
+			return;
+
+		}
+
+		// 梯子の範囲内へクランプ（静止時は現在高度を保持して貼り付き続ける）
+		this.position.y = MathUtils.clamp( nextY, box.min.y, box.max.y );
+		this.velocity.set( 0, verticalSpeed, 0 );
+
+	}
+
+	// 現在の水平位置を目標 (targetX, targetZ) へ、1 フレームの移動量を maxStep に制限して寄せる。
+	// 目標との距離が maxStep 以下ならその場で到達させる（以後は目標＝現在位置でロック）。
+	private _approachHorizontally( targetX: number, targetZ: number, maxStep: number ) {
+
+		const dx = targetX - this.position.x;
+		const dz = targetZ - this.position.z;
+		const dist = Math.sqrt( dx * dx + dz * dz );
+
+		if ( dist <= maxStep || dist < 1e-6 ) {
+
+			this.position.x = targetX;
+			this.position.z = targetZ;
+			return;
+
+		}
+
+		const t = maxStep / dist;
+		this.position.x += dx * t;
+		this.position.z += dz * t;
+
+	}
+
+	// 天面への乗り移り（マントル）。上端の高さを保ったまま into 方向へ一定速度で前進し、
+	// radius*2 進み切ったら登りを終える。瞬間移動を避けてカメラのカクつきを防ぐ。
+	private _updateMantle( deltaTime: number ) {
+
+		const climbable = this._activeClimbable!;
+		const into = climbable.intoDirection;
+		const speed = this.radius * 2 / MANTLE_DURATION_SEC;
+		const move = Math.min( speed * deltaTime, this._mantleRemaining );
+
+		this.position.x += into.x * move;
+		this.position.z += into.z * move;
+		this.position.y = climbable.box.max.y;
+		this._mantleRemaining -= move;
+
+		this.velocity.set( into.x * speed, 0, into.z * speed );
+
+		if ( this._mantleRemaining <= 1e-6 ) {
+
+			this._endClimb();
+			// 天面へ抜けた直後は、縁へ向かう入力を押し続けても即・再取り付きしないよう少し抑止する
+			this._climbMountCooldown = CLIMB_REMOUNT_COOLDOWN_SEC;
+
+		}
+
+	}
+
+	private _endClimb() {
+
+		if ( ! this.isClimbing ) return;
+
+		this.isClimbing = false;
+		this._activeClimbable = null;
+		this._isMantling = false;
+		this._mantleRemaining = 0;
+		this._climbInput.set( 0, 0 );
+		this.dispatchEvent( { type: 'endClimbing' } );
+
+	}
+
 	jump() {
+
+		// 登り中のジャンプは「壁から離脱して外向きへポップ」する
+		if ( this.isClimbing ) {
+
+			const climbable = this._activeClimbable;
+			this._endClimb();
+			this._jumpElapsed = 0;
+			this._currentJumpPower = 1;
+			this.isJumping = true;
+			// 外向き（faceDirection）へ水平慣性を与える。空中の drift として着地まで効く
+			if ( climbable ) this._externalVelocity.set( climbable.faceDirection.x * climbable.speed, 0, climbable.faceDirection.z * climbable.speed );
+			// 飛び降りた直後に（空中グラブで）即・再取り付きしないよう少し抑止する
+			this._climbMountCooldown = CLIMB_REMOUNT_COOLDOWN_SEC;
+			return;
+
+		}
 
 		if ( this.isLanding || this.isJumping || ! this.isGrounded || this.isOnSlope ) return;
 
@@ -723,6 +1013,7 @@ export class CharacterController extends Body<CharacterControllerEventType> {
 
 	teleport( position: Vector3 ) {
 
+		this._endClimb();
 		this.position.copy( position );
 		this.isLanding = false;
 		this._landingTimeRemaining = 0;
@@ -734,6 +1025,7 @@ export class CharacterController extends Body<CharacterControllerEventType> {
 	dispose(): void {
 
 		this._nearTriangles.length = 0;
+		this._nearClimbables.length = 0;
 		this._contactInfo.length = 0;
 
 	}

@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>=^.^= ladder</title>
+<style>
+body{margin: 0;padding: 0; background: #000;}
+canvas{display: block;}
+.info{
+	color: #fff;
+	font-family: monospace;
+	position: absolute;
+	top: 8px;
+	left: 8px;
+	line-height: 1.5;
+	text-shadow: 0 0 2px #000;
+}
+</style>
+</head>
+<body>
+
+<div class="info">
+	移動: WASD / 矢印　ジャンプ: Space<br>
+	梯子: 前(W)を押しながら梯子へ入ると取り付く。W=登る / S=降りる / Space=飛び降りる<br>
+	天面からは縁（梯子側）へ歩くと上端に掴まって降りられる<br>
+	<span id="state"></span>
+</div>
+
+<script async src="https://unpkg.com/es-module-shims@2.8.4/dist/es-module-shims.js"></script>
+<script type="importmap">
+	{
+		"imports": {
+			"three": "https://unpkg.com/three@0.185.1/build/three.module.js",
+			"three/examples/": "https://unpkg.com/three@0.185.1/examples/"
+		}
+	}
+</script>
+<script type="module">
+import * as THREE from 'three';
+import * as MW from '../dist/meshwalk.module.js';
+
+const world = new MW.World();
+const staticBody = new MW.StaticBody();
+world.add( staticBody );
+
+const width = window.innerWidth;
+const height = window.innerHeight;
+const timer = new THREE.Timer();
+timer.connect( document );
+const scene = new THREE.Scene();
+scene.background = new THREE.Color( 0x223344 );
+const camera = new THREE.PerspectiveCamera( 40, width / height, 1, 1000 );
+camera.position.set( 0, 4, 12 );
+const renderer = new THREE.WebGLRenderer( { antialias: true } );
+renderer.setSize( width, height );
+document.body.appendChild( renderer.domElement );
+
+scene.add( new THREE.AmbientLight( 0xffffff, 1.5 ) );
+const dirLight = new THREE.DirectionalLight( 0xffffff, 1.5 );
+dirLight.position.set( 5, 10, 7 );
+scene.add( dirLight );
+
+// --- 環境: 床 + 上部プラットフォーム（上面 y=6・前面 z=0）+ 梯子の見た目 ---
+const floor = new THREE.Mesh(
+	new THREE.PlaneGeometry( 60, 60 ),
+	new THREE.MeshStandardMaterial( { color: 0x556677 } )
+);
+floor.rotation.x = - Math.PI / 2;
+scene.add( floor );
+scene.add( new THREE.GridHelper( 60, 30, 0x334455, 0x334455 ) );
+staticBody.addFromObject( floor );
+
+const platform = new THREE.Mesh(
+	new THREE.BoxGeometry( 6, 6, 6 ),
+	new THREE.MeshStandardMaterial( { color: 0x99aabb } )
+);
+platform.position.set( 0, 3, - 3 ); // x[-3,3], y[0,6], z[-6,0]
+scene.add( platform );
+staticBody.addFromObject( platform );
+
+// 梯子の見た目（レール2本 + 横桟）。判定は下の ClimbableBody が持つ。
+const ladderGroup = new THREE.Group();
+const ladderMat = new THREE.MeshStandardMaterial( { color: 0xffcc44 } );
+const railGeo = new THREE.BoxGeometry( 0.1, 6, 0.1 );
+for ( const x of [ - 0.4, 0.4 ] ) {
+
+	const rail = new THREE.Mesh( railGeo, ladderMat );
+	rail.position.set( x, 3, 0.15 );
+	ladderGroup.add( rail );
+
+}
+const rungGeo = new THREE.BoxGeometry( 0.9, 0.08, 0.08 );
+for ( let y = 0.4; y < 6; y += 0.5 ) {
+
+	const rung = new THREE.Mesh( rungGeo, ladderMat );
+	rung.position.set( 0, y, 0.15 );
+	ladderGroup.add( rung );
+
+}
+scene.add( ladderGroup );
+
+// 登れる領域（梯子）。プラットフォーム前面 z=0 に貼り付いた薄い箱。
+const ladder = new MW.ClimbableBody( {
+	mode: 'ladder',
+	box: new THREE.Box3( new THREE.Vector3( - 0.5, 0, 0 ), new THREE.Vector3( 0.5, 6, 0.3 ) ),
+	faceDirection: new THREE.Vector3( 0, 0, 1 ),
+	speed: 3,
+} );
+world.add( ladder );
+
+// --- プレイヤー ---
+const playerRadius = 0.5;
+const playerHeight = 2;
+const playerObjectHolder = new THREE.Object3D();
+scene.add( playerObjectHolder );
+const capsule = new THREE.Mesh(
+	new THREE.CapsuleGeometry( playerRadius, playerHeight - playerRadius * 2, 4, 16 ),
+	new THREE.MeshBasicMaterial( { color: 0xff0000, wireframe: true } )
+);
+capsule.position.y = playerHeight / 2;
+playerObjectHolder.add( capsule );
+
+// 正面（facing）を可視化する鼻。キャラの forward（ローカル +Z）に突き出す。
+// カプセルは Y 軸まわりに対称なので、これが無いと yaw の変化が見えない。
+const nose = new THREE.Mesh(
+	new THREE.ConeGeometry( 0.2, 0.5, 8 ),
+	new THREE.MeshBasicMaterial( { color: 0xffff00, wireframe: true } )
+);
+nose.rotation.x = 90 * THREE.MathUtils.DEG2RAD; // 円錐の先端を +Z へ向ける
+nose.position.set( 0, playerHeight / 2, playerRadius + 0.25 );
+playerObjectHolder.add( nose );
+
+const playerController = new MW.CharacterController( { radius: playerRadius, height: playerHeight } );
+playerController.teleport( new THREE.Vector3( 0, 0, 4 ) );
+world.add( playerController );
+
+// カメラ追従点（上方向だけ遅れて追従）
+const cameraTrackObject = new THREE.Object3D();
+cameraTrackObject.position.copy( playerController.position );
+const cameraUpwardDamping = 5;
+
+const tpsCameraControls = new MW.ThirdPersonCameraControls(
+	camera,
+	cameraTrackObject,
+	world,
+	renderer.domElement
+);
+
+// --- 入力 ---
+const keyInputControl = new MW.KeyboardControls();
+keyInputControl.addEventListener( 'jumpkeypress', () => playerController.jump() );
+
+const _moveDir = new THREE.Vector3();
+const _climb = new THREE.Vector2();
+const _yAxis = new THREE.Vector3( 0, 1, 0 );
+const stateLabel = document.getElementById( 'state' );
+
+( function update () {
+
+	timer.update();
+	const delta = timer.getDelta();
+	requestAnimationFrame( update );
+
+	// 入力ルーティング: 登り中は climb()、地上は move()
+	const input = keyInputControl.inputVector; // x=右, y=前
+	if ( playerController.isClimbing ) {
+
+		playerController.climb( _climb.set( input.x, input.y ) );
+		playerController.move( _moveDir.set( 0, 0, 0 ) );
+
+	} else {
+
+		playerController.move(
+			_moveDir.set( input.x, 0, - input.y ).applyAxisAngle( _yAxis, tpsCameraControls.frontAngle ).multiplyScalar( 6 )
+		);
+
+	}
+
+	world.update( delta );
+
+	// 物理 → メッシュ同期
+	playerObjectHolder.position.copy( playerController.position );
+	playerObjectHolder.quaternion.copy( playerController.quaternion );
+	cameraTrackObject.position.x = playerController.position.x;
+	cameraTrackObject.position.z = playerController.position.z;
+	cameraTrackObject.position.y = playerController.position.y > cameraTrackObject.position.y
+		? THREE.MathUtils.damp( cameraTrackObject.position.y, playerController.position.y, cameraUpwardDamping, delta )
+		: playerController.position.y;
+	tpsCameraControls.update( delta );
+
+	stateLabel.textContent = playerController.isClimbing ? '状態: 登り中 🪜'
+		: playerController.isGrounded ? '状態: 接地'
+			: '状態: 空中';
+
+	renderer.render( scene, camera );
+
+} )();
+</script>
+
+</body>
+</html>
