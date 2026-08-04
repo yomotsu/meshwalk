@@ -1,16 +1,16 @@
 ## MeshWalk.js
 
-MeshWalk.js is a JS library which helps your TPS game development with three.js.
+MeshWalk.js is a lightweight character controller library for three.js game development.
 
 examples
 
 - [walkthrough: since it's done with previous version, the APIs are a little bit different](https://yomotsu.github.io/walkthrough/)
 - [xmas walkthrough](https://yomotsu.github.io/xmas2014/)
 
-## Usage and Learning
+## Usage and Examples
 
-See following demos and check the source code with some comments.
-(You need three.js via peerDependencies or importmap)
+See the following demos and check the source code, which includes comments explaining each feature.
+(Requires three.js, installed via peer dependencies or loaded with an import map.)
 
 1. [get started](http://yomotsu.github.io/meshwalk/examples/1_get-started.html)
 2. [keyboard Input](http://yomotsu.github.io/meshwalk/examples/2_keyboard-input.html)
@@ -25,5 +25,5 @@ See following demos and check the source code with some comments.
 
 examples with [recast-navigation-js](https://github.com/isaac-mason/recast-navigation-js):
 
-20. [with recast nav-mesh: followers](http://yomotsu.github.io/meshwalk/examples/20_with-recast-nav-mesh-followers.html)
-21. [with recast nav-mesh: auto navigation](http://yomotsu.github.io/meshwalk/examples/21_with-recast-nav-mesh-navigation.html)
+- [with recast nav-mesh: followers](http://yomotsu.github.io/meshwalk/examples/20_with-recast-nav-mesh-followers.html)
+- [with recast nav-mesh: auto navigation](http://yomotsu.github.io/meshwalk/examples/21_with-recast-nav-mesh-navigation.html)
