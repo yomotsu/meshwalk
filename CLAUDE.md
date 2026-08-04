@@ -21,9 +21,10 @@ three.js 用の TPS キャラクターコントローラ・ライブラリ（yom
 - デモは CRLF のものが混在（demo7 は LF）。node で書き換える時は**元の改行コードを保持**する。
 - `Date.now()`/`Math.random()`/`new Date()` はワークフロー用スクリプト内では使えない（別文脈）。通常コードは可。
 
-## 現状（2026-07-31）
-- ブランチ **`master`**。Phase 0–4 ＋ API 整形は master 反映済み。直近の API 変更群は**ローカルで origin より数コミット先行（未 push）**。`git log`/`git status -sb` で確認。
-- テスト15件・全10デモ ロードエラーなし・tsc/lint/build 緑。
+## 現状（2026-08-04）
+- ブランチ **`master`**。Phase 0–4 ＋ API 整形 ＋ 動く床（`KinematicBody`）＋ **梯子（`ClimbableBody`）** は master 反映済み。**ローカルで origin より先行（未 push）**。`git log`/`git status -sb` で確認。
+- テスト43件・全デモ（`1`–`10` ＋ recast の `20`/`21`）ロードエラーなし・tsc/lint/build 緑。
+- デモ番号: コア機能は `1`–`10`（`10_ladder.html`）。recast 系は将来の差し込み用に `20`/`21` へ繰り下げ済み（`10`–`19` は空き）。
 
 ### 実装済み（要点）
 - `Body`/`StaticBody`/`CharacterController`（旧 `CharacterBody` 案は撤回し `CharacterController` 据置）／`World.add(body)` 一本化。
@@ -33,6 +34,12 @@ three.js 用の TPS キャラクターコントローラ・ライブラリ（yom
 - レンダー分離: `position`/`quaternion` 公開、メッシュ同期は利用側（`world.update` の後）。
 - ジャンプ: deltaTime 駆動のコサイン弧（脱 `performance.now`・決定論）。到達高さ≈6.37・滞空≈1s。
 - `slopeLimit`（度）／`stepOffset`（既定 0.3・段差自動登り）／`groundCheckDepth`（既定 0.3・登り降り対称）。
+- 動く床 `KinematicBody`（`deltaMatrix` で運搬・回転運搬、離脱慣性、`surfaceVelocity`＝ベルトコンベア）。デモ 9。
+- **梯子 `ClimbableBody`**（`mode:'ladder'|'free'`・ワールド `Box3`・`faceDirection`・`speed`）を `world.add` 登録。判定ゾーン（コライダーではない）。デモ `10_ladder.html`。詳細は `DESIGN.md §10`。
+  - `character.climb(Vector2)`（x=横/y=上、W=上/S=下・カメラ非依存）。`isClimbing`。登り中は重力/ジャンプ弧/接地スナップをバイパス。
+  - 取り付き: ①下・側面から（面へ向かって `move`）②天面から（上端付近で縁へ `move`→そのまま降りる）③ジャンプ・自由落下中（空中グラブ）。`jump()` で外向きへポップ離脱。
+  - 遷移スムージング（カメラのカクつき防止）: マントル（上端→天面）は `MANTLE_DURATION_SEC≈0.2s`、グラブ整列は `CLIMB_ALIGN_SPEED_MPS=6` で寄せ、瞬間移動しない。マントル/飛び降り直後は再取り付きクールダウン `0.25s`。
+  - `mode:'free'`（壁面フリークライム）は**型だけ用意・未実装（Phase B）**。イベント `startClimbing`/`endClimbing`。
 - options コンストラクタ `new CharacterController({ radius, height, slopeLimit?, stepOffset?, groundCheckDepth? })`、`teleport(Vector3)`。
 - `KeyboardControls.inputVector`（Vector2, x=右/y=前, 正規化, 無入力=0）。デモは `applyAxisAngle(Y, camera.frontAngle)` で回して `move()` へ。
 - 改名: `KeyInputControl`→`KeyboardControls`、`TPSCameraControls`→`ThirdPersonCameraControls`、`AnimationController.motion`→`actions`。
@@ -44,9 +51,10 @@ three.js 用の TPS キャラクターコントローラ・ライブラリ（yom
 - 質量は無関係（速度・加速度を直接扱う運動学モデル）。
 
 ### 保留（未着手・「今はやらない」）
+- **壁面フリークライム（Phase B）**: `ClimbableBody` の `mode:'free'` を実装（領域内の壁三角形に貼り付き、`_contactInfo` 法線で正対、2D 上下＋横移動、上端マントル・下端接地・ジャンプ離脱）。up は Y のまま＝L2 とは別物。
 - `AnimationController.turn()` の脱 `Date.now`/rAF（deltaTime 化）。
-- 瞬間イベント `landed`/`jumped`（現状 `start*` イベント維持）。
-- README を現行 API に更新（DESIGN.md は as-built に更新済み）。
+- 瞬間イベント `landed`/`jumped`（現状 `start*` イベント維持）。梯子は `startClimbing`/`endClimbing` を既に持つ。
+- README の API 節を現行 API に更新（デモ一覧は更新済み・DESIGN.md は as-built）。
 - 壁歩き／惑星重力（L2＝コントローラを up ベクトル非依存に再設計）。
 
 ## 参考

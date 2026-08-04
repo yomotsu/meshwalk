@@ -9,13 +9,13 @@ Rapier / cannon-es）および three.js の命名慣習に寄せるための設�
 
 ---
 
-## 0. 実装状況（2026-07-31 時点・master に反映済み）
+## 0. 実装状況（2026-08-04 時点・master に反映済み）
 
 | 区分 | 項目 |
 |---|---|
-| **実装済み** | `Body`/`StaticBody`/`CharacterController` 化・`World.add(body)` 一本化。`StaticBody.fromObject`/`addFromObject`/`addFromGeometry`・`matrixWorld` バグ修正。`Octree` 内部化。`move(vec)` 入力。`slopeLimit`（度）。レンダー分離（`position`/`quaternion` 公開・利用側で同期）。`world.update(dt)` 固定ステップ・アキュムレータ。ジャンプの脱 `performance.now`（deltaTime 化・決定論）。`dispose()` 全クラス。型付き `EventDispatcher`。入力 `keyCode`→`event.code`。改名 `KeyInputControl`→`KeyboardControls` / `TPSCameraControls`→`ThirdPersonCameraControls` / `AnimationController.motion`→`actions`。options コンストラクタ。`teleport(Vector3)`。`KeyboardControls.inputVector`（Vector2）。**`stepOffset`（段差自動登り・既定 0.3）＋ `groundCheckDepth` 既定 0.3（登り降り対称）**。 |
+| **実装済み** | `Body`/`StaticBody`/`CharacterController` 化・`World.add(body)` 一本化。`StaticBody.fromObject`/`addFromObject`/`addFromGeometry`・`matrixWorld` バグ修正。`Octree` 内部化。`move(vec)` 入力。`slopeLimit`（度）。レンダー分離（`position`/`quaternion` 公開・利用側で同期）。`world.update(dt)` 固定ステップ・アキュムレータ。ジャンプの脱 `performance.now`（deltaTime 化・決定論）。`dispose()` 全クラス。型付き `EventDispatcher`。入力 `keyCode`→`event.code`。改名 `KeyInputControl`→`KeyboardControls` / `TPSCameraControls`→`ThirdPersonCameraControls` / `AnimationController.motion`→`actions`。options コンストラクタ。`teleport(Vector3)`。`KeyboardControls.inputVector`（Vector2）。**`stepOffset`（段差自動登り・既定 0.3）＋ `groundCheckDepth` 既定 0.3（登り降り対称）**。**動く床 `KinematicBody`**（`deltaMatrix` 運搬・回転運搬・離脱慣性・`surfaceVelocity`／ベルトコンベア。デモ 9）。**梯子 `ClimbableBody`**（登り状態。§10。デモ `10_ladder.html`）。 |
 | **ドロップ** | **物理モデル刷新（重力の「場」＋インパルスジャンプ＋`gravityScale`）**。§3 参照。現行のジャンプ／落下仕様を維持する判断。 |
-| **保留（未着手）** | `AnimationController.turn()` の `Date.now`/rAF → deltaTime 化。瞬間イベント `landed`/`jumped`（現状は `startIdling/Walking/Jumping/Sliding/Falling` を維持）。壁歩き／惑星重力（L2）。README 更新。 |
+| **保留（未着手）** | 壁面フリークライム（`ClimbableBody` の `mode:'free'`＝Phase B。§10）。`AnimationController.turn()` の `Date.now`/rAF → deltaTime 化。瞬間イベント `landed`/`jumped`（現状は `startIdling/Walking/Jumping/Sliding/Falling` を維持）。壁歩き／惑星重力（L2）。README の API 節更新。 |
 
 ---
 
@@ -252,7 +252,58 @@ const _yAxis = new THREE.Vector3( 0, 1, 0 );
 - **物理モデル刷新（重力の場・インパルスジャンプ・gravityScale）はドロップ。現行のジャンプ／落下仕様を維持。**
 
 **保留（将来やるなら）**
+- 壁面フリークライム（`ClimbableBody` の `mode:'free'`＝Phase B。§10）。
 - `AnimationController.turn()` の脱 `Date.now`/rAF（deltaTime 駆動）。
-- 瞬間イベント `landed`/`jumped`（現状は `start*` イベントを維持）。
+- 瞬間イベント `landed`/`jumped`（現状は `start*` イベントを維持）。梯子は `startClimbing`/`endClimbing` を既に持つ。
 - 段差乗り越え `stepOffset` 等の Unity 的パラメータ。
 - 重力方向可変（壁歩き・球状惑星）＝ L2（コントローラを up ベクトル非依存に再設計）。
+
+---
+
+## 10. 梯子・登り（`ClimbableBody`・as-built）
+
+梯子・壁面を「**登り状態（climb mode）**」として追加。重力を一時停止して入力を「面に沿った移動」へ写す
+状態機械で、**up ベクトルは Y のまま**（L2＝壁歩き/惑星重力の再設計は不要）。現状は `mode:'ladder'` を実装、
+`mode:'free'`（壁面フリークライム）は型だけ用意＝Phase B で未実装。
+
+### 10.1 `ClimbableBody`（判定ゾーン）
+
+```js
+const ladder = new MW.ClimbableBody({
+	mode: 'ladder',                                  // 'ladder' | 'free'（free は未実装）
+	box: new THREE.Box3( min, max ),                 // 登れる領域（ワールド AABB）
+	faceDirection: new THREE.Vector3( 0, 0, 1 ),     // 外向き（プレイヤー側）水平法線。既定 +Z
+	speed: 3,                                         // 登り速度 m/s。既定 3
+});
+world.add( ladder );
+```
+
+- `Body` 派生だが**衝突コライダーではない**（「ここでは登れる」判定ゾーン）。`_colliders` には入らない。
+- `intoDirection = -faceDirection`（面へ向かう向き）。`getAttachPoint()` は外向き面から `radius` だけ出した
+  取り付き軸（横は領域中心へロック）を返す。
+- `World` は近傍の climbable を broad-phase（`box.intersectsSphere` ＝キャラの sphere）して
+  `character.setNearClimbables()` で渡す。内部配列は `_climbableBodies`（private）。
+
+### 10.2 `CharacterController` の登り状態
+
+- 入力: **`character.climb(Vector2)`**（x=横〈free 用〉/y=上、W=上・S=下、**カメラ非依存で一貫**）。地上の
+  `move(vec3)` とは別チャネル（`move` は水平専用で y を捨てるため）。状態フラグ `isClimbing`。
+- `update()` は登り中、**重力 `FALL_VELOCITY`・ジャンプ弧・接地スナップをすべてバイパス**し `_updateClimb` で
+  面に沿って動かす。イベント `startClimbing` / `endClimbing`。
+- **取り付き（`_tryStartClimb`）** — 3 系統。いずれも `move()` の水平入力方向で判定:
+  1. **下・側面から**（登る）: 面へ向かって（`into`）押し、足元が上端の縁より下（`_overlapsClimbBody`）。
+  2. **天面から**（降りる）: 上端付近に立ち（`_isAtopClimbable`）、縁（外向き）へ押す。W=上/S=下 は一貫なので、
+     カメラを背にした自然な操作では「縁へ歩く」と「降りる」が同じキーで繋がる。
+  3. **空中グラブ**: ジャンプ中・自由落下中でも上記条件で掴める（掴んだ瞬間に落下/ジャンプ停止）。
+- **梯子（1D）**: 横は取り付き軸へ寄せてロック、面へ正対。上端で天面へ**マントル**、下端で接地離脱、
+  `jump()` で外向きへポップ離脱。
+- **遷移スムージング（カメラのカクつき防止・重要）**: 位置追従カメラは x/z を直接コピーするため、
+  1 フレームの瞬間移動がカクつく。よって:
+  - マントル（上端→天面、`radius*2` 前進）は `MANTLE_DURATION_SEC≈0.2s` かけて連続移動（`_updateMantle`）。
+  - グラブ時の軸合わせは `_approachHorizontally()` が `CLIMB_ALIGN_SPEED_MPS=6` で寄せる（瞬間スナップしない）。
+  - マントル/飛び降り直後は再取り付きクールダウン `0.25s`（縁で入力保持時のチラつき防止）。
+
+### 10.3 Phase B（壁面フリークライム・未実装）
+
+`mode:'free'`: 領域内の**壁三角形に貼り付き**、既存の壁 `_contactInfo` 法線で正対。**2D 移動**（上下＋横、
+`climb().x` を使用）、法線はトラバース中に変化、上端マントル・下端接地・ジャンプ離脱。梯子の状態機械を土台に拡張する。
