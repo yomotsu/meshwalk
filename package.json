@@ -12,9 +12,12 @@
       "import": "./dist/meshwalk.module.js"
     }
   },
+  "files": [
+    "dist"
+  ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/yomotsu/meshwalk"
+    "url": "git+https://github.com/yomotsu/meshwalk.git"
   },
   "scripts": {
     "dev": "rollup --config --watch",
