@@ -21,6 +21,7 @@ const _previousInverse = new Matrix4();
 const _localRay = new Ray();
 const _deltaQuaternion = new Quaternion();
 const _axis = new Vector3();
+const _surfaceDelta = new Matrix4();
 
 /**
  * 速度駆動のキネマティックボディ（動くトライメッシュ = ムービングプラットフォーム）。
@@ -48,6 +49,7 @@ export class KinematicBody extends Body {
 	quaternion = new Quaternion();      // 現在の姿勢（angularVelocity で積分される）
 	velocity = new Vector3();           // ワールド座標の並進速度（m/s）
 	angularVelocity = new Vector3();    // ワールド軸まわりの角速度（rad/s）。向き=軸・大きさ=速さ。yaw なら (0, ω, 0)
+	surfaceVelocity = new Vector3();    // 表面（ベルト面）の流れ速度（ワールド, m/s）。床は動かさず乗員だけ運ぶ＝コンベア。既定 0
 
 	// 直近 1 ステップの変換差分（T_new · T_old⁻¹）。乗っているキャラの運搬に使う。
 	// 並進のみの現状は移動量ぶんの平行移動行列。回転はフェーズ5で velocity に接続する。
@@ -145,6 +147,21 @@ export class KinematicBody extends Body {
 
 		// このステップの変換差分（運搬用）: delta = T_new · T_old⁻¹
 		this.deltaMatrix.multiplyMatrices( this._matrix, _previousInverse );
+
+		// コンベア: 床（position）は動かさず、表面の流れぶんだけ乗員を運ぶ。
+		// 運搬差分にワールド並進 surfaceVelocity·dt を前から足す（deltaMatrix は
+		// 乗員のワールド位置に applyMatrix4 されるので premultiply でワールド平行移動になる）。
+		// 位置・姿勢は不変なので衝突ジオメトリは静止したまま。並進・回転床との合成も可。
+		if ( this.surfaceVelocity.lengthSq() > 0 ) {
+
+			_surfaceDelta.makeTranslation(
+				this.surfaceVelocity.x * stepDeltaTime,
+				this.surfaceVelocity.y * stepDeltaTime,
+				this.surfaceVelocity.z * stepDeltaTime,
+			);
+			this.deltaMatrix.premultiply( _surfaceDelta );
+
+		}
 
 	}
 

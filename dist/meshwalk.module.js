@@ -607,6 +607,7 @@ const _previousInverse = new Matrix4();
 const _localRay = new Ray();
 const _deltaQuaternion = new Quaternion();
 const _axis = new Vector3();
+const _surfaceDelta = new Matrix4();
 /**
  * 速度駆動のキネマティックボディ（動くトライメッシュ = ムービングプラットフォーム）。
  * 形状はローカル座標で Octree に一度だけ焼き込み、毎サブステップ `velocity` で
@@ -634,6 +635,7 @@ class KinematicBody extends Body {
         this.quaternion = new Quaternion(); // 現在の姿勢（angularVelocity で積分される）
         this.velocity = new Vector3(); // ワールド座標の並進速度（m/s）
         this.angularVelocity = new Vector3(); // ワールド軸まわりの角速度（rad/s）。向き=軸・大きさ=速さ。yaw なら (0, ω, 0)
+        this.surfaceVelocity = new Vector3(); // 表面（ベルト面）の流れ速度（ワールド, m/s）。床は動かさず乗員だけ運ぶ＝コンベア。既定 0
         // 直近 1 ステップの変換差分（T_new · T_old⁻¹）。乗っているキャラの運搬に使う。
         // 並進のみの現状は移動量ぶんの平行移動行列。回転はフェーズ5で velocity に接続する。
         this.deltaMatrix = new Matrix4();
@@ -704,6 +706,14 @@ class KinematicBody extends Body {
         this._updateMatrix(); // T_new
         // このステップの変換差分（運搬用）: delta = T_new · T_old⁻¹
         this.deltaMatrix.multiplyMatrices(this._matrix, _previousInverse);
+        // コンベア: 床（position）は動かさず、表面の流れぶんだけ乗員を運ぶ。
+        // 運搬差分にワールド並進 surfaceVelocity·dt を前から足す（deltaMatrix は
+        // 乗員のワールド位置に applyMatrix4 されるので premultiply でワールド平行移動になる）。
+        // 位置・姿勢は不変なので衝突ジオメトリは静止したまま。並進・回転床との合成も可。
+        if (this.surfaceVelocity.lengthSq() > 0) {
+            _surfaceDelta.makeTranslation(this.surfaceVelocity.x * stepDeltaTime, this.surfaceVelocity.y * stepDeltaTime, this.surfaceVelocity.z * stepDeltaTime);
+            this.deltaMatrix.premultiply(_surfaceDelta);
+        }
     }
     // --- 内部クエリ（World の broad-phase から使う。StaticBody と同じ signature） ---
     getSphereTriangles(sphere, result) {
@@ -1744,7 +1754,7 @@ class World {
     /**
      * 可変フレーム時間 deltaTime（秒）を受け取り、内部の固定ステップ（1/fps）へ
      * 分解して実行する。物理はフレームレートに依存せず一定速度で進む。
-     * 毎フレーム `clock.getDelta()` などの実 delta を渡す。
+     * 毎フレーム `timer.update()` 後の `timer.getDelta()` など、実時間の delta を渡す。
      * 決定論的にちょうど1フレーム進めたい場合（テスト等）は `fixedUpdate()` を直接使う。
      */
     update(deltaTime) {

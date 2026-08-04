@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
 	Mesh,
+	Object3D,
 	Vector3,
 	PlaneGeometry,
 	BoxGeometry,
@@ -801,6 +802,147 @@ describe( 'KinematicBody moving platform', () => {
 
 		// 接線速度(-z)を引き継いで確実に -z へ飛んだ（引き継がなければ ~0）
 		expect( player.position.z - zAtJump, '接線方向へ飛ばされていない' ).toBeLessThan( - 1.5 );
+
+	} );
+
+	it( '[golden] コンベア（surfaceVelocity）: 床は静止したまま乗員だけ運ばれる', () => {
+
+		const { world, player, platform, platformTop } = makeElevatorScene( { size: [ 12, 1, 12 ] } );
+
+		player.teleport( new Vector3( 0, 8, 0 ) );
+		player.velocity.set( 0, 0, 0 );
+		for ( let i = 0; i < 120; i ++ ) { player.move( STOP ); world.fixedUpdate(); }
+		expect( player.position.y ).toBeCloseTo( platformTop(), 1 );
+		const platformX0 = platform.position.x;
+		const playerX0 = player.position.x;
+
+		platform.surfaceVelocity.set( 2, 0, 0 ); // 表面が +x へ 2 m/s で流れる
+		for ( let i = 0; i < 120; i ++ ) { player.move( STOP ); world.fixedUpdate(); } // 2s
+
+		expect( platform.position.x, '床（位置）が動いてしまった' ).toBeCloseTo( platformX0, 5 );
+		expect( player.position.x - playerX0, '乗員が表面の流れで運ばれていない' ).toBeGreaterThan( 3.5 );
+		expect( player.position.y, '床上面から外れた' ).toBeCloseTo( platformTop(), 1 );
+		expect( player.isGrounded ).toBe( true );
+
+	} );
+
+	it( '[golden] コンベアの上でジャンプすると表面速度を引き継いで飛ぶ（離脱慣性）', () => {
+
+		const { world, player, platform } = makeElevatorScene( { size: [ 12, 1, 12 ] } );
+
+		player.teleport( new Vector3( 0, 8, 0 ) );
+		player.velocity.set( 0, 0, 0 );
+		for ( let i = 0; i < 120; i ++ ) { player.move( STOP ); world.fixedUpdate(); }
+
+		platform.surfaceVelocity.set( 3, 0, 0 );
+		for ( let i = 0; i < 4; i ++ ) { player.move( STOP ); world.fixedUpdate(); }
+		const xAtJump = player.position.x;
+
+		player.jump();
+		for ( let i = 0; i < 30; i ++ ) { player.move( STOP ); world.fixedUpdate(); } // 入力なし
+
+		expect( player.position.x - xAtJump, '表面速度を引き継いで +x へ飛んでいない' ).toBeGreaterThan( 1 );
+
+	} );
+
+	// 板ポリゴン（単一面・端に立ち面が無い）の傾斜ベルトを作る。水平な面を pivot に入れて
+	// 焼き、呼び出し側が body の quaternion で傾ける。箱と違い高端に「壁」が生じない。
+	function makePlaneBelt( { width, depth }: { width: number; depth: number } ): KinematicBody {
+
+		const pivot = new Object3D();
+		const plane = new Mesh( new PlaneGeometry( width, depth ), new MeshBasicMaterial() );
+		plane.rotation.x = - 90 * MathUtils.DEG2RAD; // 面を上向き（水平）に
+		pivot.add( plane );
+		pivot.updateWorldMatrix( true, true );
+		return KinematicBody.fromObject( pivot );
+
+	}
+
+	it( '[golden] エスカレーター（傾斜コンベア）: 床は静止したまま乗員が斜面を上る', () => {
+
+		const world = new World();
+
+		const floor = new Mesh( new PlaneGeometry( 200, 200 ), new MeshBasicMaterial() );
+		floor.rotation.x = - 90 * MathUtils.DEG2RAD;
+		floor.updateMatrixWorld( true );
+		const level = new StaticBody();
+		level.addFromObject( floor );
+		world.add( level );
+
+		// +x 側が持ち上がる 30° の傾斜ベルト（歩ける勾配: slopeLimit 既定 50° 未満）
+		const theta = 30 * MathUtils.DEG2RAD;
+		const speed = 4;
+		const belt = makePlaneBelt( { width: 30, depth: 4 } );
+		belt.position.set( 0, 8, 0 );
+		belt.quaternion.setFromAxisAngle( new Vector3( 0, 0, 1 ), theta );
+		belt.surfaceVelocity.set( Math.cos( theta ) * speed, Math.sin( theta ) * speed, 0 ); // 斜面に沿って上向き
+		world.add( belt );
+
+		const player = new CharacterController( { radius: 0.5, height: 2 } );
+		world.add( player );
+
+		player.teleport( new Vector3( 0, 12, 0 ) ); // ベルト中央へ落とす
+		player.velocity.set( 0, 0, 0 );
+		for ( let i = 0; i < 90; i ++ ) { player.move( STOP ); world.fixedUpdate(); } // 着地して運ばれ始める
+		expect( player.isGrounded, 'ベルトに接地していない' ).toBe( true );
+
+		const beltX0 = belt.position.x;
+		const beltY0 = belt.position.y;
+		const x0 = player.position.x;
+		const y0 = player.position.y;
+
+		for ( let i = 0; i < 60; i ++ ) { player.move( STOP ); world.fixedUpdate(); } // 1s
+
+		expect( belt.position.x, '床（位置）が動いてしまった' ).toBeCloseTo( beltX0, 5 );
+		expect( belt.position.y, '床（位置）が動いてしまった' ).toBeCloseTo( beltY0, 5 );
+		expect( player.position.x - x0, '斜面に沿って +x へ進んでいない' ).toBeGreaterThan( 1 );
+		expect( player.position.y - y0, '斜面を上っていない（高度が増えていない）' ).toBeGreaterThan( 1 );
+		expect( player.isGrounded, '運搬中に接地が外れた' ).toBe( true );
+
+	} );
+
+	it( '[golden] 板ポリゴンの傾斜ベルト上端では固着せず前方へ離脱して降りる', () => {
+
+		// 箱ベルトだと高端キャップが壁になり上端で固着する（前進も落下もしない）。板ポリゴンなら
+		// 上端に壁が無く、表面速度を引き継いでそのまま前方へ離脱→落下できることを固定する。
+		const world = new World();
+
+		const floor = new Mesh( new PlaneGeometry( 200, 200 ), new MeshBasicMaterial() );
+		floor.rotation.x = - 90 * MathUtils.DEG2RAD;
+		floor.updateMatrixWorld( true );
+		const level = new StaticBody();
+		level.addFromObject( floor );
+		world.add( level );
+
+		const theta = 30 * MathUtils.DEG2RAD;
+		const speed = 5;
+		const belt = makePlaneBelt( { width: 12, depth: 4 } );
+		belt.position.set( - 14, 2.6, - 8 ); // demo と同配置（高端 ≈ (-8.8, 5.6)）
+		belt.quaternion.setFromAxisAngle( new Vector3( 0, 0, 1 ), theta );
+		belt.surfaceVelocity.set( Math.cos( theta ) * speed, Math.sin( theta ) * speed, 0 );
+		world.add( belt );
+
+		const player = new CharacterController( { radius: 0.5, height: 2 } );
+		world.add( player );
+
+		player.teleport( new Vector3( - 18, 3, - 8 ) ); // 低い端付近に置く
+		player.velocity.set( 0, 0, 0 );
+
+		let maxY = - Infinity;
+		let detachedAtTop = false;
+		for ( let i = 0; i < 240; i ++ ) {
+
+			player.move( STOP );
+			world.fixedUpdate();
+			maxY = Math.max( maxY, player.position.y );
+			// 上端付近（高度 > 4）で接地が外れた瞬間 = 壁で固着せず離脱できた証拠
+			if ( ! player.isGrounded && player.position.y > 4 ) detachedAtTop = true;
+
+		}
+
+		expect( maxY, '斜面をほとんど登れていない' ).toBeGreaterThan( 5 );
+		expect( detachedAtTop, '上端で固着し離脱していない（板ポリゴンの狙いが崩れた）' ).toBe( true );
+		expect( player.position.y, '最終的に降りていない（上端に張り付いたまま）' ).toBeLessThan( 1 );
 
 	} );
 

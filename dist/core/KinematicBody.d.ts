@@ -26,6 +26,7 @@ export declare class KinematicBody extends Body {
     quaternion: Quaternion;
     velocity: Vector3;
     angularVelocity: Vector3;
+    surfaceVelocity: Vector3;
     deltaMatrix: Matrix4;
     private _octree;
     private _matrix;
