@@ -23,6 +23,9 @@ canvas{display: block;}
 	<span style="color:#4f4">GREEN = elevator</span>: ride up/down (vertical carry).<br>
 	<span style="color:#48f">BLUE = sliding floor</span>: ride left/right (horizontal carry).<br>
 	<span style="color:#fc4">ORANGE = turntable</span>: stand off-center to orbit around it (rotational carry).<br>
+	<span style="color:#f4c">PINK = swinging door</span>: hinged panel that swings back and forth and pushes you.<br>
+	<span style="color:#2dc">TEAL = conveyor belt</span>: floor stays put; its surface carries you along the arrows.<br>
+	<span style="color:#fd2">YELLOW = escalator</span>: inclined conveyor; its surface carries you up the slope.<br>
 	<label><input type="checkbox" id="cameraSync"> sync camera front angle to platform rotation</label>
 </div>
 
@@ -58,7 +61,7 @@ document.body.appendChild( renderer.domElement );
 
 
 const ground = new THREE.Mesh(
-	new THREE.PlaneGeometry( 60, 60, 20, 20 ),
+	new THREE.PlaneGeometry( 60, 60, 60, 60 ),
 	new THREE.MeshBasicMaterial( { color: 0x444444, wireframe: true } )
 );
 ground.rotation.x = - 90 * THREE.MathUtils.DEG2RAD;
@@ -81,7 +84,7 @@ world.add( elevator );
 
 
 // --- sliding floor (moves horizontally) ---
-const sliderSize = { width: 8, height: 0.5, depth: 8 };
+const sliderSize = { width: 6, height: 0.5, depth: 6 };
 const sliderMesh = new THREE.Mesh(
 	new THREE.BoxGeometry( sliderSize.width, sliderSize.height, sliderSize.depth ),
 	new THREE.MeshBasicMaterial( { color: 0x4488ff, wireframe: true } )
@@ -95,7 +98,7 @@ world.add( slider );
 
 
 // --- turntable (rotates about Y) ---
-const turntableSize = { width: 10, height: 0.5, depth: 10 };
+const turntableSize = { width: 8, height: 0.5, depth: 8 };
 const turntableMesh = new THREE.Mesh(
 	new THREE.BoxGeometry( turntableSize.width, turntableSize.height, turntableSize.depth ),
 	new THREE.MeshBasicMaterial( { color: 0xffcc44, wireframe: true } )
@@ -106,6 +109,105 @@ const turntable = MW.KinematicBody.fromBox( turntableSize );
 turntable.position.set( 0, 0.25, 0 );
 turntable.angularVelocity.set( 0, Math.PI / 4, 0 ); // 45°/s
 world.add( turntable );
+
+
+// --- hinge door (swings about a vertical hinge like a door) ---
+// パネルの原点をヒンジ（片側の縦辺）へ寄せるため、doorMesh を +X に半幅ずらして
+// ピボット（Object3D）の子にする。fromObject はピボットのローカル座標で焼き込むので、
+// ボディ原点＝ヒンジ、angularVelocity の yaw でヒンジまわりに回る。
+const doorSize = { width: 4, height: 3, depth: 0.3 };
+const doorPivot = new THREE.Object3D();
+const doorMesh = new THREE.Mesh(
+	new THREE.BoxGeometry( doorSize.width, doorSize.height, doorSize.depth ),
+	new THREE.MeshBasicMaterial( { color: 0xff44cc, wireframe: true } )
+);
+doorMesh.position.x = doorSize.width / 2; // ヒンジから +X へパネルが伸びる
+doorPivot.add( doorMesh );
+scene.add( doorPivot );
+
+const door = MW.KinematicBody.fromObject( doorPivot );
+door.position.set( 12, doorSize.height / 2, 0 ); // ヒンジ柱の位置（床に接地）
+door.angularVelocity.set( 0, Math.PI / 3, 0 ); // 60°/s で開閉
+world.add( door );
+
+
+// --- conveyor belt (floor stays put; its surface carries you along +x) as a single PLANE ---
+// surfaceVelocity は「床は動かさず表面だけ流す」新 API。位置は不変なので運搬だけが起きる。
+// 他の床と揃えて板ポリゴン化（水平な面を焼き、矢印は焼いた後に追加＝衝突に含めない）。
+const conveyorSize = { width: 12, depth: 4 };
+const conveyorPivot = new THREE.Object3D();
+const conveyorPlane = new THREE.Mesh(
+	new THREE.PlaneGeometry( conveyorSize.width, conveyorSize.depth ),
+	new THREE.MeshBasicMaterial( { color: 0x22ddcc, wireframe: true, side: THREE.DoubleSide } )
+);
+conveyorPlane.rotation.x = - 90 * THREE.MathUtils.DEG2RAD; // 面を上向き（水平）に
+conveyorPivot.add( conveyorPlane );
+scene.add( conveyorPivot );
+
+const conveyor = MW.KinematicBody.fromObject( conveyorPivot ); // 面だけ焼く
+conveyor.position.set( 0, 0.2, - 14 );
+conveyor.surfaceVelocity.set( 8, 0, 0 ); // 表面が +x へ 8 m/s で流れる（床自体は静止）
+world.add( conveyor );
+
+// 流れる向きを示す矢印（表面を +x へ運ぶことを可視化）。焼いた後に足すので衝突には含まれない。
+const conveyorArrows = new THREE.Group();
+for ( let i = 0; i < 3; i ++ ) {
+
+	const arrow = new THREE.Mesh(
+		new THREE.ConeGeometry( 0.4, 1, 8 ),
+		new THREE.MeshBasicMaterial( { color: 0x22ddcc, wireframe: true } )
+	);
+	arrow.rotation.z = - 90 * THREE.MathUtils.DEG2RAD; // 先端を +x へ
+	arrow.position.set( ( i - 1 ) * 3, 0.1, 0 );
+	conveyorArrows.add( arrow );
+
+}
+conveyorPivot.add( conveyorArrows );
+
+
+// --- escalator (inclined conveyor as a single PLANE: no end-cap wall at the top) ---
+// 箱で作ると傾いた高端キャップの法線 y が slopeLimit 超の「壁」判定になり、上り切った
+// キャラが上端に押し付けられて固着する（前進も落下もできない）。板ポリゴン（単一面・端に
+// 立ち面が無い）なら上端に壁が無く、到達すると表面速度を引き継いでそのまま前方へ離脱する。
+const escalatorAngle = 30 * THREE.MathUtils.DEG2RAD; // 傾斜角
+const escalatorSpeed = 5;                            // 表面速度の大きさ（m/s）
+const escalatorSize = { width: 12, depth: 4 };
+
+// body と同じ姿勢で描画する入れ物。面（＝床）だけを衝突に焼き、矢印は後付けで見た目のみ。
+const escalatorPivot = new THREE.Object3D();
+const escalatorPlane = new THREE.Mesh(
+	new THREE.PlaneGeometry( escalatorSize.width, escalatorSize.depth ),
+	new THREE.MeshBasicMaterial( { color: 0xffdd22, wireframe: true, side: THREE.DoubleSide } )
+);
+escalatorPlane.rotation.x = - 90 * THREE.MathUtils.DEG2RAD; // 面を上向き（水平）に
+escalatorPivot.add( escalatorPlane );
+scene.add( escalatorPivot );
+
+// 面だけを焼く（この時点で子は面のみ・矢印はまだ追加していない）
+const escalator = MW.KinematicBody.fromObject( escalatorPivot );
+escalator.position.set( - 14, 2.6, - 8 ); // 低い端が地面付近、+x 側が持ち上がる
+escalator.quaternion.setFromAxisAngle( new THREE.Vector3( 0, 0, 1 ), escalatorAngle );
+escalator.surfaceVelocity.set(
+	Math.cos( escalatorAngle ) * escalatorSpeed,
+	Math.sin( escalatorAngle ) * escalatorSpeed,
+	0
+); // 斜面に沿って上向き（床は静止）
+world.add( escalator );
+
+// 上り方向を示す矢印（ローカル +x = 斜面上方向）。焼いた後に足すので衝突には含まれない。
+const escalatorArrows = new THREE.Group();
+for ( let i = 0; i < 3; i ++ ) {
+
+	const arrow = new THREE.Mesh(
+		new THREE.ConeGeometry( 0.4, 1, 8 ),
+		new THREE.MeshBasicMaterial( { color: 0xffdd22, wireframe: true } )
+	);
+	arrow.rotation.z = - 90 * THREE.MathUtils.DEG2RAD; // 先端を +x（斜面上方向）へ
+	arrow.position.set( ( i - 1 ) * 3, 0.1, 0 );
+	escalatorArrows.add( arrow );
+
+}
+escalatorPivot.add( escalatorArrows );
 
 
 const playerRadius = .5;
@@ -157,6 +259,7 @@ cameraSyncCheckbox.addEventListener( 'change', () => {
 
 const _moveDir = new THREE.Vector3();
 const _yAxis = new THREE.Vector3( 0, 1, 0 );
+const _doorEuler = new THREE.Euler();
 const applyMove = () => {
 
 	const input = keyInputControl.inputVector;
@@ -189,6 +292,11 @@ tpsCameraControls.addEventListener( 'update', () => {
 	if ( slider.position.x > 6 ) slider.velocity.x = - 3;
 	if ( slider.position.x < - 6 ) slider.velocity.x = + 3;
 
+	// ヒンジの開閉: 0°〜90° の間で yaw を往復させる
+	_doorEuler.setFromQuaternion( door.quaternion, 'YXZ' );
+	if ( _doorEuler.y > Math.PI / 2 ) door.angularVelocity.y = - Math.PI / 3;
+	if ( _doorEuler.y < 0 ) door.angularVelocity.y = + Math.PI / 3;
+
 	world.update( delta );
 
 	// 物理(Body)からメッシュへ transform を同期する
@@ -198,6 +306,12 @@ tpsCameraControls.addEventListener( 'update', () => {
 	sliderMesh.position.copy( slider.position );
 	turntableMesh.position.copy( turntable.position );
 	turntableMesh.quaternion.copy( turntable.quaternion );
+	doorPivot.position.copy( door.position );
+	doorPivot.quaternion.copy( door.quaternion );
+	conveyorPivot.position.copy( conveyor.position ); // 位置は静止（surfaceVelocity は表面だけ流す）
+	conveyorPivot.quaternion.copy( conveyor.quaternion );
+	escalatorPivot.position.copy( escalator.position ); // 位置・姿勢とも静止
+	escalatorPivot.quaternion.copy( escalator.quaternion );
 
 	tpsCameraControls.update( delta );
 	renderer.render( scene, camera );
