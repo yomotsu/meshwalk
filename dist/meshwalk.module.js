@@ -1204,7 +1204,7 @@ class CharacterController extends Body {
     get _slopeLimitCos() {
         return Math.cos(this.slopeLimit * MathUtils.DEG2RAD);
     }
-    constructor({ radius, height, slopeLimit, stepOffset, groundCheckDepth, landingLockDuration }) {
+    constructor({ radius, height, slopeLimit, stepOffset, groundCheckDepth, landingLockDuration, jumpDuration }) {
         super();
         this.isCharacterController = true;
         this.position = new Vector3();
@@ -1213,6 +1213,7 @@ class CharacterController extends Body {
         this.slopeLimit = 50; // 度。これより急な面は登れず滑り落ちる（Unity の slopeLimit 相当）
         this.stepOffset = 0.3; // これ以下の高さの段差は自動で登る（0 で無効・Unity の stepOffset 相当）
         this.landingLockDuration = 0.2; // ジャンプ・自由落下から着地した直後、移動・ジャンプ入力を抑止する時間（秒）
+        this.jumpDuration = JUMP_DURATION_SEC; // ジャンプ弧の全長（秒）。大きいほど高く長く跳ぶ。既定は定数 JUMP_DURATION_SEC
         this.carryRotation = true; // true のとき、乗っている回転床の yaw に合わせて自分の向きも回す（既定 on）
         this.isGrounded = false;
         this.isOnSlope = false;
@@ -1249,6 +1250,8 @@ class CharacterController extends Body {
             this.groundCheckDepth = groundCheckDepth;
         if (landingLockDuration !== undefined)
             this.landingLockDuration = Math.max(0, landingLockDuration);
+        if (jumpDuration !== undefined)
+            this.jumpDuration = jumpDuration;
         this.radius = radius;
         // カプセルの全高（先端から先端まで）。幾何学的に最小でも球の直径（2 * radius）
         this.height = Math.max(height, radius * 2);
@@ -1882,7 +1885,7 @@ class CharacterController extends Body {
         // 経過時間を deltaTime で積算する（実時計 performance.now に依存しない＝決定論的）。
         // コサイン弧の形は従来と同一で、60fps 実行時は旧実装と一致する。
         this._jumpElapsed += deltaTime;
-        const progress = this._jumpElapsed / JUMP_DURATION_SEC;
+        const progress = this._jumpElapsed / this.jumpDuration;
         this._currentJumpPower = Math.cos(Math.min(progress, 1) * Math.PI);
     }
     _updateLanding(deltaTime) {

@@ -47,6 +47,7 @@ export interface CharacterControllerOptions {
 	stepOffset?: number;       // 登れる段差の最大高さ。既定 0.3
 	groundCheckDepth?: number; // 既定 0.3
 	landingLockDuration?: number; // ジャンプ・自由落下後の着地硬直時間（秒）。既定 0.2
+	jumpDuration?: number;     // ジャンプ弧の全長（秒）。既定 JUMP_DURATION_SEC（=1）
 }
 
 export type CharacterControllerEventType =
@@ -71,6 +72,7 @@ export class CharacterController extends Body<CharacterControllerEventType> {
 	slopeLimit = 50; // 度。これより急な面は登れず滑り落ちる（Unity の slopeLimit 相当）
 	stepOffset = 0.3; // これ以下の高さの段差は自動で登る（0 で無効・Unity の stepOffset 相当）
 	landingLockDuration = 0.2; // ジャンプ・自由落下から着地した直後、移動・ジャンプ入力を抑止する時間（秒）
+	jumpDuration = JUMP_DURATION_SEC; // ジャンプ弧の全長（秒）。大きいほど高く長く跳ぶ。既定は定数 JUMP_DURATION_SEC
 	carryRotation = true; // true のとき、乗っている回転床の yaw に合わせて自分の向きも回す（既定 on）
 	isGrounded = false;
 	isOnSlope  = false;
@@ -114,7 +116,7 @@ export class CharacterController extends Body<CharacterControllerEventType> {
 
 	}
 
-	constructor( { radius, height, slopeLimit, stepOffset, groundCheckDepth, landingLockDuration }: CharacterControllerOptions ) {
+	constructor( { radius, height, slopeLimit, stepOffset, groundCheckDepth, landingLockDuration, jumpDuration }: CharacterControllerOptions ) {
 
 		super();
 
@@ -122,6 +124,7 @@ export class CharacterController extends Body<CharacterControllerEventType> {
 		if ( stepOffset !== undefined ) this.stepOffset = stepOffset;
 		if ( groundCheckDepth !== undefined ) this.groundCheckDepth = groundCheckDepth;
 		if ( landingLockDuration !== undefined ) this.landingLockDuration = Math.max( 0, landingLockDuration );
+		if ( jumpDuration !== undefined ) this.jumpDuration = jumpDuration;
 
 		this.radius = radius;
 		// カプセルの全高（先端から先端まで）。幾何学的に最小でも球の直径（2 * radius）
@@ -992,7 +995,7 @@ export class CharacterController extends Body<CharacterControllerEventType> {
 		// 経過時間を deltaTime で積算する（実時計 performance.now に依存しない＝決定論的）。
 		// コサイン弧の形は従来と同一で、60fps 実行時は旧実装と一致する。
 		this._jumpElapsed += deltaTime;
-		const progress = this._jumpElapsed / JUMP_DURATION_SEC;
+		const progress = this._jumpElapsed / this.jumpDuration;
 		this._currentJumpPower = Math.cos( Math.min( progress, 1 ) * Math.PI );
 
 	}

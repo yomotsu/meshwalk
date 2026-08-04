@@ -32,7 +32,7 @@ three.js 用の TPS キャラクターコントローラ・ライブラリ（yom
 - 入力: `character.move(vec3)`（水平の望む速度をセット・持続）。`velocity` は**エンジンが出す最終速度（読み取り）**で、入力とは別概念（`velocity` を入力にはしない＝内部で y を管理するため）。
 - `world.update(dt)`（実 delta・内部アキュムレータで固定ステップ、上限 `MAX_CATCH_UP_FRAMES`）。`fixedUpdate()` は決定論用に残置（テストが使用）。
 - レンダー分離: `position`/`quaternion` 公開、メッシュ同期は利用側（`world.update` の後）。
-- ジャンプ: deltaTime 駆動のコサイン弧（脱 `performance.now`・決定論）。到達高さ≈6.37・滞空≈1s。
+- ジャンプ: deltaTime 駆動のコサイン弧（脱 `performance.now`・決定論）。全長は公開プロパティ／option `jumpDuration`（既定 1s＝定数 `JUMP_DURATION_SEC`）で可変。既定時は到達高さ≈6.37・滞空≈1s。
 - `slopeLimit`（度）／`stepOffset`（既定 0.3・段差自動登り）／`groundCheckDepth`（既定 0.3・登り降り対称）。
 - 動く床 `KinematicBody`（`deltaMatrix` で運搬・回転運搬、離脱慣性、`surfaceVelocity`＝ベルトコンベア）。デモ 9。
 - **梯子 `ClimbableBody`**（`mode:'ladder'|'free'`・ワールド `Box3`・`faceDirection`・`speed`）を `world.add` 登録。判定ゾーン（コライダーではない）。デモ `10_ladder.html`。詳細は `DESIGN.md §10`。

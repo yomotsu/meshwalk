@@ -397,6 +397,48 @@ describe( 'CharacterController capsule collision', () => {
 
 	} );
 
+	it( 'jumpDuration を大きくすると高く長く跳ぶ（既定は 1・コンストラクタでも指定可）', () => {
+
+		// 既定値は定数 JUMP_DURATION_SEC（=1）
+		expect( new CharacterController( { radius: PLAYER_RADIUS, height: PLAYER_HEIGHT } ).jumpDuration ).toBe( 1 );
+		// コンストラクタ option でも指定できる
+		expect( new CharacterController( { radius: PLAYER_RADIUS, height: PLAYER_HEIGHT, jumpDuration: 2 } ).jumpDuration ).toBe( 2 );
+
+		// 平地からジャンプし、到達高さと滞空フレーム数を測る
+		const measure = ( jumpDuration?: number ) => {
+
+			const { world, player } = makeScene();
+			if ( jumpDuration !== undefined ) player.jumpDuration = jumpDuration;
+			player.teleport( new Vector3( 10, 0, 10 ) );
+			player.velocity.set( 0, 0, 0 );
+			for ( let i = 0; i < 60; i ++ ) { player.move( STOP ); world.fixedUpdate(); }
+			const restY = player.position.y;
+
+			player.jump();
+			let maxY = restY;
+			let airborneFrames = 0;
+			for ( let i = 0; i < 600; i ++ ) {
+
+				player.move( STOP );
+				world.fixedUpdate();
+				maxY = Math.max( maxY, player.position.y );
+				if ( player.isJumping || ! player.isGrounded ) airborneFrames ++;
+				else if ( airborneFrames > 0 ) break; // 再接地したら終了
+
+			}
+
+			return { rise: maxY - restY, airborneFrames };
+
+		};
+
+		const def = measure();       // 既定 1s
+		const long = measure( 2 );   // 2s
+
+		expect( long.rise, `長い方が高く跳んでいない (def=${def.rise.toFixed( 2 )}, long=${long.rise.toFixed( 2 )})` ).toBeGreaterThan( def.rise + 1 );
+		expect( long.airborneFrames, '長い方が滞空が長くない' ).toBeGreaterThan( def.airborneFrames );
+
+	} );
+
 	it( '通常のジャンプ着地でも startLanding を発火し、硬直解除時に endLanding を発火する', () => {
 
 		const { world, player } = makeScene();

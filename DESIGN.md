@@ -109,7 +109,7 @@ world.dispose();
 | 移動入力 | `character.move(vec3)`：望む**水平**速度をセット（y は無視）。次に呼ぶまで持続。停止はゼロベクトル。 |
 | 速度 | `character.velocity`：エンジンが毎ステップ算出する**最終速度（読み取り用）**。y=ジャンプ/落下、x/z=衝突解決後。※入力とは別概念（下記）。 |
 | 落下 | 一定 `FALL_VELOCITY = -20`（**速度**であって加速度ではない）。重力積分はしない。 |
-| ジャンプ | 時間ベースのコサイン弧（`jump()` → `_updateJumping(deltaTime)`、全長 1 秒）。到達高さ ≈ 6.37、滞空 ≈ 1s。deltaTime 駆動で決定論的（脱 `performance.now`）。 |
+| ジャンプ | 時間ベースのコサイン弧（`jump()` → `_updateJumping(deltaTime)`）。全長は **`jumpDuration`（公開・既定 1 秒＝定数 `JUMP_DURATION_SEC`）** で可変（大きいほど高く長い）。既定時は到達高さ ≈ 6.37・滞空 ≈ 1s。deltaTime 駆動で決定論的（脱 `performance.now`）。 |
 | 斜面 | `slopeLimit`（**度**、既定 50）。内部で cos 化（Unity 準拠）。急勾配は `FALL_VELOCITY` で滑走。 |
 | 段差 | `stepOffset`（既定 0.3）以下の段は自動で登る。`_checkGround` の `_stepLookAhead` が前縁を先読みし `groundHeight` を段上面へ上げる。壁接触ゲート＋ラッチ＋天井チェック（詳細はコード）。降りは `groundCheckDepth`（既定 0.3）が対称に担う。 |
 

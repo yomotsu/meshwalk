@@ -9,6 +9,7 @@ export interface CharacterControllerOptions {
     stepOffset?: number;
     groundCheckDepth?: number;
     landingLockDuration?: number;
+    jumpDuration?: number;
 }
 export type CharacterControllerEventType = 'startIdling' | 'startWalking' | 'startJumping' | 'startSliding' | 'startFalling' | 'startLanding' | 'endLanding' | 'startClimbing' | 'endClimbing';
 export declare class CharacterController extends Body<CharacterControllerEventType> {
@@ -21,6 +22,7 @@ export declare class CharacterController extends Body<CharacterControllerEventTy
     slopeLimit: number;
     stepOffset: number;
     landingLockDuration: number;
+    jumpDuration: number;
     carryRotation: boolean;
     isGrounded: boolean;
     isOnSlope: boolean;
@@ -51,7 +53,7 @@ export declare class CharacterController extends Body<CharacterControllerEventTy
     private _fallElapsed;
     private _events;
     private get _slopeLimitCos();
-    constructor({ radius, height, slopeLimit, stepOffset, groundCheckDepth, landingLockDuration }: CharacterControllerOptions);
+    constructor({ radius, height, slopeLimit, stepOffset, groundCheckDepth, landingLockDuration, jumpDuration }: CharacterControllerOptions);
     setNearTriangles(nearTriangles: ComputedTriangle[]): void;
     setNearClimbables(nearClimbables: ClimbableBody[]): void;
     /**
