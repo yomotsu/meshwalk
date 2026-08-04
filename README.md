@@ -21,8 +21,9 @@ See following demos and check the source code with some comments.
 7. [all together](http://yomotsu.github.io/meshwalk/examples/7_all-together.html)
 8. [remove collider](http://yomotsu.github.io/meshwalk/examples/8_mesh-remove.html)
 9. [moving platform](http://yomotsu.github.io/meshwalk/examples/9_moving-platform.html)
+10. [ladder](http://yomotsu.github.io/meshwalk/examples/10_ladder.html)
 
 examples with [recast-navigation-js](https://github.com/isaac-mason/recast-navigation-js):
 
-10. [with recast nav-mesh: followers](http://yomotsu.github.io/meshwalk/examples/10_with-recast-nav-mesh-followers.html)
-11. [with recast nav-mesh: auto navigation](http://yomotsu.github.io/meshwalk/examples/11_with-recast-nav-mesh-navigation.html)
+20. [with recast nav-mesh: followers](http://yomotsu.github.io/meshwalk/examples/20_with-recast-nav-mesh-followers.html)
+21. [with recast nav-mesh: auto navigation](http://yomotsu.github.io/meshwalk/examples/21_with-recast-nav-mesh-navigation.html)
