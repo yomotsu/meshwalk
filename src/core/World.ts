@@ -19,6 +19,9 @@ export class World {
 	private _kinematicBodies: KinematicBody[] = [];
 	private _characterControllers: CharacterController[] = [];
 	private _climbableBodies: ClimbableBody[] = [];
+	// broad-phase 結果の使い回しバッファ（キャラごとに1本。毎ステップの配列確保を避ける）
+	private _triangleBuffers: ComputedTriangle[][] = [];
+	private _climbableBuffers: ClimbableBody[][] = [];
 	// カメラのレイ衝突など「レイを当てる対象」。静的＋動的ボディ（キャラは含めない）。
 	private _colliders: ( StaticBody | KinematicBody )[] = [];
 	private _fps: number;
@@ -150,7 +153,8 @@ export class World {
 		for ( let i = 0, l = this._characterControllers.length; i < l; i ++ ) {
 
 			const character = this._characterControllers[ i ];
-			const triangles: ComputedTriangle[] = [];
+			const triangles = this._triangleBuffers[ i ] || ( this._triangleBuffers[ i ] = [] );
+			triangles.length = 0;
 
 			// 前ステップで接地していた床（運搬・離脱慣性の判定に使う「1つ前の土台」）
 			const previousGroundBody = character.groundBody;
@@ -194,7 +198,8 @@ export class World {
 			character.setNearTriangles( triangles );
 
 			// 近傍の登れる領域（梯子・壁面）を渡す。broad-phase はキャラの sphere と box の交差。
-			const climbables: ClimbableBody[] = [];
+			const climbables = this._climbableBuffers[ i ] || ( this._climbableBuffers[ i ] = [] );
+			climbables.length = 0;
 			for ( let ii = 0, ll = this._climbableBodies.length; ii < ll; ii ++ ) {
 
 				if ( this._climbableBodies[ ii ].box.intersectsSphere( sphere ) ) climbables.push( this._climbableBodies[ ii ] );
@@ -231,6 +236,8 @@ export class World {
 		this._characterControllers.length = 0;
 		this._climbableBodies.length = 0;
 		this._colliders.length = 0;
+		this._triangleBuffers.length = 0;
+		this._climbableBuffers.length = 0;
 
 	}
 
