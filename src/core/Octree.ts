@@ -13,6 +13,11 @@ import { intersectsLineTriangle } from "../math/intersectsLineTriangle";
 
 const _v1 = new Vector3();
 const _v2 = new Vector3();
+
+// get*Triangles の重複排除用のマーク。三角形は複数のサブツリーに属するため、1回のクエリで
+// 同じ三角形が何度も見つかる。クエリごとに ID を1つ進め、結果へ入れた三角形へその ID を
+// 書いておくことで、結果配列の線形探索（indexOf・O(n²)）を使わずに重複を弾く。
+let _queryId = 0;
 // const _plane = new Plane();
 // const _line1 = new Line3();
 // const _line2 = new Line3();
@@ -128,7 +133,9 @@ export class Octree {
 
 	}
 
-	getLineTriangles( line: Line3, result: ComputedTriangle[] ) {
+	getLineTriangles( line: Line3, result: ComputedTriangle[], isRoot = true ) {
+
+		if ( isRoot ) _queryId ++;
 
 		for ( let i = 0; i < this.subTrees.length; i ++ ) {
 
@@ -139,13 +146,17 @@ export class Octree {
 
 				for ( let j = 0; j < subTree.triangles.length; j ++ ) {
 
-					if ( result.indexOf( subTree.triangles[ j ] ) === - 1 ) result.push( subTree.triangles[ j ] );
+					const triangle = subTree.triangles[ j ];
+					if ( triangle._queryId === _queryId ) continue;
+
+					triangle._queryId = _queryId;
+					result.push( triangle );
 
 				}
 
 			} else {
 
-				subTree.getLineTriangles( line, result );
+				subTree.getLineTriangles( line, result, false );
 
 			}
 
@@ -155,7 +166,9 @@ export class Octree {
 
 	}
 
-	getRayTriangles( ray: Ray, result: ComputedTriangle[] ) {
+	getRayTriangles( ray: Ray, result: ComputedTriangle[], isRoot = true ) {
+
+		if ( isRoot ) _queryId ++;
 
 		for ( let i = 0; i < this.subTrees.length; i ++ ) {
 
@@ -166,13 +179,17 @@ export class Octree {
 
 				for ( let j = 0; j < subTree.triangles.length; j ++ ) {
 
-					if ( result.indexOf( subTree.triangles[ j ] ) === - 1 ) result.push( subTree.triangles[ j ] );
+					const triangle = subTree.triangles[ j ];
+					if ( triangle._queryId === _queryId ) continue;
+
+					triangle._queryId = _queryId;
+					result.push( triangle );
 
 				}
 
 			} else {
 
-				subTree.getRayTriangles( ray, result );
+				subTree.getRayTriangles( ray, result, false );
 
 			}
 
@@ -182,7 +199,9 @@ export class Octree {
 
 	}
 
-	getSphereTriangles( sphere:Sphere, result: ComputedTriangle[] ) {
+	getSphereTriangles( sphere:Sphere, result: ComputedTriangle[], isRoot = true ) {
+
+		if ( isRoot ) _queryId ++;
 
 		for ( let i = 0; i < this.subTrees.length; i ++ ) {
 
@@ -194,13 +213,17 @@ export class Octree {
 
 				for ( let j = 0; j < subTree.triangles.length; j ++ ) {
 
-					if ( result.indexOf( subTree.triangles[ j ] ) === - 1 ) result.push( subTree.triangles[ j ] );
+					const triangle = subTree.triangles[ j ];
+					if ( triangle._queryId === _queryId ) continue;
+
+					triangle._queryId = _queryId;
+					result.push( triangle );
 
 				}
 
 			} else {
 
-				subTree.getSphereTriangles( sphere, result );
+				subTree.getSphereTriangles( sphere, result, false );
 
 			}
 
@@ -210,7 +233,9 @@ export class Octree {
 
 	}
 
-	getCapsuleTriangles( capsule: Sphere, result: ComputedTriangle[] ) {
+	getCapsuleTriangles( capsule: Sphere, result: ComputedTriangle[], isRoot = true ) {
+
+		if ( isRoot ) _queryId ++;
 
 		for ( let i = 0; i < this.subTrees.length; i ++ ) {
 
@@ -222,13 +247,17 @@ export class Octree {
 
 				for ( let j = 0; j < subTree.triangles.length; j ++ ) {
 
-					if ( result.indexOf( subTree.triangles[ j ] ) === - 1 ) result.push( subTree.triangles[ j ] );
+					const triangle = subTree.triangles[ j ];
+					if ( triangle._queryId === _queryId ) continue;
+
+					triangle._queryId = _queryId;
+					result.push( triangle );
 
 				}
 
 			} else {
 
-				subTree.getCapsuleTriangles( capsule, result );
+				subTree.getCapsuleTriangles( capsule, result, false );
 
 			}
 

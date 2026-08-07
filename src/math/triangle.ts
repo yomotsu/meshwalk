@@ -9,6 +9,9 @@ export class ComputedTriangle extends Triangle {
 	// この三角形を所有する Body（動くボディの運搬判定に使う）。静的な焼き込み三角形は null。
 	body: Body | null = null;
 
+	// Octree のクエリ中に「すでに結果へ入れた」ことを示すマーク（重複排除用・Octree が管理する）
+	_queryId = - 1;
+
 	constructor( a: Vector3, b: Vector3, c: Vector3 ) {
 
 		super( a, b, c );
