@@ -7,11 +7,16 @@ import { CharacterController } from './CharacterController';
 import { ClimbableBody } from './ClimbableBody';
 
 const sphere = new Sphere();
+const _staticQuerySphere = new Sphere();
 const _leaveVelocity = new Vector3();
 
 // 巨大な deltaTime（タブ復帰・ブレークポイント復帰など）で追いつき処理が暴走
 // （spiral of death）しないよう、1回の update で進める固定ステップ数の上限。
 const MAX_CATCH_UP_FRAMES = 5;
+
+// 静的ジオメトリの broad-phase をフレーム先頭で1回だけ引くときに、1フレーム分の移動を
+// 包むために半径へ足す余裕の下限（m）。速度から算出した余裕がこれ未満ならこの値を使う。
+const STATIC_QUERY_PADDING_MIN = 0.1;
 
 export class World {
 
@@ -20,8 +25,15 @@ export class World {
 	private _characterControllers: CharacterController[] = [];
 	private _climbableBodies: ClimbableBody[] = [];
 	// broad-phase 結果の使い回しバッファ（キャラごとに1本。毎ステップの配列確保を避ける）
+	// バッファの先頭 _staticTriangleCounts[ i ] 件は「フレーム先頭で引いた静的ジオメトリの
+	// 三角形」で、substep 間で使い回す。その後ろへ substep ごとに動的ボディぶんを足す。
 	private _triangleBuffers: ComputedTriangle[][] = [];
 	private _climbableBuffers: ClimbableBody[][] = [];
+	private _staticTriangleCounts: number[] = [];
+	// 静的ぶんを引いたときの sphere（キャッシュの有効範囲）。substep の sphere がこの中に
+	// 収まっている限り、必要な葉ノードは必ずキャッシュに含まれているので引き直さなくてよい。
+	private _staticQueryCenters: Vector3[] = [];
+	private _staticQueryRadii: number[] = [];
 	// カメラのレイ衝突など「レイを当てる対象」。静的＋動的ボディ（キャラは含めない）。
 	private _colliders: ( StaticBody | KinematicBody )[] = [];
 	private _fps: number;
@@ -133,11 +145,55 @@ export class World {
 		const deltaTime = 1 / this._fps;
 		const stepDeltaTime = deltaTime / this._stepsPerFrame;
 
+		// 静的ジオメトリは substep 間で動かないので、broad-phase はフレーム先頭で1回だけ引く。
+		// 1フレーム分の移動を包む余裕を持たせておき、足りなかった substep だけ引き直す。
+		for ( let i = 0, l = this._characterControllers.length; i < l; i ++ ) {
+
+			this._queryStaticTriangles( this._characterControllers[ i ], i, deltaTime );
+
+		}
+
 		for ( let i = 0; i < this._stepsPerFrame; i ++ ) {
 
 			this.step( stepDeltaTime );
 
 		}
+
+	}
+
+	/**
+	 * キャラの近傍にある静的ジオメトリの三角形をバッファ先頭へ引き直す。
+	 * 半径には「1フレームで動きうる距離」ぶんの余裕を足す（足りなければ step() が引き直す
+	 * ので、この余裕は速度のためのチューニングであって正しさの条件ではない）。
+	 */
+	private _queryStaticTriangles( character: CharacterController, index: number, deltaTime: number ): void {
+
+		const triangles = this._triangleBuffers[ index ] || ( this._triangleBuffers[ index ] = [] );
+		const center = this._staticQueryCenters[ index ] || ( this._staticQueryCenters[ index ] = new Vector3() );
+
+		// 乗っている動く床の運搬ぶんも移動量に含める
+		const groundBody = character.groundBody;
+		const platformSpeed = groundBody instanceof KinematicBody
+			? groundBody.velocity.length() + groundBody.surfaceVelocity.length()
+			: 0;
+		const padding = Math.max( ( character.velocity.length() + platformSpeed ) * deltaTime, STATIC_QUERY_PADDING_MIN );
+
+		center.set( 0, character.height / 2, 0 ).add( character.position );
+		const radius = character.height / 2 + character.groundCheckDepth + padding;
+
+		_staticQuerySphere.center.copy( center );
+		_staticQuerySphere.radius = radius;
+
+		triangles.length = 0;
+
+		for ( let i = 0, l = this._staticBodies.length; i < l; i ++ ) {
+
+			this._staticBodies[ i ].getSphereTriangles( _staticQuerySphere, triangles );
+
+		}
+
+		this._staticTriangleCounts[ index ] = triangles.length;
+		this._staticQueryRadii[ index ] = radius;
 
 	}
 
@@ -154,7 +210,6 @@ export class World {
 
 			const character = this._characterControllers[ i ];
 			const triangles = this._triangleBuffers[ i ] || ( this._triangleBuffers[ i ] = [] );
-			triangles.length = 0;
 
 			// 前ステップで接地していた床（運搬・離脱慣性の判定に使う「1つ前の土台」）
 			const previousGroundBody = character.groundBody;
@@ -182,13 +237,20 @@ export class World {
 			sphere.center.set( 0, character.height / 2, 0 ).add( character.position );
 			sphere.radius = character.height / 2 + character.groundCheckDepth;
 
-			for ( let ii = 0, ll = this._staticBodies.length; ii < ll; ii ++ ) {
+			// 静的ぶんはフレーム先頭で引いたものを使い回す。このステップで必要な sphere が
+			// キャッシュの sphere に収まっていなければ（ジャンプ開始・速い運搬・テレポートなど）
+			// 引き直す。収まっていれば必要な葉ノードは必ず含まれている。
+			const cachedCenter = this._staticQueryCenters[ i ];
+			const isCacheValid = cachedCenter !== undefined &&
+				cachedCenter.distanceTo( sphere.center ) + sphere.radius <= this._staticQueryRadii[ i ];
 
-				this._staticBodies[ ii ].getSphereTriangles( sphere, triangles );
+			if ( ! isCacheValid ) this._queryStaticTriangles( character, i, stepDeltaTime * this._stepsPerFrame );
 
-			}
-
-			// 動的ボディの近傍三角形は現在位置でワールド座標へ変換して混ぜる（所有ボディ tag 付き）
+			// 静的ぶんだけ残して、動的ボディの近傍三角形を現在位置でワールド座標へ変換して混ぜる（所有ボディ tag 付き）
+			// 動的ボディが無ければ静的ぶんそのままなので、length 代入自体を避ける
+			// （V8 は length 代入で backing store を作り直すことがあり、毎ステップ確保になる）
+			const staticCount = this._staticTriangleCounts[ i ];
+			if ( triangles.length !== staticCount ) triangles.length = staticCount;
 			for ( let ii = 0, ll = this._kinematicBodies.length; ii < ll; ii ++ ) {
 
 				this._kinematicBodies[ ii ].getSphereTriangles( sphere, triangles );
@@ -238,6 +300,9 @@ export class World {
 		this._colliders.length = 0;
 		this._triangleBuffers.length = 0;
 		this._climbableBuffers.length = 0;
+		this._staticTriangleCounts.length = 0;
+		this._staticQueryCenters.length = 0;
+		this._staticQueryRadii.length = 0;
 
 	}
 
