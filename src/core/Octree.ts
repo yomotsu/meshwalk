@@ -14,10 +14,16 @@ import { intersectsLineTriangle } from "../math/intersectsLineTriangle";
 const _v1 = new Vector3();
 const _v2 = new Vector3();
 
-// get*Triangles の重複排除用のマーク。三角形は複数のサブツリーに属するため、1回のクエリで
-// 同じ三角形が何度も見つかる。クエリごとに ID を1つ進め、結果へ入れた三角形へその ID を
-// 書いておくことで、結果配列の線形探索（indexOf・O(n²)）を使わずに重複を弾く。
+// get*Triangles の重複排除用のマーク。三角形は複数のサブツリーに属するため、
+// 1回のクエリで同じ三角形が何度も見つかる。
+// クエリごとに ID を1つ進め、結果へ入れた三角形へその ID を書いておくことで、
+// 結果配列の線形探索（indexOf・O(n²)）を使わずに重複を弾く。
 let _queryId = 0;
+
+// lineIntersect / rayIntersect が使う一時バッファ（呼び出しごとに確保しない）。
+// 再帰・入れ子で使わないので1本で足りる。
+const _intersectTriangles: ComputedTriangle[] = [];
+const _bestPoint = new Vector3();
 // const _plane = new Plane();
 // const _line1 = new Line3();
 // const _line2 = new Line3();
@@ -267,8 +273,9 @@ export class Octree {
 
 	lineIntersect( line: Line3 ) {
 
-		const position = new Vector3();
-		const triangles: ComputedTriangle[] = [];
+		const triangles = _intersectTriangles;
+		triangles.length = 0;
+
 		let distanceSquared = Infinity;
 		let triangle: ComputedTriangle | null = null;
 
@@ -285,7 +292,7 @@ export class Octree {
 
 				if ( distanceSquared > newDistanceSquared ) {
 
-					position.copy( result );
+					_bestPoint.copy( result );
 					distanceSquared = newDistanceSquared;
 					triangle = triangles[ i ];
 
@@ -295,7 +302,8 @@ export class Octree {
 
 		}
 
-		return triangle ? { distance: Math.sqrt( distanceSquared ), triangle, position } : false;
+		// 交点は「もっとも近いものが確定してから」1つだけ確保する（候補ごとに clone しない）
+		return triangle ? { distance: Math.sqrt( distanceSquared ), triangle, position: _bestPoint.clone() } : false;
 
 	}
 
@@ -303,8 +311,10 @@ export class Octree {
 
 		if ( ray.direction.lengthSq() === 0 ) return;
 
-		const triangles: ComputedTriangle[] = [];
-		let triangle, position, distanceSquared = 1e100;
+		const triangles = _intersectTriangles;
+		triangles.length = 0;
+
+		let triangle, distanceSquared = 1e100;
 
 		this.getRayTriangles( ray, triangles );
 
@@ -318,7 +328,7 @@ export class Octree {
 
 				if ( distanceSquared > newDistanceSquared ) {
 
-					position = result.clone().add( ray.origin );
+					_bestPoint.copy( result ).add( ray.origin );
 					distanceSquared = newDistanceSquared;
 					triangle = triangles[ i ];
 
@@ -328,7 +338,8 @@ export class Octree {
 
 		}
 
-		return distanceSquared < 1e100 ? { distance: Math.sqrt( distanceSquared ), triangle, position } : false;
+		// 交点は「もっとも近いものが確定してから」1つだけ確保する（候補ごとに clone しない）
+		return distanceSquared < 1e100 ? { distance: Math.sqrt( distanceSquared ), triangle, position: _bestPoint.clone() } : false;
 
 	}
 
