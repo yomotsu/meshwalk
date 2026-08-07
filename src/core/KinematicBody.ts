@@ -189,8 +189,15 @@ export class KinematicBody extends Body {
 			world.b.copy( local.b ).applyMatrix4( this._matrix );
 			world.c.copy( local.c ).applyMatrix4( this._matrix );
 			world.normal.copy( local.normal ).applyQuaternion( this.quaternion ).normalize();
-			world.boundingSphere = undefined; // 利用側 (_collisionDetection) がワールド座標で再計算する
 			world.body = this;
+
+			// bounding sphere は剛体変換（並進＋回転）なので、ローカルのものを移すだけでよい。
+			// 半径は不変。毎フレーム三角形から作り直す（= Sphere の新規確保）のを避ける。
+			if ( ! local.boundingSphere ) local.computeBoundingSphere();
+
+			const boundingSphere = world.boundingSphere || ( world.boundingSphere = new Sphere() );
+			boundingSphere.center.copy( local.boundingSphere!.center ).applyMatrix4( this._matrix );
+			boundingSphere.radius = local.boundingSphere!.radius;
 
 			result.push( world );
 

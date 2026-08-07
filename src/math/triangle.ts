@@ -22,7 +22,8 @@ export class ComputedTriangle extends Triangle {
 
 	computeBoundingSphere() {
 
-		this.boundingSphere = makeTriangleBoundingSphere( this, this.normal );
+		// すでに Sphere を持っていれば書き込んで使い回す（毎フレーム計算される動くボディ用）
+		this.boundingSphere = makeTriangleBoundingSphere( this, this.normal, this.boundingSphere || new Sphere() );
 
 	}
 
@@ -112,9 +113,7 @@ const e0 = new Vector3();
 const e1 = new Vector3();
 const triangleNormal = new Vector3();
 
-function makeTriangleBoundingSphere( triangle: Triangle, normal: Vector3 ) {
-
-	const bs = new Sphere();
+function makeTriangleBoundingSphere( triangle: Triangle, normal: Vector3, bs: Sphere ) {
 
 	// obtuse triangle
 
@@ -175,7 +174,7 @@ function makeTriangleBoundingSphere( triangle: Triangle, normal: Vector3 ) {
 	// t = ( - a * c + b * e ) / div;
 	const s = ( - c * d + a * e ) / div;
 
-	bs.center = e0.clone().add( v0.clone().multiplyScalar( s ) );
+	bs.center.copy( e0 ).addScaledVector( v0, s );
 	bs.radius = v.subVectors( bs.center, triangle.a ).length();
 	return bs;
 
