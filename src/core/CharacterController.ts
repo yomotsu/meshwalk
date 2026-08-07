@@ -40,6 +40,21 @@ const attachPoint = new Vector3();
 
 const intersection = new Intersection();
 
+// 縦線（真下・真上へ伸ばす線分）と三角形の交差判定の前段フィルタ。
+// 三角形の bounding sphere の中心と縦線の xz 距離が半径より遠ければ、絶対に交差しない
+// （三角形上のどの点も中心から半径以内なので、交点があればその xz 距離は半径以下になる）。
+// bounding sphere を持たない三角形は判定できないので通す。
+function isFarFromVerticalLine( triangle: ComputedTriangle, x: number, z: number ): boolean {
+
+	const boundingSphere = triangle.boundingSphere;
+	if ( ! boundingSphere ) return false;
+
+	const dx = boundingSphere.center.x - x;
+	const dz = boundingSphere.center.z - z;
+	return dx * dx + dz * dz > boundingSphere.radius * boundingSphere.radius;
+
+}
+
 export interface CharacterControllerOptions {
 	radius: number;
 	height: number;
@@ -468,6 +483,8 @@ export class CharacterController extends Body<CharacterControllerEventType> {
 
 			// 壁・天井は接地処理では無視
 			if ( triangle.normal.y <= 0 ) continue;
+			// 真下への線分から xz が離れている三角形は交差しえない
+			if ( isFarFromVerticalLine( triangle, this.position.x, this.position.z ) ) continue;
 
 			const isIntersected = intersectsLineTriangle(
 				groundingHead,
@@ -586,6 +603,7 @@ export class CharacterController extends Body<CharacterControllerEventType> {
 
 			const triangle = triangles[ i ];
 			if ( triangle.normal.y <= walkableCos ) continue; // 歩ける面のみ
+			if ( isFarFromVerticalLine( triangle, px, pz ) ) continue;
 			if ( ! intersectsLineTriangle( stepProbeFrom, stepProbeTo, triangle.a, triangle.b, triangle.c, stepProbePoint ) ) continue;
 			if ( stepProbePoint.y > stepTop ) { stepTop = stepProbePoint.y; stepTriangle = triangle; }
 
@@ -601,6 +619,7 @@ export class CharacterController extends Body<CharacterControllerEventType> {
 		for ( let i = 0, l = triangles.length; i < l; i ++ ) {
 
 			const triangle = triangles[ i ];
+			if ( isFarFromVerticalLine( triangle, this.position.x, this.position.z ) ) continue;
 			if ( intersectsLineTriangle( headroomFrom, headroomTo, triangle.a, triangle.b, triangle.c, stepProbePoint ) ) { this._isStepping = false; return; }
 
 		}
