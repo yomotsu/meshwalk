@@ -55,6 +55,14 @@ function isFarFromVerticalLine( triangle: ComputedTriangle, x: number, z: number
 
 }
 
+// カプセルと三角形の接触1件。インスタンスは使い回すので、参照を外へ持ち出さない。
+interface Contact {
+	depth: number;
+	point: Vector3;
+	normal: Vector3;
+	triangle: ComputedTriangle;
+}
+
 export interface CharacterControllerOptions {
 	radius: number;
 	height: number;
@@ -104,12 +112,10 @@ export class CharacterController extends Body<CharacterControllerEventType> {
 	private _currentJumpPower = 0;
 	private _isStepping = false; // 段差登り中フラグ（壁接触が一時的に消えても登りを継続させるラッチ）
 	private _nearTriangles: ComputedTriangle[] = [];
-	private _contactInfo: {
-		depth: number;
-		point: Vector3;
-		normal: Vector3;
-		triangle: ComputedTriangle;
-	}[] = [];
+	// このステップの接触。配列は使い回し（毎ステップの確保を避ける）で、有効なのは
+	// 先頭 _contactCount 件だけ。それより後ろには前のステップの残骸が入っている。
+	private _contactInfo: Contact[] = [];
+	private _contactCount = 0;
 
 	private _moveVelocity = new Vector3();     // move() で設定する望む水平速度
 	private _climbInput = new Vector2();       // climb() で設定する登り入力（x=横, y=上）
@@ -343,7 +349,7 @@ export class CharacterController extends Body<CharacterControllerEventType> {
 		);
 
 		// 急勾配や自由落下など、自動で付与される速度の処理
-		if ( this._contactInfo.length === 0 && ! this.isJumping ) {
+		if ( this._contactCount === 0 && ! this.isJumping ) {
 
 			// 何とも衝突していないので、自由落下
 			return;
@@ -377,7 +383,7 @@ export class CharacterController extends Body<CharacterControllerEventType> {
 		// const frontAngle = Math.atan2( direction2D.y, direction2D.x );
 		const negativeFrontAngle = Math.atan2( - direction2D.y, - direction2D.x );
 
-		for ( let i = 0, l = this._contactInfo.length; i < l; i ++ ) {
+		for ( let i = 0, l = this._contactCount; i < l; i ++ ) {
 
 			const normal = this._contactInfo[ i ].triangle.normal;
 			// var distance = this._contactInfo[ i ].distance;
@@ -575,7 +581,7 @@ export class CharacterController extends Body<CharacterControllerEventType> {
 
 		// 進行方向を塞ぐ「壁」接触が（直前フレームに）あるか
 		let wallAhead = false;
-		for ( let i = 0, l = this._contactInfo.length; i < l; i ++ ) {
+		for ( let i = 0, l = this._contactCount; i < l; i ++ ) {
 
 			const n = this._contactInfo[ i ].triangle.normal;
 			if ( n.y > walkableCos ) continue;                          // 歩ける面は壁ではない
@@ -658,7 +664,7 @@ export class CharacterController extends Body<CharacterControllerEventType> {
 		// this._contactInfo に追加する
 
 		const triangles = this._nearTriangles;
-		this._contactInfo.length = 0;
+		this._contactCount = 0;
 
 		for ( let i = 0, l = triangles.length; i < l; i ++ ) {
 
@@ -675,12 +681,21 @@ export class CharacterController extends Body<CharacterControllerEventType> {
 
 			if ( ! isIntersected ) continue;
 
-			this._contactInfo.push( {
-				point: intersection.point.clone(),
-				normal: intersection.normal.clone(),
-				depth: intersection.depth,
-				triangle,
-			} );
+			// 接触は使い回しのインスタンスへ書き込む（毎ステップ生成すると数 KB/frame のゴミになる）
+			let contact = this._contactInfo[ this._contactCount ];
+
+			if ( ! contact ) {
+
+				contact = { point: new Vector3(), normal: new Vector3(), depth: 0, triangle };
+				this._contactInfo[ this._contactCount ] = contact;
+
+			}
+
+			contact.point.copy( intersection.point );
+			contact.normal.copy( intersection.normal );
+			contact.depth = intersection.depth;
+			contact.triangle = triangle;
+			this._contactCount ++;
 
 		}
 
@@ -692,7 +707,7 @@ export class CharacterController extends Body<CharacterControllerEventType> {
 		// 壁と衝突し食い込んでいる場合、
 		// ここで壁の外への押し出しをする
 
-		if ( this._contactInfo.length === 0 ) {
+		if ( this._contactCount === 0 ) {
 
 			// 何とも衝突していない。position はそのまま、向きだけ更新して終了
 			this._updateQuaternion();
@@ -704,7 +719,7 @@ export class CharacterController extends Body<CharacterControllerEventType> {
 		// 壁に食い込んでいる分だけ、法線方向に押し出す（デペネトレーション）。
 		// これを毎ステップ行うことで、斜め・側面から高速で進入しても壁を貫通しない。
 		translate.set( 0, 0, 0 );
-		for ( let i = 0, l = this._contactInfo.length; i < l; i ++ ) {
+		for ( let i = 0, l = this._contactCount; i < l; i ++ ) {
 
 			const contact = this._contactInfo[ i ];
 			const normal = contact.triangle.normal;
@@ -1049,6 +1064,7 @@ export class CharacterController extends Body<CharacterControllerEventType> {
 		this._nearTriangles.length = 0;
 		this._nearClimbables.length = 0;
 		this._contactInfo.length = 0;
+		this._contactCount = 0;
 
 	}
 
