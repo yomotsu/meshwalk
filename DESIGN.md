@@ -9,11 +9,12 @@ Rapier / cannon-es）および three.js の命名慣習に寄せるための設�
 
 ---
 
-## 0. 実装状況（2026-08-04 時点・master に反映済み）
+## 0. 実装状況（2026-08-07 時点・master に反映済み）
 
 | 区分 | 項目 |
 |---|---|
 | **実装済み** | `Body`/`StaticBody`/`CharacterController` 化・`World.add(body)` 一本化。`StaticBody.fromObject`/`addFromObject`/`addFromGeometry`・`matrixWorld` バグ修正。`Octree` 内部化。`move(vec)` 入力。`slopeLimit`（度）。レンダー分離（`position`/`quaternion` 公開・利用側で同期）。`world.update(dt)` 固定ステップ・アキュムレータ。ジャンプの脱 `performance.now`（deltaTime 化・決定論）。`dispose()` 全クラス。型付き `EventDispatcher`。入力 `keyCode`→`event.code`。改名 `KeyInputControl`→`KeyboardControls` / `TPSCameraControls`→`ThirdPersonCameraControls` / `AnimationController.motion`→`actions`。options コンストラクタ。`teleport(Vector3)`。`KeyboardControls.inputVector`（Vector2）。**`stepOffset`（段差自動登り・既定 0.3）＋ `groundCheckDepth` 既定 0.3（登り降り対称）**。**動く床 `KinematicBody`**（`deltaMatrix` 運搬・回転運搬・離脱慣性・`surfaceVelocity`／ベルトコンベア。デモ 9）。**梯子 `ClimbableBody`**（登り状態。§10。デモ `10_ladder.html`）。 |
+| **実装済み（性能）** | **パフォーマンス最適化 9 コミット**（§11）。`Octree` の重複排除を `_queryId` マーク化、静的 broad-phase をフレーム単位＋有効範囲キャッシュ、動く床の bounding sphere を剛体変換、縦レイの xz prefilter、接触・バッファのプール化、カメラのレイに `far`。`fixedUpdate` 約 0.30 → 約 0.046 ms/frame。 |
 | **ドロップ** | **物理モデル刷新（重力の「場」＋インパルスジャンプ＋`gravityScale`）**。§3 参照。現行のジャンプ／落下仕様を維持する判断。 |
 | **保留（未着手）** | 壁面フリークライム（`ClimbableBody` の `mode:'free'`＝Phase B。§10）。`AnimationController.turn()` の `Date.now`/rAF → deltaTime 化。瞬間イベント `landed`/`jumped`（現状は `startIdling/Walking/Jumping/Sliding/Falling` を維持）。壁歩き／惑星重力（L2）。README の API 節更新。 |
 
@@ -307,3 +308,90 @@ world.add( ladder );
 
 `mode:'free'`: 領域内の**壁三角形に貼り付き**、既存の壁 `_contactInfo` 法線で正対。**2D 移動**（上下＋横、
 `climb().x` を使用）、法線はトラバース中に変化、上端マントル・下端接地・ジャンプ離脱。梯子の状態機械を土台に拡張する。
+
+---
+
+## 11. パフォーマンス（as-built・2026-08-07）
+
+計測環境: 床 198×198（66分割・3m セル）＋ 2m 箱 81 個、近傍三角形 238、キャラが箱の間を歩き続ける
+シナリオを 5000 フレーム平均。ヘッドレス（vitest + node）。**`fixedUpdate` 約 0.30 ms → 約 0.046 ms/frame**。
+
+各変更は「ゴールデンテスト 43→46 件が緑」＋「同一シナリオの最終位置トレースがビット一致するか」で検証した。
+唯一の意図的な挙動差は 11.2 の superset 化（箱の林を 600 フレーム突っ切った終端で約 3cm ずれる）。
+
+### 11.1 `Octree` の重複排除（`_queryId` マーク）
+
+三角形は複数のサブツリーに登録されるので 1 クエリで何度も見つかる。従来は `result.indexOf()` で弾いており
+**近傍数に対して O(n²)**（238 個で約 3 万回の線形探索）で、これが物理ステップ全体の支配項だった。
+モジュールスコープの `_queryId` をクエリごとに 1 進め、結果へ入れた三角形に `triangle._queryId` を書く方式へ。
+`get*Triangles` の第3〜4引数 `isRoot` は「最上位呼び出しだけ ID を進める」ためにある（再帰は `false`）。
+走査順は不変なので**結果配列は要素も順序も完全に同一**（867 クエリで旧実装と照合）。0.308 → 0.166 ms/frame。
+
+### 11.2 静的 broad-phase をフレーム単位に（`World`）
+
+静的ボディは substep 間で動かないので、`fixedUpdate()` の先頭で 1 回だけ引いて 4 substep で使い回す。
+半径には 1 フレームで動きうる距離 `(|velocity| + 乗っている床の速度) × dt`（下限 `STATIC_QUERY_PADDING_MIN`）を足す。
+
+**重要な設計点**: 各 substep は「そのステップで必要な sphere がキャッシュの sphere に含まれるか」を確認し、
+外に出ていたら引き直す（`_staticQueryCenters` / `_staticQueryRadii`）。包含していれば必要な葉ノードは必ず
+キャッシュに入っているので、**padding は速度のためのチューニングであって正しさの条件ではない**
+（ジャンプ開始・高速な運搬・テレポートは自動で引き直しになる）。`KinematicBody` は精度を落とさないため
+**従来どおり substep ごとに**引き、バッファは「先頭＝静的ぶん（`_staticTriangleCounts`）／後ろ＝動的ぶん」。
+
+近傍集合が厳密集合の superset になるため、壁ずり・段差・ジャンプ・動く床（2 m/s・10 m/s）はビット一致だが、
+箱に当たって滑る挙動が積み重なるケースだけ数 cm ずれる。歩行 79.5 → 56.1 µs/frame。
+
+### 11.3 動く床の bounding sphere（`KinematicBody`）
+
+以前は world 三角形の `boundingSphere` を毎フレーム `undefined` にして利用側で作り直していた（＝近傍三角形
+ごとに `new Sphere` ＋ `clone()`×2）。ボディ変換は剛体なので**ローカルの中心を行列変換・半径そのまま**でよい。
+`computeBoundingSphere()` も既存の `Sphere` へ書き込む形に変更。板（12三角形）10.7 → 7.8 µs/frame、
+数百三角形の床 32.4 → 22.8、回転床 34.7 → 24.8。回転床・コンベアを含めトレースはビット一致。
+
+### 11.4 縦レイの xz prefilter（`CharacterController`）
+
+接地判定と `stepOffset` の 2 プローブは真下／真上への線分。`isFarFromVerticalLine()` で
+「三角形の bounding sphere 中心と縦線の xz 距離 > 半径」なら即スキップする（三角形上のどの点も中心から
+半径以内なので、交点があれば xz 距離は半径以下＝**偽陰性なし**）。近傍が多いほど効く（1m セルの床で -11%）。
+
+### 11.5 アロケーション（GC 圧）
+
+- `World.step` の broad-phase 結果配列はキャラごとに使い回す（`_triangleBuffers` / `_climbableBuffers`）。
+- 接触は `_contactInfo` を**プール**として使い、有効件数を `_contactCount` で持つ（読み側はこのカウントで
+  ループを回す）。旧実装は接触ごとに `{ point: clone(), normal: clone(), … }` を生成しており、壁に押し付けると
+  約 4 KB/frame のゴミになっていた（3.9 → 0.8 KB/frame）。
+- `Octree.lineIntersect` / `rayIntersect` はモジュールスコープの三角形バッファを共有し、交点は最近点が
+  確定してから 1 回だけ確保する（634 → 179 bytes/frame・カメラのレイ 4 本）。
+
+**V8 に関する知見（測って分かったこと）**:
+- 配列を `length = 0` してから `push` し直すと backing store が作り直されるため、プール化しても新規配列と
+  ほぼ同じ確保量になる（239 要素で約 380 B）。`arr[ n++ ] = x` で上書きして最後に `length = n` にすればほぼ 0。
+- 短命な一時配列（`[ a, b ]` を返して即捨てるなど）はエスケープ解析で消えているため、そこを削っても
+  **測定できる差は出ない**（`intersectsCapsuleTriangle` の一時配列撤去は refactor 扱いでコミット）。
+  実際に効くのは `_contactInfo` のように**参照が外へ逃げる**オブジェクト。
+
+### 11.6 カメラのレイに `far`（`Octree` / `ThirdPersonCameraControls`）
+
+本家 camera-controls の `_collisionTest()` は `raycaster.far = _spherical.radius + 1` を必ず設定しているが、
+meshwalk の Octree 版オーバーライドはこの上限が落ちていた。`rayIntersect( ray, far? )` /
+`getRayTriangles( ray, result, far?, isRoot? )` を追加し、原点からの 2 乗距離が `far` を超えるサブツリーを枝刈りする
+（三角形は交差する全葉ノードに登録されているので、`far` 以内の交点はその交点を含む葉＝`far` 以内の葉にも
+登録されており取りこぼさない）。`StaticBody` / `KinematicBody` は `far` を素通し（剛体変換で距離は不変）。
+
+効果はレベル形状に依存する。**平坦なレベル（現デモ相当）ではカメラのレイ 4 本で 16 µs/frame・枝刈りゼロ＝
+効果なし**。高さ 20m のビル群でカメラを 5m まで寄せた場合は 103 → 40 三角形・149.6 → 92.7 µs（-38%）。
+逆にカメラが 30m でレイ全体が `far` 以内だと枝刈りできず判定コストぶん約 +8%。物理経路は `far` 無指定
+（`Infinity`）で短絡するため影響なし。
+
+### 11.7 残アイデア
+
+- **近い順の octree 走査＋最初のヒットで打ち切り（G2）**: 現在の `rayIntersect` は「集める → 全部厳密判定」の
+  2 段。高さのあるレベルでカメラの衝突判定が 150 µs/frame かかる問題の本質的な解はこれ。現デモ規模
+  （16 µs/frame）では不要。
+- `Octree.get*Triangles` を `push` → `arr[ n++ ]` 方式へ（約 0.4 KB/frame。複数ボディの結果を 1 本の配列へ
+  足し込む構造なのでカウントの受け渡しが必要）。
+- `_slopeLimitCos` の `Math.cos` キャッシュ、`KinematicBody._updateMatrix()` の invert 重複（dirty フラグ）。
+  どちらも µs 未満なので測定できる差にならない見込み。
+- ロード時間・常駐メモリ: `_addGeometry` は三角形ごとに `new Vector3`×3 ＋ `extend()`（normalize/sqrt 6 回）
+  ＋ `Sphere`。大きい glTF ではロード時間に出る。本気でやるなら三角形を `Float32Array` のフラット配列に
+  持つデータ指向への作り替え（全面改造・別プロジェクト規模）。

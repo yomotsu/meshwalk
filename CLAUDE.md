@@ -21,9 +21,10 @@ three.js 用の TPS キャラクターコントローラ・ライブラリ（yom
 - デモは CRLF のものが混在（demo7 は LF）。node で書き換える時は**元の改行コードを保持**する。
 - `Date.now()`/`Math.random()`/`new Date()` はワークフロー用スクリプト内では使えない（別文脈）。通常コードは可。
 
-## 現状（2026-08-04）
-- ブランチ **`master`**。Phase 0–4 ＋ API 整形 ＋ 動く床（`KinematicBody`）＋ **梯子（`ClimbableBody`）** は master 反映済み。**ローカルで origin より先行（未 push）**。`git log`/`git status -sb` で確認。
-- テスト43件・全デモ（`1`–`10` ＋ recast の `20`/`21`）ロードエラーなし・tsc/lint/build 緑。
+## 現状（2026-08-07）
+- ブランチ **`master`**。Phase 0–4 ＋ API 整形 ＋ 動く床（`KinematicBody`）＋ **梯子（`ClimbableBody`）** ＋ **パフォーマンス最適化 9 コミット** は master 反映済み。**ローカルで origin より先行（未 push）**。`git log`/`git status -sb` で確認。
+- テスト46件・全デモ（`1`–`10` ＋ recast の `20`/`21`）ロードエラーなし・tsc/lint/build 緑。
+- **`dist` はこの最適化シリーズの分が未コミット**（src のみコミットする運用にした＝差分が大きくなるため）。デモは `dist/meshwalk.module.js` を読むのでローカルではビルド済み。どこかでまとめてコミットするか、`dist` を追跡から外すかは**未決**。コミット時は `git add -A` ではなくパス指定で入れる。
 - デモ番号: コア機能は `1`–`10`（`10_ladder.html`）。recast 系は将来の差し込み用に `20`/`21` へ繰り下げ済み（`10`–`19` は空き）。
 
 ### 実装済み（要点）
@@ -45,6 +46,18 @@ three.js 用の TPS キャラクターコントローラ・ライブラリ（yom
 - 改名: `KeyInputControl`→`KeyboardControls`、`TPSCameraControls`→`ThirdPersonCameraControls`、`AnimationController.motion`→`actions`。
 - `dispose()` 全クラス。型付き `EventDispatcher<TEventType>`（既定 string）。入力 `keyCode`→`event.code`。
 
+### パフォーマンス最適化（2026-08-07・詳細は `DESIGN.md §11`）
+`fixedUpdate` **約0.30 → 約0.046 ms/frame**（床198×198＋箱81個・近傍238三角形で歩行、5000フレーム平均）。
+各変更は「ゴールデンテスト緑」＋「同一シナリオの最終位置トレースがビット一致するか」で検証済み。
+- `Octree` の重複排除を `indexOf`（O(n²)）→ `triangle._queryId` マークへ。`get*Triangles` の `isRoot` 引数は「最上位呼び出しだけ ID を進める」ため。**支配項だった**（0.308→0.166 ms/frame）。
+- **静的 broad-phase はフレーム単位**（`World.fixedUpdate` 先頭で1回）。substep は「必要な sphere がキャッシュに含まれるか」で判定し、外れたら引き直す＝**padding は速度のためのもので正しさの条件ではない**。`KinematicBody` は従来どおり substep ごと。**唯一の意図的な挙動差**（近傍が superset になる／箱の林を600フレーム突っ切ると終端で約3cm ずれる）。
+- 動く床の `boundingSphere` は剛体変換でローカルから持ってくる（毎フレーム再計算をやめた・約30%短縮）。
+- 縦レイ（接地・段差プローブ）に bounding sphere の xz prefilter（偽陰性なし）。
+- ゴミ削減: broad-phase 結果配列の使い回し、接触の**プール化**（`_contactInfo` + `_contactCount`／3.9→0.8 KB/frame）、`Octree.rayIntersect` のバッファ共有。
+- カメラのレイに `far`（本家 camera-controls と同じ `_spherical.radius + 1`）。**平坦なレベルでは効果ゼロ**、高さのあるレベルでカメラが近いと -38%、逆に枝刈りできないと +8%。
+- **V8 の知見**: ①配列は `length = 0` → `push` だと backing store を作り直すので、`arr[n++]` ＋最後に `length = n` にしないとプール化の意味が薄い。②即捨てる一時配列はエスケープ解析で消えるので削っても差は出ない（効くのは参照が外に逃げるオブジェクト）。
+- 測り方の教訓: ベンチはキャラをレベル外へ歩き去らせない（周期的に `teleport` で戻す）、試行回数を稼ぐ、A/B は同一ハーネス・複数回。**カメラのレイは向きで桁が変わる**（下向き斜めは重く、実際の三人称カメラの上後方は軽い）。
+
 ### 物理の決定（重要）
 - **重力の「場」＋インパルスジャンプ＋`gravityScale` の刷新は検討の上ドロップ**。現行のジャンプ／落下（コサイン弧＋定数 `FALL_VELOCITY=-20`）を維持。
   - 理由: 単一重力では {メートル現実 9.8・現状の大ジャンプ高さ・現状の速い落下} を同時に満たせない（物理制約）。両立には非対称重力が要るが、ユーザーは現行の手触り維持を選択。
@@ -56,6 +69,7 @@ three.js 用の TPS キャラクターコントローラ・ライブラリ（yom
 - 瞬間イベント `landed`/`jumped`（現状 `start*` イベント維持）。梯子は `startClimbing`/`endClimbing` を既に持つ。
 - README の API 節を現行 API に更新（デモ一覧は更新済み・DESIGN.md は as-built）。
 - 壁歩き／惑星重力（L2＝コントローラを up ベクトル非依存に再設計）。
+- **G2: octree のレイ走査を「近い順＋最初のヒットで打ち切り」に**（現在は「集める→全部厳密判定」の2段）。高さのあるレベルでカメラの衝突判定が 150 µs/frame かかる問題の本質的な解。現デモ規模（16 µs/frame）では不要。`DESIGN.md §11.7`。
 
 ## 参考
 - 破棄した物理刷新の試作（Approach 1 等）は git tag `backup/w2b-attempt` に保全。
