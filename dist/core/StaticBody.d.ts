@@ -26,10 +26,10 @@ export declare class StaticBody extends Body {
      */
     addFromGeometry(geometry: BufferGeometry, matrix?: Matrix4): this;
     getSphereTriangles(sphere: Sphere, result: ComputedTriangle[]): ComputedTriangle[];
-    rayIntersect(ray: Ray): false | {
+    rayIntersect(ray: Ray, far?: number): false | {
         distance: number;
         triangle: ComputedTriangle | undefined;
-        position: Vector3 | undefined;
+        position: Vector3;
     } | undefined;
     dispose(): void;
     private _addGeometry;

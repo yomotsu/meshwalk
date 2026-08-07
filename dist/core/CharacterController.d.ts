@@ -39,6 +39,7 @@ export declare class CharacterController extends Body<CharacterControllerEventTy
     private _isStepping;
     private _nearTriangles;
     private _contactInfo;
+    private _contactCount;
     private _moveVelocity;
     private _climbInput;
     private _nearClimbables;

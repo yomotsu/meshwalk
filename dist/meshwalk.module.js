@@ -4,7 +4,7 @@
  * (c) 2017 @yomotsu
  * Released under the MIT License.
  */
-import { Vector3, Box3, Triangle, Sphere, Mesh, Matrix4, Ray, Quaternion, BoxGeometry, Plane, Line3, MathUtils, Vector2, AnimationMixer, Raycaster, Spherical, Vector4, Object3D } from 'three';
+import { Vector3, Box3, Triangle, Sphere, Mesh, Matrix4, Ray, Quaternion, BoxGeometry, Plane, MathUtils, Line3, Vector2, AnimationMixer, Raycaster, Spherical, Vector4, Object3D } from 'three';
 
 /**
  * イベント発行・購読の基底クラス。
@@ -231,6 +231,22 @@ function intersectsLineTriangle(p, q, a, b, c, hit) {
 
 const _v1$1 = new Vector3();
 const _v2$1 = new Vector3();
+// get*Triangles の重複排除用のマーク。三角形は複数のサブツリーに属するため、
+// 1回のクエリで同じ三角形が何度も見つかる。
+// クエリごとに ID を1つ進め、結果へ入れた三角形へその ID を書いておくことで、
+// 結果配列の線形探索（indexOf・O(n²)）を使わずに重複を弾く。
+let _queryId = 0;
+// lineIntersect / rayIntersect が使う一時バッファ（呼び出しごとに確保しない）。
+// 再帰・入れ子で使わないので1本で足りる。
+const _intersectTriangles = [];
+const _bestPoint = new Vector3();
+// 点から box までの最短距離の2乗（box の内側なら 0）。far による枝刈り用（sqrt を避ける）。
+function distanceSquaredToBox(box, point) {
+    const dx = Math.max(box.min.x - point.x, 0, point.x - box.max.x);
+    const dy = Math.max(box.min.y - point.y, 0, point.y - box.max.y);
+    const dz = Math.max(box.min.z - point.z, 0, point.z - box.max.z);
+    return dx * dx + dy * dy + dz * dz;
+}
 // const _plane = new Plane();
 // const _line1 = new Line3();
 // const _line2 = new Line3();
@@ -297,76 +313,105 @@ class Octree {
         this.split(0);
         return this;
     }
-    getLineTriangles(line, result) {
+    getLineTriangles(line, result, isRoot = true) {
+        if (isRoot)
+            _queryId++;
         for (let i = 0; i < this.subTrees.length; i++) {
             const subTree = this.subTrees[i];
             if (!intersectsLineBox(line, subTree.box))
                 continue;
             if (subTree.triangles.length > 0) {
                 for (let j = 0; j < subTree.triangles.length; j++) {
-                    if (result.indexOf(subTree.triangles[j]) === -1)
-                        result.push(subTree.triangles[j]);
+                    const triangle = subTree.triangles[j];
+                    if (triangle._queryId === _queryId)
+                        continue;
+                    triangle._queryId = _queryId;
+                    result.push(triangle);
                 }
             }
             else {
-                subTree.getLineTriangles(line, result);
+                subTree.getLineTriangles(line, result, false);
             }
         }
         return result;
     }
-    getRayTriangles(ray, result) {
+    /**
+     * far を渡すと、原点から far より遠いサブツリーを枝刈りする（カメラの衝突判定のように
+     * 「ある距離までに何かあるか」だけ知りたい場合に、レベル全体を辿らずに済む）。
+     * 三角形はそれが交差するすべての葉ノードに登録されているので、far 以内に交点があるなら
+     * その交点を含む葉ノード（＝原点から far 以内）にも必ず登録されている＝枝刈りしても取りこぼさない。
+     */
+    getRayTriangles(ray, result, far = Infinity, isRoot = true) {
+        if (isRoot)
+            _queryId++;
+        const farSquared = far === Infinity ? Infinity : far * far;
         for (let i = 0; i < this.subTrees.length; i++) {
             const subTree = this.subTrees[i];
             if (!ray.intersectsBox(subTree.box))
                 continue;
+            if (farSquared !== Infinity && distanceSquaredToBox(subTree.box, ray.origin) > farSquared)
+                continue;
             if (subTree.triangles.length > 0) {
                 for (let j = 0; j < subTree.triangles.length; j++) {
-                    if (result.indexOf(subTree.triangles[j]) === -1)
-                        result.push(subTree.triangles[j]);
+                    const triangle = subTree.triangles[j];
+                    if (triangle._queryId === _queryId)
+                        continue;
+                    triangle._queryId = _queryId;
+                    result.push(triangle);
                 }
             }
             else {
-                subTree.getRayTriangles(ray, result);
+                subTree.getRayTriangles(ray, result, far, false);
             }
         }
         return result;
     }
-    getSphereTriangles(sphere, result) {
+    getSphereTriangles(sphere, result, isRoot = true) {
+        if (isRoot)
+            _queryId++;
         for (let i = 0; i < this.subTrees.length; i++) {
             const subTree = this.subTrees[i];
             if (!sphere.intersectsBox(subTree.box))
                 continue;
             if (subTree.triangles.length > 0) {
                 for (let j = 0; j < subTree.triangles.length; j++) {
-                    if (result.indexOf(subTree.triangles[j]) === -1)
-                        result.push(subTree.triangles[j]);
+                    const triangle = subTree.triangles[j];
+                    if (triangle._queryId === _queryId)
+                        continue;
+                    triangle._queryId = _queryId;
+                    result.push(triangle);
                 }
             }
             else {
-                subTree.getSphereTriangles(sphere, result);
+                subTree.getSphereTriangles(sphere, result, false);
             }
         }
         return result;
     }
-    getCapsuleTriangles(capsule, result) {
+    getCapsuleTriangles(capsule, result, isRoot = true) {
+        if (isRoot)
+            _queryId++;
         for (let i = 0; i < this.subTrees.length; i++) {
             const subTree = this.subTrees[i];
             if (!capsule.intersectsBox(subTree.box))
                 continue;
             if (subTree.triangles.length > 0) {
                 for (let j = 0; j < subTree.triangles.length; j++) {
-                    if (result.indexOf(subTree.triangles[j]) === -1)
-                        result.push(subTree.triangles[j]);
+                    const triangle = subTree.triangles[j];
+                    if (triangle._queryId === _queryId)
+                        continue;
+                    triangle._queryId = _queryId;
+                    result.push(triangle);
                 }
             }
             else {
-                subTree.getCapsuleTriangles(capsule, result);
+                subTree.getCapsuleTriangles(capsule, result, false);
             }
         }
     }
     lineIntersect(line) {
-        const position = new Vector3();
-        const triangles = [];
+        const triangles = _intersectTriangles;
+        triangles.length = 0;
         let distanceSquared = Infinity;
         let triangle = null;
         this.getLineTriangles(line, triangles);
@@ -376,32 +421,41 @@ class Octree {
             if (isIntersected) {
                 const newDistanceSquared = line.start.distanceToSquared(result);
                 if (distanceSquared > newDistanceSquared) {
-                    position.copy(result);
+                    _bestPoint.copy(result);
                     distanceSquared = newDistanceSquared;
                     triangle = triangles[i];
                 }
             }
         }
-        return triangle ? { distance: Math.sqrt(distanceSquared), triangle, position } : false;
+        // 交点は「もっとも近いものが確定してから」1つだけ確保する（候補ごとに clone しない）
+        return triangle ? { distance: Math.sqrt(distanceSquared), triangle, position: _bestPoint.clone() } : false;
     }
-    rayIntersect(ray) {
+    /**
+     * far を渡すと、その距離より遠い交差は無視する（見つからなければ false）。
+     */
+    rayIntersect(ray, far = Infinity) {
         if (ray.direction.lengthSq() === 0)
             return;
-        const triangles = [];
-        let triangle, position, distanceSquared = 1e100;
-        this.getRayTriangles(ray, triangles);
+        const triangles = _intersectTriangles;
+        triangles.length = 0;
+        let triangle, distanceSquared = 1e100;
+        const farSquared = far === Infinity ? Infinity : far * far;
+        this.getRayTriangles(ray, triangles, far);
         for (let i = 0; i < triangles.length; i++) {
             const result = ray.intersectTriangle(triangles[i].a, triangles[i].b, triangles[i].c, true, _v1$1);
             if (result) {
                 const newDistanceSquared = result.sub(ray.origin).lengthSq();
+                if (newDistanceSquared > farSquared)
+                    continue;
                 if (distanceSquared > newDistanceSquared) {
-                    position = result.clone().add(ray.origin);
+                    _bestPoint.copy(result).add(ray.origin);
                     distanceSquared = newDistanceSquared;
                     triangle = triangles[i];
                 }
             }
         }
-        return distanceSquared < 1e100 ? { distance: Math.sqrt(distanceSquared), triangle, position } : false;
+        // 交点は「もっとも近いものが確定してから」1つだけ確保する（候補ごとに clone しない）
+        return distanceSquared < 1e100 ? { distance: Math.sqrt(distanceSquared), triangle, position: _bestPoint.clone() } : false;
     }
 }
 
@@ -411,10 +465,13 @@ class ComputedTriangle extends Triangle {
         super(a, b, c);
         // この三角形を所有する Body（動くボディの運搬判定に使う）。静的な焼き込み三角形は null。
         this.body = null;
+        // Octree のクエリ中に「すでに結果へ入れた」ことを示すマーク（重複排除用・Octree が管理する）
+        this._queryId = -1;
         this.normal = this.getNormal(new Vector3());
     }
     computeBoundingSphere() {
-        this.boundingSphere = makeTriangleBoundingSphere(this, this.normal);
+        // すでに Sphere を持っていれば書き込んで使い回す（毎フレーム計算される動くボディ用）
+        this.boundingSphere = makeTriangleBoundingSphere(this, this.normal, this.boundingSphere || new Sphere());
     }
     // https://math.stackexchange.com/questions/1397456/how-to-scale-a-triangle-such-that-the-distance-between-original-edges-and-new-ed
     // scale( amount: number ) {
@@ -472,8 +529,7 @@ const v1 = new Vector3();
 const e0 = new Vector3();
 const e1 = new Vector3();
 const triangleNormal = new Vector3();
-function makeTriangleBoundingSphere(triangle, normal) {
-    const bs = new Sphere();
+function makeTriangleBoundingSphere(triangle, normal, bs) {
     // obtuse triangle
     v0.subVectors(triangle.b, triangle.a);
     v1.subVectors(triangle.c, triangle.a);
@@ -512,7 +568,7 @@ function makeTriangleBoundingSphere(triangle, normal) {
     const div = -a * a + b * d;
     // t = ( - a * c + b * e ) / div;
     const s = (-c * d + a * e) / div;
-    bs.center = e0.clone().add(v0.clone().multiplyScalar(s));
+    bs.center.copy(e0).addScaledVector(v0, s);
     bs.radius = v.subVectors(bs.center, triangle.a).length();
     return bs;
 }
@@ -562,8 +618,8 @@ class StaticBody extends Body {
     getSphereTriangles(sphere, result) {
         return this._octree.getSphereTriangles(sphere, result);
     }
-    rayIntersect(ray) {
-        return this._octree.rayIntersect(ray);
+    rayIntersect(ray, far = Infinity) {
+        return this._octree.rayIntersect(ray, far);
     }
     dispose() {
         this._octree.triangles.length = 0;
@@ -733,8 +789,14 @@ class KinematicBody extends Body {
             world.b.copy(local.b).applyMatrix4(this._matrix);
             world.c.copy(local.c).applyMatrix4(this._matrix);
             world.normal.copy(local.normal).applyQuaternion(this.quaternion).normalize();
-            world.boundingSphere = undefined; // 利用側 (_collisionDetection) がワールド座標で再計算する
             world.body = this;
+            // bounding sphere は剛体変換（並進＋回転）なので、ローカルのものを移すだけでよい。
+            // 半径は不変。毎フレーム三角形から作り直す（= Sphere の新規確保）のを避ける。
+            if (!local.boundingSphere)
+                local.computeBoundingSphere();
+            const boundingSphere = world.boundingSphere || (world.boundingSphere = new Sphere());
+            boundingSphere.center.copy(local.boundingSphere.center).applyMatrix4(this._matrix);
+            boundingSphere.radius = local.boundingSphere.radius;
             result.push(world);
         }
         return result;
@@ -744,11 +806,12 @@ class KinematicBody extends Body {
      * レイをボディローカルへ移して Octree に問い合わせ、交点をワールドへ戻す。
      * 剛体変換（並進＋回転）なので距離は不変。
      */
-    rayIntersect(ray) {
+    rayIntersect(ray, far = Infinity) {
         this._updateMatrix(); // 現在の公開トランスフォームを反映
         _localRay.origin.copy(ray.origin).applyMatrix4(this._matrixInverse);
         _localRay.direction.copy(ray.direction).transformDirection(this._matrixInverse);
-        const result = this._octree.rayIntersect(_localRay);
+        // 剛体変換なので距離は不変。far はそのままローカル空間でも使える
+        const result = this._octree.rayIntersect(_localRay, far);
         if (!result)
             return result;
         if (result.position)
@@ -1074,8 +1137,6 @@ const sphere$1 = new Sphere();
 // 5.1.10
 const _v1 = new Vector3();
 const _plane = new Plane();
-const _line1 = new Line3();
-const _line2 = new Line3();
 const point1 = new Vector3();
 const point2 = new Vector3();
 function intersectsCapsuleTriangle(capsule, triangle, out) {
@@ -1109,29 +1170,25 @@ function intersectsCapsuleTriangle(capsule, triangle, out) {
         return true;
     }
     // 辺との接触: 中心線と三角形の各辺の最近点間距離が半径以下なら、辺で接している。
-    // もっとも深い（距離が最小の）辺を採用する。
+    // もっとも深い（距離が最小の）辺を採用する。3辺は展開して書く（一時配列を作らない）。
     const radiusSquared = capsule.radius * capsule.radius;
-    _line1.set(capsule.start, capsule.end);
-    const edges = [
-        [triangle.a, triangle.b],
-        [triangle.b, triangle.c],
-        [triangle.c, triangle.a],
-    ];
-    let found = false;
     let minDistanceSquared = Infinity;
-    for (let i = 0; i < edges.length; i++) {
-        _line2.set(edges[i][0], edges[i][1]);
-        nearestPointsOnLineSegments(_line1.start, _line1.end, _line2.start, _line2.end, point1, point2);
-        const distanceSquared = point1.distanceToSquared(point2);
-        if (distanceSquared < radiusSquared && distanceSquared < minDistanceSquared) {
-            minDistanceSquared = distanceSquared;
-            const distance = Math.sqrt(distanceSquared);
-            out.set(point1, _v1.subVectors(point1, point2).divideScalar(distance || 1), // 辺 → 中心線 の単位ベクトル
-            capsule.radius - distance);
-            found = true;
-        }
-    }
-    return found;
+    minDistanceSquared = testEdge(capsule, triangle.a, triangle.b, radiusSquared, minDistanceSquared, out);
+    minDistanceSquared = testEdge(capsule, triangle.b, triangle.c, radiusSquared, minDistanceSquared, out);
+    minDistanceSquared = testEdge(capsule, triangle.c, triangle.a, radiusSquared, minDistanceSquared, out);
+    return minDistanceSquared !== Infinity;
+}
+// カプセルの中心線と辺 (edgeStart, edgeEnd) の最近点間距離が半径以下で、
+// かつこれまでの最小より近ければ out を更新する。採用したら「その距離^2」を、しなければ渡された値を返す。
+function testEdge(capsule, edgeStart, edgeEnd, radiusSquared, minDistanceSquared, out) {
+    nearestPointsOnLineSegments(capsule.start, capsule.end, edgeStart, edgeEnd, point1, point2);
+    const distanceSquared = point1.distanceToSquared(point2);
+    if (distanceSquared >= radiusSquared || distanceSquared >= minDistanceSquared)
+        return minDistanceSquared;
+    const distance = Math.sqrt(distanceSquared);
+    out.set(point1, _v1.subVectors(point1, point2).divideScalar(distance || 1), // 辺 → 中心線 の単位ベクトル
+    capsule.radius - distance);
+    return distanceSquared;
 }
 // https://stackoverflow.com/a/67102941/1512272
 function nearestPointsOnLineSegments(a0, a1, b0, b1, out0, out1) {
@@ -1155,9 +1212,8 @@ function nearestPointsOnLineSegments(a0, a1, b0, b1, out0, out1) {
     }
     const S = MathUtils.clamp((t * uv + ru) / uu, 0, 1);
     const T = MathUtils.clamp((s * uv - rv) / vv, 0, 1);
-    const A = out0.addVectors(a0, u.multiplyScalar(S));
-    const B = out1.addVectors(b0, v.multiplyScalar(T));
-    return [A, B];
+    out0.addVectors(a0, u.multiplyScalar(S));
+    out1.addVectors(b0, v.multiplyScalar(T));
 }
 
 const vec3 = new Vector3();
@@ -1200,6 +1256,18 @@ const headroomTo = new Vector3();
 const capsule = new Capsule(new Vector3(), new Vector3(), 0);
 const attachPoint = new Vector3();
 const intersection = new Intersection();
+// 縦線（真下・真上へ伸ばす線分）と三角形の交差判定の前段フィルタ。
+// 三角形の bounding sphere の中心と縦線の xz 距離が半径より遠ければ、絶対に交差しない
+// （三角形上のどの点も中心から半径以内なので、交点があればその xz 距離は半径以下になる）。
+// bounding sphere を持たない三角形は判定できないので通す。
+function isFarFromVerticalLine(triangle, x, z) {
+    const boundingSphere = triangle.boundingSphere;
+    if (!boundingSphere)
+        return false;
+    const dx = boundingSphere.center.x - x;
+    const dz = boundingSphere.center.z - z;
+    return dx * dx + dz * dz > boundingSphere.radius * boundingSphere.radius;
+}
 class CharacterController extends Body {
     get _slopeLimitCos() {
         return Math.cos(this.slopeLimit * MathUtils.DEG2RAD);
@@ -1229,7 +1297,10 @@ class CharacterController extends Body {
         this._currentJumpPower = 0;
         this._isStepping = false; // 段差登り中フラグ（壁接触が一時的に消えても登りを継続させるラッチ）
         this._nearTriangles = [];
+        // このステップの接触。配列は使い回し（毎ステップの確保を避ける）で、有効なのは
+        // 先頭 _contactCount 件だけ。それより後ろには前のステップの残骸が入っている。
         this._contactInfo = [];
+        this._contactCount = 0;
         this._moveVelocity = new Vector3(); // move() で設定する望む水平速度
         this._climbInput = new Vector2(); // climb() で設定する登り入力（x=横, y=上）
         this._nearClimbables = []; // World が渡す近傍の登れる領域
@@ -1396,7 +1467,7 @@ class CharacterController extends Body {
         let isHittingCeiling = false;
         this.velocity.set(this.isLanding ? 0 : this._moveVelocity.x, FALL_VELOCITY, this.isLanding ? 0 : this._moveVelocity.z);
         // 急勾配や自由落下など、自動で付与される速度の処理
-        if (this._contactInfo.length === 0 && !this.isJumping) {
+        if (this._contactCount === 0 && !this.isJumping) {
             // 何とも衝突していないので、自由落下
             return;
         }
@@ -1419,7 +1490,7 @@ class CharacterController extends Body {
         direction2D.set(this.velocity.x, this.velocity.z);
         // const frontAngle = Math.atan2( direction2D.y, direction2D.x );
         const negativeFrontAngle = Math.atan2(-direction2D.y, -direction2D.x);
-        for (let i = 0, l = this._contactInfo.length; i < l; i++) {
+        for (let i = 0, l = this._contactCount; i < l; i++) {
             const normal = this._contactInfo[i].triangle.normal;
             // var distance = this._contactInfo[ i ].distance;
             if (this._slopeLimitCos < normal.y || this.isOnSlope) {
@@ -1483,6 +1554,9 @@ class CharacterController extends Body {
             const triangle = triangles[i];
             // 壁・天井は接地処理では無視
             if (triangle.normal.y <= 0)
+                continue;
+            // 真下への線分から xz が離れている三角形は交差しえない
+            if (isFarFromVerticalLine(triangle, this.position.x, this.position.z))
                 continue;
             const isIntersected = intersectsLineTriangle(groundingHead, groundingTo, triangle.a, triangle.b, triangle.c, groundContactPointTmp);
             if (!isIntersected)
@@ -1549,7 +1623,7 @@ class CharacterController extends Body {
         const walkableCos = this._slopeLimitCos;
         // 進行方向を塞ぐ「壁」接触が（直前フレームに）あるか
         let wallAhead = false;
-        for (let i = 0, l = this._contactInfo.length; i < l; i++) {
+        for (let i = 0, l = this._contactCount; i < l; i++) {
             const n = this._contactInfo[i].triangle.normal;
             if (n.y > walkableCos)
                 continue; // 歩ける面は壁ではない
@@ -1575,6 +1649,8 @@ class CharacterController extends Body {
             const triangle = triangles[i];
             if (triangle.normal.y <= walkableCos)
                 continue; // 歩ける面のみ
+            if (isFarFromVerticalLine(triangle, px, pz))
+                continue;
             if (!intersectsLineTriangle(stepProbeFrom, stepProbeTo, triangle.a, triangle.b, triangle.c, stepProbePoint))
                 continue;
             if (stepProbePoint.y > stepTop) {
@@ -1593,6 +1669,8 @@ class CharacterController extends Body {
         headroomTo.set(this.position.x, stepTop + this.height, this.position.z);
         for (let i = 0, l = triangles.length; i < l; i++) {
             const triangle = triangles[i];
+            if (isFarFromVerticalLine(triangle, this.position.x, this.position.z))
+                continue;
             if (intersectsLineTriangle(headroomFrom, headroomTo, triangle.a, triangle.b, triangle.c, stepProbePoint)) {
                 this._isStepping = false;
                 return;
@@ -1621,7 +1699,7 @@ class CharacterController extends Body {
         // 実際に交差している壁フェイスを抜き出して
         // this._contactInfo に追加する
         const triangles = this._nearTriangles;
-        this._contactInfo.length = 0;
+        this._contactCount = 0;
         for (let i = 0, l = triangles.length; i < l; i++) {
             const triangle = triangles[i];
             if (!triangle.boundingSphere)
@@ -1631,19 +1709,24 @@ class CharacterController extends Body {
             const isIntersected = intersectsCapsuleTriangle(capsule, triangle, intersection);
             if (!isIntersected)
                 continue;
-            this._contactInfo.push({
-                point: intersection.point.clone(),
-                normal: intersection.normal.clone(),
-                depth: intersection.depth,
-                triangle,
-            });
+            // 接触は使い回しのインスタンスへ書き込む（毎ステップ生成すると数 KB/frame のゴミになる）
+            let contact = this._contactInfo[this._contactCount];
+            if (!contact) {
+                contact = { point: new Vector3(), normal: new Vector3(), depth: 0, triangle };
+                this._contactInfo[this._contactCount] = contact;
+            }
+            contact.point.copy(intersection.point);
+            contact.normal.copy(intersection.normal);
+            contact.depth = intersection.depth;
+            contact.triangle = triangle;
+            this._contactCount++;
         }
     }
     _solvePosition() {
         // updatePosition() で position を動かした後
         // 壁と衝突し食い込んでいる場合、
         // ここで壁の外への押し出しをする
-        if (this._contactInfo.length === 0) {
+        if (this._contactCount === 0) {
             // 何とも衝突していない。position はそのまま、向きだけ更新して終了
             this._updateQuaternion();
             return;
@@ -1652,7 +1735,7 @@ class CharacterController extends Body {
         // 壁に食い込んでいる分だけ、法線方向に押し出す（デペネトレーション）。
         // これを毎ステップ行うことで、斜め・側面から高速で進入しても壁を貫通しない。
         translate.set(0, 0, 0);
-        for (let i = 0, l = this._contactInfo.length; i < l; i++) {
+        for (let i = 0, l = this._contactCount; i < l; i++) {
             const contact = this._contactInfo[i];
             const normal = contact.triangle.normal;
             if (this._slopeLimitCos < normal.y) {
@@ -1912,6 +1995,7 @@ class CharacterController extends Body {
         this._nearTriangles.length = 0;
         this._nearClimbables.length = 0;
         this._contactInfo.length = 0;
+        this._contactCount = 0;
     }
 }
 
@@ -1960,16 +2044,30 @@ class ClimbableBody extends Body {
 }
 
 const sphere = new Sphere();
+const _staticQuerySphere = new Sphere();
 const _leaveVelocity = new Vector3();
 // 巨大な deltaTime（タブ復帰・ブレークポイント復帰など）で追いつき処理が暴走
 // （spiral of death）しないよう、1回の update で進める固定ステップ数の上限。
 const MAX_CATCH_UP_FRAMES = 5;
+// 静的ジオメトリの broad-phase をフレーム先頭で1回だけ引くときに、1フレーム分の移動を
+// 包むために半径へ足す余裕の下限（m）。速度から算出した余裕がこれ未満ならこの値を使う。
+const STATIC_QUERY_PADDING_MIN = 0.1;
 class World {
     constructor({ fps = 60, stepsPerFrame = 4 } = {}) {
         this._staticBodies = [];
         this._kinematicBodies = [];
         this._characterControllers = [];
         this._climbableBodies = [];
+        // broad-phase 結果の使い回しバッファ（キャラごとに1本。毎ステップの配列確保を避ける）
+        // バッファの先頭 _staticTriangleCounts[ i ] 件は「フレーム先頭で引いた静的ジオメトリの
+        // 三角形」で、substep 間で使い回す。その後ろへ substep ごとに動的ボディぶんを足す。
+        this._triangleBuffers = [];
+        this._climbableBuffers = [];
+        this._staticTriangleCounts = [];
+        // 静的ぶんを引いたときの sphere（キャッシュの有効範囲）。substep の sphere がこの中に
+        // 収まっている限り、必要な葉ノードは必ずキャッシュに含まれているので引き直さなくてよい。
+        this._staticQueryCenters = [];
+        this._staticQueryRadii = [];
         // カメラのレイ衝突など「レイを当てる対象」。静的＋動的ボディ（キャラは含めない）。
         this._colliders = [];
         this._accumulatedTime = 0;
@@ -2050,9 +2148,39 @@ class World {
     fixedUpdate() {
         const deltaTime = 1 / this._fps;
         const stepDeltaTime = deltaTime / this._stepsPerFrame;
+        // 静的ジオメトリは substep 間で動かないので、broad-phase はフレーム先頭で1回だけ引く。
+        // 1フレーム分の移動を包む余裕を持たせておき、足りなかった substep だけ引き直す。
+        for (let i = 0, l = this._characterControllers.length; i < l; i++) {
+            this._queryStaticTriangles(this._characterControllers[i], i, deltaTime);
+        }
         for (let i = 0; i < this._stepsPerFrame; i++) {
             this.step(stepDeltaTime);
         }
+    }
+    /**
+     * キャラの近傍にある静的ジオメトリの三角形をバッファ先頭へ引き直す。
+     * 半径には「1フレームで動きうる距離」ぶんの余裕を足す（足りなければ step() が引き直す
+     * ので、この余裕は速度のためのチューニングであって正しさの条件ではない）。
+     */
+    _queryStaticTriangles(character, index, deltaTime) {
+        const triangles = this._triangleBuffers[index] || (this._triangleBuffers[index] = []);
+        const center = this._staticQueryCenters[index] || (this._staticQueryCenters[index] = new Vector3());
+        // 乗っている動く床の運搬ぶんも移動量に含める
+        const groundBody = character.groundBody;
+        const platformSpeed = groundBody instanceof KinematicBody
+            ? groundBody.velocity.length() + groundBody.surfaceVelocity.length()
+            : 0;
+        const padding = Math.max((character.velocity.length() + platformSpeed) * deltaTime, STATIC_QUERY_PADDING_MIN);
+        center.set(0, character.height / 2, 0).add(character.position);
+        const radius = character.height / 2 + character.groundCheckDepth + padding;
+        _staticQuerySphere.center.copy(center);
+        _staticQuerySphere.radius = radius;
+        triangles.length = 0;
+        for (let i = 0, l = this._staticBodies.length; i < l; i++) {
+            this._staticBodies[i].getSphereTriangles(_staticQuerySphere, triangles);
+        }
+        this._staticTriangleCounts[index] = triangles.length;
+        this._staticQueryRadii[index] = radius;
     }
     step(stepDeltaTime) {
         // キャラクターの broad-phase より前に動的ボディを進める（キャラが新位置の床を見るため）
@@ -2061,7 +2189,7 @@ class World {
         }
         for (let i = 0, l = this._characterControllers.length; i < l; i++) {
             const character = this._characterControllers[i];
-            const triangles = [];
+            const triangles = this._triangleBuffers[i] || (this._triangleBuffers[i] = []);
             // 前ステップで接地していた床（運搬・離脱慣性の判定に使う「1つ前の土台」）
             const previousGroundBody = character.groundBody;
             // 運搬: 前ステップで動く床に接地していたら、その床のこのステップの変換差分を
@@ -2080,16 +2208,27 @@ class World {
             // 近傍の三角形だけを character に渡して判定する
             sphere.center.set(0, character.height / 2, 0).add(character.position);
             sphere.radius = character.height / 2 + character.groundCheckDepth;
-            for (let ii = 0, ll = this._staticBodies.length; ii < ll; ii++) {
-                this._staticBodies[ii].getSphereTriangles(sphere, triangles);
-            }
-            // 動的ボディの近傍三角形は現在位置でワールド座標へ変換して混ぜる（所有ボディ tag 付き）
+            // 静的ぶんはフレーム先頭で引いたものを使い回す。このステップで必要な sphere が
+            // キャッシュの sphere に収まっていなければ（ジャンプ開始・速い運搬・テレポートなど）
+            // 引き直す。収まっていれば必要な葉ノードは必ず含まれている。
+            const cachedCenter = this._staticQueryCenters[i];
+            const isCacheValid = cachedCenter !== undefined &&
+                cachedCenter.distanceTo(sphere.center) + sphere.radius <= this._staticQueryRadii[i];
+            if (!isCacheValid)
+                this._queryStaticTriangles(character, i, stepDeltaTime * this._stepsPerFrame);
+            // 静的ぶんだけ残して、動的ボディの近傍三角形を現在位置でワールド座標へ変換して混ぜる（所有ボディ tag 付き）
+            // 動的ボディが無ければ静的ぶんそのままなので、length 代入自体を避ける
+            // （V8 は length 代入で backing store を作り直すことがあり、毎ステップ確保になる）
+            const staticCount = this._staticTriangleCounts[i];
+            if (triangles.length !== staticCount)
+                triangles.length = staticCount;
             for (let ii = 0, ll = this._kinematicBodies.length; ii < ll; ii++) {
                 this._kinematicBodies[ii].getSphereTriangles(sphere, triangles);
             }
             character.setNearTriangles(triangles);
             // 近傍の登れる領域（梯子・壁面）を渡す。broad-phase はキャラの sphere と box の交差。
-            const climbables = [];
+            const climbables = this._climbableBuffers[i] || (this._climbableBuffers[i] = []);
+            climbables.length = 0;
             for (let ii = 0, ll = this._climbableBodies.length; ii < ll; ii++) {
                 if (this._climbableBodies[ii].box.intersectsSphere(sphere))
                     climbables.push(this._climbableBodies[ii]);
@@ -2121,6 +2260,11 @@ class World {
         this._characterControllers.length = 0;
         this._climbableBodies.length = 0;
         this._colliders.length = 0;
+        this._triangleBuffers.length = 0;
+        this._climbableBuffers.length = 0;
+        this._staticTriangleCounts.length = 0;
+        this._staticQueryCenters.length = 0;
+        this._staticQueryRadii.length = 0;
     }
 }
 
@@ -5074,6 +5218,9 @@ class ThirdPersonCameraControls extends CameraControls {
         let distance = Infinity;
         if (!this.world)
             return distance;
+        // 本家 camera-controls の _collisionTest が raycaster.far に入れているのと同じ上限。
+        // これより遠い衝突は結果に影響しないので、Octree の探索を打ち切ってよい。
+        const far = this._spherical.radius + 1;
         for (let i = 0, l = this.world.colliders.length; i < l; i++) {
             const staticBody = this.world.colliders[i];
             const direction = _v3A.setFromSpherical(this._spherical).divideScalar(this._spherical.radius);
@@ -5083,7 +5230,7 @@ class ThirdPersonCameraControls extends CameraControls {
                 nearPlaneCorner.applyMatrix4(_rotationMatrix);
                 const origin = _v3C.addVectors(this._target, nearPlaneCorner);
                 _ray.set(origin, direction);
-                const intersect = staticBody.rayIntersect(_ray);
+                const intersect = staticBody.rayIntersect(_ray, far);
                 if (intersect && intersect.distance < distance) {
                     distance = intersect.distance;
                 }

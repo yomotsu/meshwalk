@@ -64,10 +64,10 @@ export declare class KinematicBody extends Body {
      * レイをボディローカルへ移して Octree に問い合わせ、交点をワールドへ戻す。
      * 剛体変換（並進＋回転）なので距離は不変。
      */
-    rayIntersect(ray: Ray): false | {
+    rayIntersect(ray: Ray, far?: number): false | {
         distance: number;
         triangle: ComputedTriangle | undefined;
-        position: Vector3 | undefined;
+        position: Vector3;
     } | undefined;
     dispose(): void;
     private _acquireWorldTriangle;

@@ -6,6 +6,11 @@ export declare class World {
     private _kinematicBodies;
     private _characterControllers;
     private _climbableBodies;
+    private _triangleBuffers;
+    private _climbableBuffers;
+    private _staticTriangleCounts;
+    private _staticQueryCenters;
+    private _staticQueryRadii;
     private _colliders;
     private _fps;
     private _stepsPerFrame;
@@ -28,6 +33,12 @@ export declare class World {
      */
     update(deltaTime: number): void;
     fixedUpdate(): void;
+    /**
+     * キャラの近傍にある静的ジオメトリの三角形をバッファ先頭へ引き直す。
+     * 半径には「1フレームで動きうる距離」ぶんの余裕を足す（足りなければ step() が引き直す
+     * ので、この余裕は速度のためのチューニングであって正しさの条件ではない）。
+     */
+    private _queryStaticTriangles;
     step(stepDeltaTime: number): void;
     dispose(): void;
 }
