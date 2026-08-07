@@ -1,4 +1,4 @@
-import { Vector3, Line3, Plane, Sphere, MathUtils } from 'three';
+import { Vector3, Plane, Sphere, MathUtils } from 'three';
 import { type Capsule } from 'three/examples/jsm/math/Capsule.js';
 import { type ComputedTriangle } from './triangle';
 
@@ -22,8 +22,6 @@ const sphere = new Sphere();
 
 const _v1 = new Vector3();
 const _plane = new Plane();
-const _line1 = new Line3();
-const _line2 = new Line3();
 
 const point1 = new Vector3();
 const point2 = new Vector3();
@@ -76,39 +74,35 @@ export function intersectsCapsuleTriangle( capsule: Capsule, triangle: ComputedT
 	}
 
 	// 辺との接触: 中心線と三角形の各辺の最近点間距離が半径以下なら、辺で接している。
-	// もっとも深い（距離が最小の）辺を採用する。
+	// もっとも深い（距離が最小の）辺を採用する。3辺は展開して書く（一時配列を作らない）。
 	const radiusSquared = capsule.radius * capsule.radius;
-	_line1.set( capsule.start, capsule.end );
-	const edges = [
-		[ triangle.a, triangle.b ],
-		[ triangle.b, triangle.c ],
-		[ triangle.c, triangle.a ],
-	];
 
-	let found = false;
 	let minDistanceSquared = Infinity;
-	for ( let i = 0; i < edges.length; i ++ ) {
+	minDistanceSquared = testEdge( capsule, triangle.a, triangle.b, radiusSquared, minDistanceSquared, out );
+	minDistanceSquared = testEdge( capsule, triangle.b, triangle.c, radiusSquared, minDistanceSquared, out );
+	minDistanceSquared = testEdge( capsule, triangle.c, triangle.a, radiusSquared, minDistanceSquared, out );
 
-		_line2.set( edges[ i ][ 0 ], edges[ i ][ 1 ] );
-		nearestPointsOnLineSegments( _line1.start, _line1.end, _line2.start, _line2.end, point1, point2 );
-		const distanceSquared = point1.distanceToSquared( point2 );
+	return minDistanceSquared !== Infinity;
 
-		if ( distanceSquared < radiusSquared && distanceSquared < minDistanceSquared ) {
+}
 
-			minDistanceSquared = distanceSquared;
-			const distance = Math.sqrt( distanceSquared );
-			out.set(
-				point1,
-				_v1.subVectors( point1, point2 ).divideScalar( distance || 1 ), // 辺 → 中心線 の単位ベクトル
-				capsule.radius - distance,
-			);
-			found = true;
+// カプセルの中心線と辺 (edgeStart, edgeEnd) の最近点間距離が半径以下で、
+// かつこれまでの最小より近ければ out を更新する。採用したら「その距離^2」を、しなければ渡された値を返す。
+function testEdge( capsule: Capsule, edgeStart: Vector3, edgeEnd: Vector3, radiusSquared: number, minDistanceSquared: number, out: Intersection ) {
 
-		}
+	nearestPointsOnLineSegments( capsule.start, capsule.end, edgeStart, edgeEnd, point1, point2 );
+	const distanceSquared = point1.distanceToSquared( point2 );
 
-	}
+	if ( distanceSquared >= radiusSquared || distanceSquared >= minDistanceSquared ) return minDistanceSquared;
 
-	return found;
+	const distance = Math.sqrt( distanceSquared );
+	out.set(
+		point1,
+		_v1.subVectors( point1, point2 ).divideScalar( distance || 1 ), // 辺 → 中心線 の単位ベクトル
+		capsule.radius - distance,
+	);
+
+	return distanceSquared;
 
 }
 
@@ -143,8 +137,7 @@ function nearestPointsOnLineSegments( a0: Vector3, a1: Vector3, b0: Vector3, b1:
 	const S = MathUtils.clamp( ( t * uv + ru ) / uu, 0, 1 );
 	const T = MathUtils.clamp( ( s * uv - rv ) / vv, 0, 1 );
 
-	const A = out0.addVectors( a0, u.multiplyScalar( S ) );
-	const B = out1.addVectors( b0, v.multiplyScalar( T ) );
-	return [ A, B ];
+	out0.addVectors( a0, u.multiplyScalar( S ) );
+	out1.addVectors( b0, v.multiplyScalar( T ) );
 
 }
