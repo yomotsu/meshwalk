@@ -212,14 +212,15 @@ export class KinematicBody extends Body {
 	 * レイをボディローカルへ移して Octree に問い合わせ、交点をワールドへ戻す。
 	 * 剛体変換（並進＋回転）なので距離は不変。
 	 */
-	rayIntersect( ray: Ray ) {
+	rayIntersect( ray: Ray, far = Infinity ) {
 
 		this._updateMatrix(); // 現在の公開トランスフォームを反映
 
 		_localRay.origin.copy( ray.origin ).applyMatrix4( this._matrixInverse );
 		_localRay.direction.copy( ray.direction ).transformDirection( this._matrixInverse );
 
-		const result = this._octree.rayIntersect( _localRay );
+		// 剛体変換なので距離は不変。far はそのままローカル空間でも使える
+		const result = this._octree.rayIntersect( _localRay, far );
 		if ( ! result ) return result;
 
 		if ( result.position ) result.position.applyMatrix4( this._matrix );

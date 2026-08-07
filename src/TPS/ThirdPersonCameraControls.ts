@@ -111,6 +111,10 @@ export class ThirdPersonCameraControls extends CameraControls {
 
 		if ( ! this.world ) return distance;
 
+		// 本家 camera-controls の _collisionTest が raycaster.far に入れているのと同じ上限。
+		// これより遠い衝突は結果に影響しないので、Octree の探索を打ち切ってよい。
+		const far = this._spherical.radius + 1;
+
 		for ( let i = 0, l = this.world.colliders.length; i < l; i ++ ) {
 
 			const staticBody = this.world.colliders[ i ];
@@ -125,7 +129,7 @@ export class ThirdPersonCameraControls extends CameraControls {
 				const origin = _v3C.addVectors( this._target, nearPlaneCorner );
 				_ray.set( origin, direction );
 
-				const intersect = staticBody.rayIntersect( _ray );
+				const intersect = staticBody.rayIntersect( _ray, far );
 
 				if ( intersect && intersect.distance < distance ) {
 

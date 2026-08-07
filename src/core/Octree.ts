@@ -24,6 +24,17 @@ let _queryId = 0;
 // 再帰・入れ子で使わないので1本で足りる。
 const _intersectTriangles: ComputedTriangle[] = [];
 const _bestPoint = new Vector3();
+
+// 点から box までの最短距離の2乗（box の内側なら 0）。far による枝刈り用（sqrt を避ける）。
+function distanceSquaredToBox( box: Box3, point: Vector3 ): number {
+
+	const dx = Math.max( box.min.x - point.x, 0, point.x - box.max.x );
+	const dy = Math.max( box.min.y - point.y, 0, point.y - box.max.y );
+	const dz = Math.max( box.min.z - point.z, 0, point.z - box.max.z );
+
+	return dx * dx + dy * dy + dz * dz;
+
+}
 // const _plane = new Plane();
 // const _line1 = new Line3();
 // const _line2 = new Line3();
@@ -172,14 +183,23 @@ export class Octree {
 
 	}
 
-	getRayTriangles( ray: Ray, result: ComputedTriangle[], isRoot = true ) {
+	/**
+	 * far を渡すと、原点から far より遠いサブツリーを枝刈りする（カメラの衝突判定のように
+	 * 「ある距離までに何かあるか」だけ知りたい場合に、レベル全体を辿らずに済む）。
+	 * 三角形はそれが交差するすべての葉ノードに登録されているので、far 以内に交点があるなら
+	 * その交点を含む葉ノード（＝原点から far 以内）にも必ず登録されている＝枝刈りしても取りこぼさない。
+	 */
+	getRayTriangles( ray: Ray, result: ComputedTriangle[], far = Infinity, isRoot = true ) {
 
 		if ( isRoot ) _queryId ++;
+
+		const farSquared = far === Infinity ? Infinity : far * far;
 
 		for ( let i = 0; i < this.subTrees.length; i ++ ) {
 
 			const subTree = this.subTrees[ i ];
 			if ( ! ray.intersectsBox( subTree.box ) ) continue;
+			if ( farSquared !== Infinity && distanceSquaredToBox( subTree.box, ray.origin ) > farSquared ) continue;
 
 			if ( subTree.triangles.length > 0 ) {
 
@@ -195,7 +215,7 @@ export class Octree {
 
 			} else {
 
-				subTree.getRayTriangles( ray, result, false );
+				subTree.getRayTriangles( ray, result, far, false );
 
 			}
 
@@ -307,7 +327,10 @@ export class Octree {
 
 	}
 
-	rayIntersect( ray: Ray ) {
+	/**
+	 * far を渡すと、その距離より遠い交差は無視する（見つからなければ false）。
+	 */
+	rayIntersect( ray: Ray, far = Infinity ) {
 
 		if ( ray.direction.lengthSq() === 0 ) return;
 
@@ -315,8 +338,9 @@ export class Octree {
 		triangles.length = 0;
 
 		let triangle, distanceSquared = 1e100;
+		const farSquared = far === Infinity ? Infinity : far * far;
 
-		this.getRayTriangles( ray, triangles );
+		this.getRayTriangles( ray, triangles, far );
 
 		for ( let i = 0; i < triangles.length; i ++ ) {
 
@@ -325,6 +349,8 @@ export class Octree {
 			if ( result ) {
 
 				const newDistanceSquared = result.sub( ray.origin ).lengthSq();
+
+				if ( newDistanceSquared > farSquared ) continue;
 
 				if ( distanceSquared > newDistanceSquared ) {
 

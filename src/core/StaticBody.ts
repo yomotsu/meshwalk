@@ -69,9 +69,9 @@ export class StaticBody extends Body {
 
 	}
 
-	rayIntersect( ray: Ray ) {
+	rayIntersect( ray: Ray, far = Infinity ) {
 
-		return this._octree.rayIntersect( ray );
+		return this._octree.rayIntersect( ray, far );
 
 	}
 
