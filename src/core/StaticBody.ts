@@ -61,6 +61,21 @@ export class StaticBody extends Body {
 
 	}
 
+	/**
+	 * Add a baked, world-space triangle mesh from flat position data without
+	 * creating a three.js BufferGeometry. Positions are xyz-packed; indices are
+	 * optional and use position indices. The input is already in world space.
+	 */
+	addTriangles( positions: ArrayLike<number>, indices?: ArrayLike<number> ): this {
+
+		this._validateTriangles( positions, indices );
+		this._addTriangles( positions, indices );
+		this._octree.build();
+
+		return this;
+
+	}
+
 	// --- 内部クエリ（World の broad-phase / カメラのレイ判定から使う） ---
 
 	getSphereTriangles( sphere: Sphere, result: ComputedTriangle[] ): ComputedTriangle[] {
@@ -120,6 +135,57 @@ export class StaticBody extends Body {
 
 			for ( let i = 0, l = position.count; i < l; i += 3 ) addTriangle( i, i + 1, i + 2 );
 
+		}
+
+	}
+
+	private _addTriangles( positions: ArrayLike<number>, indices: ArrayLike<number> | undefined ): void {
+
+		const triangleCount = indices === undefined ? positions.length / 9 : indices.length / 3;
+
+		for ( let triangle = 0; triangle < triangleCount; triangle ++ ) {
+
+			const base = triangle * 3;
+			const a = indices === undefined ? base : indices[ base ]!;
+			const b = indices === undefined ? base + 1 : indices[ base + 1 ]!;
+			const c = indices === undefined ? base + 2 : indices[ base + 2 ]!;
+
+			this._addTriangle( positions, a, b, c );
+
+		}
+
+	}
+
+	private _addTriangle(
+		positions: ArrayLike<number>, a: number, b: number, c: number,
+	): void {
+
+		const vA = new Vector3( positions[ a * 3 ]!, positions[ a * 3 + 1 ]!, positions[ a * 3 + 2 ]! );
+		const vB = new Vector3( positions[ b * 3 ]!, positions[ b * 3 + 1 ]!, positions[ b * 3 + 2 ]! );
+		const vC = new Vector3( positions[ c * 3 ]!, positions[ c * 3 + 1 ]!, positions[ c * 3 + 2 ]! );
+
+		const triangle = new ComputedTriangle( vA, vB, vC );
+		triangle.extend( 1e-10 );
+		triangle.computeBoundingSphere();
+		this._octree.addTriangle( triangle );
+
+	}
+
+	private _validateTriangles( positions: ArrayLike<number>, indices?: ArrayLike<number> ): void {
+
+		if ( positions.length % 3 !== 0 ) throw new Error( 'StaticBody: positions length must be a multiple of 3' );
+		if ( indices === undefined && positions.length % 9 !== 0 ) throw new Error( 'StaticBody: non-indexed positions length must be a multiple of 9' );
+		if ( indices !== undefined && indices.length % 3 !== 0 ) throw new Error( 'StaticBody: indices length must be a multiple of 3' );
+
+		const vertexCount = positions.length / 3;
+
+		if ( indices !== undefined ) {
+			for ( let i = 0; i < indices.length; i ++ ) {
+				const index = indices[ i]!;
+				if ( ! Number.isInteger( index ) || index < 0 || index >= vertexCount ) {
+					throw new Error( `StaticBody: index ${ index } is outside positions (${ vertexCount } vertices)` );
+				}
+			}
 		}
 
 	}
