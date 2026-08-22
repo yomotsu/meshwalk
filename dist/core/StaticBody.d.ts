@@ -1,5 +1,6 @@
 import { Object3D, Vector3, BufferGeometry, Matrix4, type Ray, type Sphere } from 'three';
 import { Body } from './Body';
+import { type SerializedOctree } from './Octree';
 import { ComputedTriangle } from '../math/triangle';
 /**
  * 静的な環境コライダー（動かないトライメッシュ）。
@@ -17,6 +18,7 @@ export declare class StaticBody extends Body {
      * Object3D（graph）から生成する。子孫の全 Mesh を辿って取り込む。
      */
     static fromObject(object: Object3D): StaticBody;
+    static fromOctreeData(data: SerializedOctree): StaticBody;
     /**
      * Object3D（graph）を辿り、含まれる全 Mesh の三角形をワールド座標で取り込む（加算）。
      */
@@ -31,6 +33,8 @@ export declare class StaticBody extends Body {
      * optional and use position indices. The input is already in world space.
      */
     addTriangles(positions: ArrayLike<number>, indices?: ArrayLike<number>): this;
+    toOctreeData(): SerializedOctree;
+    setOctreeData(data: SerializedOctree): this;
     getSphereTriangles(sphere: Sphere, result: ComputedTriangle[]): ComputedTriangle[];
     rayIntersect(ray: Ray, far?: number): false | {
         distance: number;

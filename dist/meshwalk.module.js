@@ -4,7 +4,7 @@
  * (c) 2017 @yomotsu
  * Released under the MIT License.
  */
-import { Vector3, Box3, Triangle, Sphere, Mesh, Matrix4, Ray, Quaternion, BoxGeometry, Plane, MathUtils, Line3, Vector2, AnimationMixer, Raycaster, Spherical, Vector4, Object3D } from 'three';
+import { Vector3, Triangle, Sphere, Box3, Mesh, Matrix4, Ray, Quaternion, BoxGeometry, Plane, MathUtils, Line3, Vector2, AnimationMixer, Raycaster, Spherical, Vector4, Object3D } from 'three';
 
 /**
  * イベント発行・購読の基底クラス。
@@ -89,6 +89,120 @@ class Body extends EventDispatcher$1 {
 }
 
 const vec3$4 = new Vector3();
+class ComputedTriangle extends Triangle {
+    constructor(a, b, c) {
+        super(a, b, c);
+        // この三角形を所有する Body（動くボディの運搬判定に使う）。静的な焼き込み三角形は null。
+        this.body = null;
+        // Octree のクエリ中に「すでに結果へ入れた」ことを示すマーク（重複排除用・Octree が管理する）
+        this._queryId = -1;
+        this.normal = this.getNormal(new Vector3());
+    }
+    computeBoundingSphere() {
+        // すでに Sphere を持っていれば書き込んで使い回す（毎フレーム計算される動くボディ用）
+        this.boundingSphere = makeTriangleBoundingSphere(this, this.normal, this.boundingSphere || new Sphere());
+    }
+    // https://math.stackexchange.com/questions/1397456/how-to-scale-a-triangle-such-that-the-distance-between-original-edges-and-new-ed
+    // scale( amount: number ) {
+    // 	const incenter = getIncenter( this, vec3 );
+    // 	this.a.sub( incenter ).multiplyScalar( amount ).add( incenter );
+    // 	this.b.sub( incenter ).multiplyScalar( amount ).add( incenter );
+    // 	this.c.sub( incenter ).multiplyScalar( amount ).add( incenter );
+    // 	拡張したら、過去の boundingSphere はすでに大きさが違うものとなる。破棄する。
+    // 	this.boundingSphere = undefined;
+    // }
+    extend(amount) {
+        const incenter = getIncenter(this, vec3$4);
+        const a = incenter.distanceTo(this.a);
+        const b = incenter.distanceTo(this.b);
+        const c = incenter.distanceTo(this.c);
+        this.a.sub(incenter).normalize().multiplyScalar(a + amount).add(incenter);
+        this.b.sub(incenter).normalize().multiplyScalar(b + amount).add(incenter);
+        this.c.sub(incenter).normalize().multiplyScalar(c + amount).add(incenter);
+        // 拡張したら、過去の boundingSphere はすでに大きさが違うものとなる。破棄する。
+        this.boundingSphere = undefined;
+    }
+}
+// aka Semiperimeter
+function getIncenter(triangle, out) {
+    // https://byjus.com/maths/incenter-of-a-triangle/
+    const a = triangle.a.distanceTo(triangle.b);
+    const b = triangle.b.distanceTo(triangle.c);
+    const c = triangle.c.distanceTo(triangle.a);
+    const p = a + b + c;
+    out.set((a * triangle.a.x + b * triangle.b.x + c * triangle.c.x) / p, (a * triangle.a.y + b * triangle.b.y + c * triangle.c.y) / p, (a * triangle.a.z + b * triangle.b.z + c * triangle.c.z) / p);
+    return out;
+}
+// const edge = new Line3();
+// function getInradius( triangle: Triangle ) {
+// 	const incenter = getIncenter( triangle, vec3 );
+// 	const closestPointToEdge = new Vector3();
+// 	edge.start = triangle.a;
+// 	edge.end = triangle.b;
+// 	edge.closestPointToPoint( incenter, true, closestPointToEdge );
+// 	return incenter.distanceTo( closestPointToEdge );
+// }
+// function makeTriangleBoundingBox( triangle: Triangle ) {
+// 	const bb = new Box3();
+// 	bb.min = bb.min.min( triangle.a );
+// 	bb.min = bb.min.min( triangle.b );
+// 	bb.min = bb.min.min( triangle.c );
+// 	bb.max = bb.max.max( triangle.a );
+// 	bb.max = bb.max.max( triangle.b );
+// 	bb.max = bb.max.max( triangle.c );
+// 	return bb;
+// }
+const v = new Vector3();
+const v0 = new Vector3();
+const v1 = new Vector3();
+const e0 = new Vector3();
+const e1 = new Vector3();
+const triangleNormal = new Vector3();
+function makeTriangleBoundingSphere(triangle, normal, bs) {
+    // obtuse triangle
+    v0.subVectors(triangle.b, triangle.a);
+    v1.subVectors(triangle.c, triangle.a);
+    if (v0.dot(v1) <= 0) {
+        bs.center.addVectors(triangle.b, triangle.c).divideScalar(2);
+        bs.radius = v.subVectors(triangle.b, triangle.c).length() / 2;
+        return bs;
+    }
+    v0.subVectors(triangle.a, triangle.b);
+    v1.subVectors(triangle.c, triangle.b);
+    if (v0.dot(v1) <= 0) {
+        bs.center.addVectors(triangle.a, triangle.c).divideScalar(2);
+        bs.radius = v.subVectors(triangle.a, triangle.c).length() / 2;
+        return bs;
+    }
+    v0.subVectors(triangle.a, triangle.c);
+    v1.subVectors(triangle.b, triangle.c);
+    if (v0.dot(v1) <= 0) {
+        bs.center.addVectors(triangle.a, triangle.b).divideScalar(2);
+        bs.radius = v.subVectors(triangle.a, triangle.b).length() / 2;
+        return bs;
+    }
+    // acute‐angled triangle
+    if (!normal) {
+        normal = triangle.getNormal(triangleNormal);
+    }
+    v0.crossVectors(v.subVectors(triangle.c, triangle.b), normal);
+    v1.crossVectors(v.subVectors(triangle.c, triangle.a), normal);
+    e0.addVectors(triangle.c, triangle.b).multiplyScalar(.5);
+    e1.addVectors(triangle.c, triangle.a).multiplyScalar(.5);
+    const a = v0.dot(v1);
+    const b = v0.dot(v0);
+    const d = v1.dot(v1);
+    const c = -v.subVectors(e1, e0).dot(v0);
+    const e = -v.subVectors(e1, e0).dot(v1);
+    const div = -a * a + b * d;
+    // t = ( - a * c + b * e ) / div;
+    const s = (-c * d + a * e) / div;
+    bs.center.copy(e0).addScaledVector(v0, s);
+    bs.radius = v.subVectors(bs.center, triangle.a).length();
+    return bs;
+}
+
+const vec3$3 = new Vector3();
 // https://3dkingdoms.com/weekly/weekly.php?a=3
 function intersectsLineBox(line, box, hit) {
     if (line.end.x < box.min.x && line.start.x < box.min.x)
@@ -108,7 +222,7 @@ function intersectsLineBox(line, box, hit) {
         line.start.z > box.min.z && line.start.z < box.max.z) {
         return true;
     }
-    const _hit = vec3$4;
+    const _hit = vec3$3;
     if ((getIntersection(line.start.x - box.min.x, line.end.x - box.min.x, line.start, line.end, _hit) && inBox(_hit, box, 1)) ||
         (getIntersection(line.start.y - box.min.y, line.end.y - box.min.y, line.start, line.end, _hit) && inBox(_hit, box, 2)) ||
         (getIntersection(line.start.z - box.min.z, line.end.z - box.min.z, line.start, line.end, _hit) && inBox(_hit, box, 3)) ||
@@ -125,9 +239,9 @@ function getIntersection(dst1, dst2, p1, p2, hit) {
     if (dst1 == dst2)
         return false;
     if (hit) {
-        vec3$4.subVectors(p2, p1);
-        vec3$4.multiplyScalar(-dst1 / (dst2 - dst1));
-        hit.addVectors(p1, vec3$4);
+        vec3$3.subVectors(p2, p1);
+        vec3$3.multiplyScalar(-dst1 / (dst2 - dst1));
+        hit.addVectors(p1, vec3$3);
     }
     return true;
 }
@@ -141,7 +255,7 @@ function inBox(hit, box, axis) {
     return false;
 }
 
-const vec3$3 = new Vector3();
+const vec3$2 = new Vector3();
 // // based on Real-Time Collision Detection Section 5.3.4
 // // p: <THREE.Vector3>, // line3.start
 // // q: <THREE.Vector3>, // line3.end
@@ -214,7 +328,7 @@ function intersectsLineTriangle(p, q, a, b, c, hit) {
     let v = ac$1.dot(e);
     if (v < 0 || v > d)
         return false;
-    let w = vec3$3.copy(ab$1).dot(e) * -1;
+    let w = vec3$2.copy(ab$1).dot(e) * -1;
     if (w < 0 || v + w > d)
         return false;
     const ood = 1 / d;
@@ -312,6 +426,91 @@ class Octree {
         this.calcBox();
         this.split(0);
         return this;
+    }
+    toData() {
+        const boxes = [];
+        const nodes = [];
+        const triangleRefs = [];
+        const trianglePositions = [];
+        const triangleNormals = [];
+        const triangleIds = new Map();
+        const addTriangle = (triangle) => {
+            const existing = triangleIds.get(triangle);
+            if (existing !== undefined)
+                return existing;
+            const id = triangleIds.size;
+            triangleIds.set(triangle, id);
+            trianglePositions.push(triangle.a.x, triangle.a.y, triangle.a.z, triangle.b.x, triangle.b.y, triangle.b.z, triangle.c.x, triangle.c.y, triangle.c.z);
+            triangleNormals.push(triangle.normal.x, triangle.normal.y, triangle.normal.z);
+            return id;
+        };
+        const visit = (node) => {
+            const nodeId = nodes.length / 4;
+            const triangleStart = triangleRefs.length;
+            boxes.push(node.box.min.x, node.box.min.y, node.box.min.z, node.box.max.x, node.box.max.y, node.box.max.z);
+            nodes.push(0, node.subTrees.length, triangleStart, node.triangles.length);
+            for (const triangle of node.triangles)
+                triangleRefs.push(addTriangle(triangle));
+            const childStart = nodes.length / 4;
+            nodes[nodeId * 4] = childStart;
+            for (const child of node.subTrees)
+                visit(child);
+        };
+        visit(this);
+        return {
+            boxes: new Float32Array(boxes),
+            nodes: new Uint32Array(nodes),
+            triangleRefs: new Uint32Array(triangleRefs),
+            triangles: new Float32Array(trianglePositions),
+            normals: new Float32Array(triangleNormals),
+        };
+    }
+    static fromData(data) {
+        if (data.boxes.length % 6 !== 0 || data.nodes.length % 4 !== 0) {
+            throw new Error('Octree.fromData: invalid node buffer lengths');
+        }
+        if (data.triangles.length % 9 !== 0 || data.normals.length % 3 !== 0
+            || data.triangles.length / 3 !== data.normals.length) {
+            throw new Error('Octree.fromData: invalid triangle buffer lengths');
+        }
+        const nodeCount = data.nodes.length / 4;
+        if (data.boxes.length / 6 !== nodeCount)
+            throw new Error('Octree.fromData: node/box count differs');
+        const triangles = new Array(data.triangles.length / 9);
+        for (let i = 0; i < triangles.length; i++) {
+            const p = i * 9;
+            const n = i * 3;
+            const triangle = new ComputedTriangle(new Vector3(data.triangles[p], data.triangles[p + 1], data.triangles[p + 2]), new Vector3(data.triangles[p + 3], data.triangles[p + 4], data.triangles[p + 5]), new Vector3(data.triangles[p + 6], data.triangles[p + 7], data.triangles[p + 8]));
+            triangle.normal.set(data.normals[n], data.normals[n + 1], data.normals[n + 2]);
+            triangle.computeBoundingSphere();
+            triangles[i] = triangle;
+        }
+        const create = (nodeId) => {
+            if (nodeId < 0 || nodeId >= nodeCount)
+                throw new Error('Octree.fromData: invalid child node index');
+            const b = nodeId * 6;
+            const node = new Octree(new Box3(new Vector3(data.boxes[b], data.boxes[b + 1], data.boxes[b + 2]), new Vector3(data.boxes[b + 3], data.boxes[b + 4], data.boxes[b + 5])));
+            node.bounds.copy(node.box);
+            const m = nodeId * 4;
+            const childStart = data.nodes[m];
+            const childCount = data.nodes[m + 1];
+            const triangleStart = data.nodes[m + 2];
+            const triangleCount = data.nodes[m + 3];
+            if (triangleStart + triangleCount > data.triangleRefs.length)
+                throw new Error('Octree.fromData: invalid triangle range');
+            for (let i = 0; i < triangleCount; i++) {
+                const triangleId = data.triangleRefs[triangleStart + i];
+                if (triangleId === undefined || triangleId >= triangles.length)
+                    throw new Error('Octree.fromData: invalid triangle reference');
+                node.triangles.push(triangles[triangleId]);
+            }
+            if (childStart + childCount > nodeCount)
+                throw new Error('Octree.fromData: invalid child range');
+            for (let i = 0; i < childCount; i++)
+                node.subTrees.push(create(childStart + i));
+            return node;
+        };
+        return create(0);
     }
     getLineTriangles(line, result, isRoot = true) {
         if (isRoot)
@@ -459,120 +658,6 @@ class Octree {
     }
 }
 
-const vec3$2 = new Vector3();
-class ComputedTriangle extends Triangle {
-    constructor(a, b, c) {
-        super(a, b, c);
-        // この三角形を所有する Body（動くボディの運搬判定に使う）。静的な焼き込み三角形は null。
-        this.body = null;
-        // Octree のクエリ中に「すでに結果へ入れた」ことを示すマーク（重複排除用・Octree が管理する）
-        this._queryId = -1;
-        this.normal = this.getNormal(new Vector3());
-    }
-    computeBoundingSphere() {
-        // すでに Sphere を持っていれば書き込んで使い回す（毎フレーム計算される動くボディ用）
-        this.boundingSphere = makeTriangleBoundingSphere(this, this.normal, this.boundingSphere || new Sphere());
-    }
-    // https://math.stackexchange.com/questions/1397456/how-to-scale-a-triangle-such-that-the-distance-between-original-edges-and-new-ed
-    // scale( amount: number ) {
-    // 	const incenter = getIncenter( this, vec3 );
-    // 	this.a.sub( incenter ).multiplyScalar( amount ).add( incenter );
-    // 	this.b.sub( incenter ).multiplyScalar( amount ).add( incenter );
-    // 	this.c.sub( incenter ).multiplyScalar( amount ).add( incenter );
-    // 	拡張したら、過去の boundingSphere はすでに大きさが違うものとなる。破棄する。
-    // 	this.boundingSphere = undefined;
-    // }
-    extend(amount) {
-        const incenter = getIncenter(this, vec3$2);
-        const a = incenter.distanceTo(this.a);
-        const b = incenter.distanceTo(this.b);
-        const c = incenter.distanceTo(this.c);
-        this.a.sub(incenter).normalize().multiplyScalar(a + amount).add(incenter);
-        this.b.sub(incenter).normalize().multiplyScalar(b + amount).add(incenter);
-        this.c.sub(incenter).normalize().multiplyScalar(c + amount).add(incenter);
-        // 拡張したら、過去の boundingSphere はすでに大きさが違うものとなる。破棄する。
-        this.boundingSphere = undefined;
-    }
-}
-// aka Semiperimeter
-function getIncenter(triangle, out) {
-    // https://byjus.com/maths/incenter-of-a-triangle/
-    const a = triangle.a.distanceTo(triangle.b);
-    const b = triangle.b.distanceTo(triangle.c);
-    const c = triangle.c.distanceTo(triangle.a);
-    const p = a + b + c;
-    out.set((a * triangle.a.x + b * triangle.b.x + c * triangle.c.x) / p, (a * triangle.a.y + b * triangle.b.y + c * triangle.c.y) / p, (a * triangle.a.z + b * triangle.b.z + c * triangle.c.z) / p);
-    return out;
-}
-// const edge = new Line3();
-// function getInradius( triangle: Triangle ) {
-// 	const incenter = getIncenter( triangle, vec3 );
-// 	const closestPointToEdge = new Vector3();
-// 	edge.start = triangle.a;
-// 	edge.end = triangle.b;
-// 	edge.closestPointToPoint( incenter, true, closestPointToEdge );
-// 	return incenter.distanceTo( closestPointToEdge );
-// }
-// function makeTriangleBoundingBox( triangle: Triangle ) {
-// 	const bb = new Box3();
-// 	bb.min = bb.min.min( triangle.a );
-// 	bb.min = bb.min.min( triangle.b );
-// 	bb.min = bb.min.min( triangle.c );
-// 	bb.max = bb.max.max( triangle.a );
-// 	bb.max = bb.max.max( triangle.b );
-// 	bb.max = bb.max.max( triangle.c );
-// 	return bb;
-// }
-const v = new Vector3();
-const v0 = new Vector3();
-const v1 = new Vector3();
-const e0 = new Vector3();
-const e1 = new Vector3();
-const triangleNormal = new Vector3();
-function makeTriangleBoundingSphere(triangle, normal, bs) {
-    // obtuse triangle
-    v0.subVectors(triangle.b, triangle.a);
-    v1.subVectors(triangle.c, triangle.a);
-    if (v0.dot(v1) <= 0) {
-        bs.center.addVectors(triangle.b, triangle.c).divideScalar(2);
-        bs.radius = v.subVectors(triangle.b, triangle.c).length() / 2;
-        return bs;
-    }
-    v0.subVectors(triangle.a, triangle.b);
-    v1.subVectors(triangle.c, triangle.b);
-    if (v0.dot(v1) <= 0) {
-        bs.center.addVectors(triangle.a, triangle.c).divideScalar(2);
-        bs.radius = v.subVectors(triangle.a, triangle.c).length() / 2;
-        return bs;
-    }
-    v0.subVectors(triangle.a, triangle.c);
-    v1.subVectors(triangle.b, triangle.c);
-    if (v0.dot(v1) <= 0) {
-        bs.center.addVectors(triangle.a, triangle.b).divideScalar(2);
-        bs.radius = v.subVectors(triangle.a, triangle.b).length() / 2;
-        return bs;
-    }
-    // acute‐angled triangle
-    if (!normal) {
-        normal = triangle.getNormal(triangleNormal);
-    }
-    v0.crossVectors(v.subVectors(triangle.c, triangle.b), normal);
-    v1.crossVectors(v.subVectors(triangle.c, triangle.a), normal);
-    e0.addVectors(triangle.c, triangle.b).multiplyScalar(.5);
-    e1.addVectors(triangle.c, triangle.a).multiplyScalar(.5);
-    const a = v0.dot(v1);
-    const b = v0.dot(v0);
-    const d = v1.dot(v1);
-    const c = -v.subVectors(e1, e0).dot(v0);
-    const e = -v.subVectors(e1, e0).dot(v1);
-    const div = -a * a + b * d;
-    // t = ( - a * c + b * e ) / div;
-    const s = (-c * d + a * e) / div;
-    bs.center.copy(e0).addScaledVector(v0, s);
-    bs.radius = v.subVectors(bs.center, triangle.a).length();
-    return bs;
-}
-
 /**
  * 静的な環境コライダー（動かないトライメッシュ）。
  * three.js の Object3D / BufferGeometry を「形状のソース」として取り込み、
@@ -593,6 +678,9 @@ class StaticBody extends Body {
      */
     static fromObject(object) {
         return new StaticBody().addFromObject(object);
+    }
+    static fromOctreeData(data) {
+        return new StaticBody().setOctreeData(data);
     }
     /**
      * Object3D（graph）を辿り、含まれる全 Mesh の三角形をワールド座標で取り込む（加算）。
@@ -623,6 +711,13 @@ class StaticBody extends Body {
         this._validateTriangles(positions, indices);
         this._addTriangles(positions, indices);
         this._octree.build();
+        return this;
+    }
+    toOctreeData() {
+        return this._octree.toData();
+    }
+    setOctreeData(data) {
+        this._octree = Octree.fromData(data);
         return this;
     }
     // --- 内部クエリ（World の broad-phase / カメラのレイ判定から使う） ---
