@@ -25,6 +25,12 @@ export declare class StaticBody extends Body {
      * BufferGeometry を直接取り込む（事前マージ済みジオメトリ向け・任意で変換行列を適用）。
      */
     addFromGeometry(geometry: BufferGeometry, matrix?: Matrix4): this;
+    /**
+     * Add a baked, world-space triangle mesh from flat position data without
+     * creating a three.js BufferGeometry. Positions are xyz-packed; indices are
+     * optional and use position indices. The input is already in world space.
+     */
+    addTriangles(positions: ArrayLike<number>, indices?: ArrayLike<number>): this;
     getSphereTriangles(sphere: Sphere, result: ComputedTriangle[]): ComputedTriangle[];
     rayIntersect(ray: Ray, far?: number): false | {
         distance: number;
@@ -33,4 +39,7 @@ export declare class StaticBody extends Body {
     } | undefined;
     dispose(): void;
     private _addGeometry;
+    private _addTriangles;
+    private _addTriangle;
+    private _validateTriangles;
 }
