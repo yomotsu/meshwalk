@@ -1524,4 +1524,16 @@ describe( 'StaticBody triangle buffers', () => {
 
 	} );
 
+	it( '構築済みoctreeをシリアライズしてhydrateできる', () => {
+
+		const source = new StaticBody().addTriangles( positions, indices );
+		const data = source.toOctreeData();
+		const body = StaticBody.fromOctreeData( data );
+		const triangles = body.getSphereTriangles( new Sphere( new Vector3( 0, 0, 0 ), 1 ), [] );
+
+		expect( triangles ).toHaveLength( 2 );
+		expect( data.triangleRefs ).toBeInstanceOf( Uint32Array );
+
+	} );
+
 } );

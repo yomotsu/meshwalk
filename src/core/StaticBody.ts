@@ -8,7 +8,7 @@ import {
 	type Sphere,
 } from 'three';
 import { Body } from './Body';
-import { Octree } from './Octree';
+import { Octree, type SerializedOctree } from './Octree';
 import { ComputedTriangle } from '../math/triangle';
 
 /**
@@ -31,6 +31,12 @@ export class StaticBody extends Body {
 	static fromObject( object: Object3D ): StaticBody {
 
 		return new StaticBody().addFromObject( object );
+
+	}
+
+	static fromOctreeData( data: SerializedOctree ): StaticBody {
+
+		return new StaticBody().setOctreeData( data );
 
 	}
 
@@ -72,6 +78,19 @@ export class StaticBody extends Body {
 		this._addTriangles( positions, indices );
 		this._octree.build();
 
+		return this;
+
+	}
+
+	toOctreeData(): SerializedOctree {
+
+		return this._octree.toData();
+
+	}
+
+	setOctreeData( data: SerializedOctree ): this {
+
+		this._octree = Octree.fromData( data );
 		return this;
 
 	}

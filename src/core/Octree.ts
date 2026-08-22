@@ -25,6 +25,21 @@ let _queryId = 0;
 const _intersectTriangles: ComputedTriangle[] = [];
 const _bestPoint = new Vector3();
 
+/**
+ * Transferable representation of a built static octree.
+ *
+ * `nodes` stores childStart, childCount, triangleStart and triangleCount per
+ * node. `boxes` stores min.xyz and max.xyz per node. Triangle references are
+ * stored in each node's triangle range and point into `triangles`/`normals`.
+ */
+export interface SerializedOctree {
+	boxes: Float32Array;
+	nodes: Uint32Array;
+	triangleRefs: Uint32Array;
+	triangles: Float32Array;
+	normals: Float32Array;
+}
+
 // 点から box までの最短距離の2乗（box の内側なら 0）。far による枝刈り用（sqrt を避ける）。
 function distanceSquaredToBox( box: Box3, point: Vector3 ): number {
 
@@ -147,6 +162,132 @@ export class Octree {
 		this.split( 0 );
 
 		return this;
+
+	}
+
+	toData(): SerializedOctree {
+
+		const boxes: number[] = [];
+		const nodes: number[] = [];
+		const triangleRefs: number[] = [];
+		const trianglePositions: number[] = [];
+		const triangleNormals: number[] = [];
+		const triangleIds = new Map<ComputedTriangle, number>();
+
+		const addTriangle = ( triangle: ComputedTriangle ): number => {
+
+			const existing = triangleIds.get( triangle );
+
+			if ( existing !== undefined ) return existing;
+
+			const id = triangleIds.size;
+			triangleIds.set( triangle, id );
+
+			trianglePositions.push(
+				triangle.a.x, triangle.a.y, triangle.a.z,
+				triangle.b.x, triangle.b.y, triangle.b.z,
+				triangle.c.x, triangle.c.y, triangle.c.z,
+			);
+			triangleNormals.push( triangle.normal.x, triangle.normal.y, triangle.normal.z );
+
+			return id;
+
+		};
+
+		const visit = ( node: Octree ): void => {
+
+			const nodeId = nodes.length / 4;
+			const triangleStart = triangleRefs.length;
+
+			boxes.push(
+				node.box.min.x, node.box.min.y, node.box.min.z,
+				node.box.max.x, node.box.max.y, node.box.max.z,
+			);
+			nodes.push( 0, node.subTrees.length, triangleStart, node.triangles.length );
+
+			for ( const triangle of node.triangles ) triangleRefs.push( addTriangle( triangle ) );
+
+			const childStart = nodes.length / 4;
+			nodes[ nodeId * 4 ] = childStart;
+
+			for ( const child of node.subTrees ) visit( child );
+
+		};
+
+		visit( this );
+
+		return {
+			boxes: new Float32Array( boxes ),
+			nodes: new Uint32Array( nodes ),
+			triangleRefs: new Uint32Array( triangleRefs ),
+			triangles: new Float32Array( trianglePositions ),
+			normals: new Float32Array( triangleNormals ),
+		};
+
+	}
+
+	static fromData( data: SerializedOctree ): Octree {
+
+		if ( data.boxes.length % 6 !== 0 || data.nodes.length % 4 !== 0 ) {
+			throw new Error( 'Octree.fromData: invalid node buffer lengths' );
+		}
+		if ( data.triangles.length % 9 !== 0 || data.normals.length % 3 !== 0
+			|| data.triangles.length / 3 !== data.normals.length ) {
+			throw new Error( 'Octree.fromData: invalid triangle buffer lengths' );
+		}
+
+		const nodeCount = data.nodes.length / 4;
+		if ( data.boxes.length / 6 !== nodeCount ) throw new Error( 'Octree.fromData: node/box count differs' );
+
+		const triangles = new Array<ComputedTriangle>( data.triangles.length / 9 );
+
+		for ( let i = 0; i < triangles.length; i ++ ) {
+
+			const p = i * 9;
+			const n = i * 3;
+			const triangle = new ComputedTriangle(
+				new Vector3( data.triangles[ p ]!, data.triangles[ p + 1 ]!, data.triangles[ p + 2 ]! ),
+				new Vector3( data.triangles[ p + 3 ]!, data.triangles[ p + 4 ]!, data.triangles[ p + 5 ]! ),
+				new Vector3( data.triangles[ p + 6 ]!, data.triangles[ p + 7 ]!, data.triangles[ p + 8 ]! ),
+			);
+			triangle.normal.set( data.normals[ n ]!, data.normals[ n + 1 ]!, data.normals[ n + 2 ]! );
+			triangle.computeBoundingSphere();
+			triangles[ i ] = triangle;
+
+		}
+
+		const create = ( nodeId: number ): Octree => {
+
+			if ( nodeId < 0 || nodeId >= nodeCount ) throw new Error( 'Octree.fromData: invalid child node index' );
+
+			const b = nodeId * 6;
+			const node = new Octree( new Box3(
+				new Vector3( data.boxes[ b ]!, data.boxes[ b + 1 ]!, data.boxes[ b + 2 ]! ),
+				new Vector3( data.boxes[ b + 3 ]!, data.boxes[ b + 4 ]!, data.boxes[ b + 5 ]! ),
+			) );
+			node.bounds.copy( node.box );
+
+			const m = nodeId * 4;
+			const childStart = data.nodes[ m ]!;
+			const childCount = data.nodes[ m + 1 ]!;
+			const triangleStart = data.nodes[ m + 2 ]!;
+			const triangleCount = data.nodes[ m + 3 ]!;
+
+			if ( triangleStart + triangleCount > data.triangleRefs.length ) throw new Error( 'Octree.fromData: invalid triangle range' );
+			for ( let i = 0; i < triangleCount; i ++ ) {
+				const triangleId = data.triangleRefs[ triangleStart + i ];
+				if ( triangleId === undefined || triangleId >= triangles.length ) throw new Error( 'Octree.fromData: invalid triangle reference' );
+				node.triangles.push( triangles[ triangleId ]! );
+			}
+
+			if ( childStart + childCount > nodeCount ) throw new Error( 'Octree.fromData: invalid child range' );
+			for ( let i = 0; i < childCount; i ++ ) node.subTrees.push( create( childStart + i ) );
+
+			return node;
+
+		};
+
+		return create( 0 );
 
 	}
 
