@@ -1536,4 +1536,39 @@ describe( 'StaticBody triangle buffers', () => {
 
 	} );
 
+	it( '大きな地形の子ノード境界でもhydrate後に三角形を検索できる', () => {
+
+		const n = 16;
+		const side = n + 1;
+		const positions = new Float32Array( side * side * 3 );
+		const indices: number[] = [];
+
+		for ( let row = 0; row < side; row ++ ) {
+			for ( let col = 0; col < side; col ++ ) {
+				const i = ( row * side + col ) * 3;
+				positions[ i ] = col * 4;
+				positions[ i + 1 ] = 0;
+				positions[ i + 2 ] = row * 4;
+			}
+		}
+
+		for ( let row = 0; row < n; row ++ ) {
+			for ( let col = 0; col < n; col ++ ) {
+				const a = row * side + col;
+				const b = a + 1;
+				const c = a + side;
+				const d = c + 1;
+				indices.push( a, d, b, a, c, d );
+			}
+		}
+
+		const source = new StaticBody().addTriangles( positions, new Uint32Array( indices ) );
+		const hydrated = StaticBody.fromOctreeData( source.toOctreeData() );
+		const sphere = new Sphere( new Vector3( 12, 0, 0.1 ), 2 );
+
+		expect( source.getSphereTriangles( sphere, [] ).length ).toBeGreaterThan( 0 );
+		expect( hydrated.getSphereTriangles( sphere, [] ).length ).toBeGreaterThan( 0 );
+
+	} );
+
 } );
