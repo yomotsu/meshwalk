@@ -444,19 +444,21 @@ class Octree {
             triangleNormals.push(triangle.normal.x, triangle.normal.y, triangle.normal.z);
             return id;
         };
-        const visit = (node) => {
-            const nodeId = nodes.length / 4;
+        // Store nodes breadth-first. fromData() treats childStart..childStart+childCount
+        // as a contiguous range; preorder traversal would put a child's descendants
+        // between its siblings and make hydration attach the wrong subtrees.
+        const queue = [this];
+        for (let nodeId = 0; nodeId < queue.length; nodeId++) {
+            const node = queue[nodeId];
             const triangleStart = triangleRefs.length;
+            const childStart = queue.length;
             boxes.push(node.box.min.x, node.box.min.y, node.box.min.z, node.box.max.x, node.box.max.y, node.box.max.z);
-            nodes.push(0, node.subTrees.length, triangleStart, node.triangles.length);
+            nodes.push(childStart, node.subTrees.length, triangleStart, node.triangles.length);
             for (const triangle of node.triangles)
                 triangleRefs.push(addTriangle(triangle));
-            const childStart = nodes.length / 4;
-            nodes[nodeId * 4] = childStart;
             for (const child of node.subTrees)
-                visit(child);
-        };
-        visit(this);
+                queue.push(child);
+        }
         return {
             boxes: new Float32Array(boxes),
             nodes: new Uint32Array(nodes),
