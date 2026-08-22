@@ -94,6 +94,7 @@ The static environment collider: a triangle mesh that never moves, baked into an
 | `StaticBody.fromObject( object3D )` | Create from an `Object3D`, walking its descendants and taking every `Mesh` in world space. |
 | `addFromObject( object3D )` | Same, additive. |
 | `addFromGeometry( geometry, matrix? )` | Take a `BufferGeometry` directly, optionally transformed. |
+| `addTriangles( positions, indices? )` | Take already baked world-space flat xyz positions and optional triangle indices directly. |
 | `dispose()` | Drop the baked triangles. |
 
 Geometry is snapshotted at the time it is added, so moving the source `Object3D` afterwards does

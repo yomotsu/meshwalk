@@ -1495,3 +1495,33 @@ describe( 'StaticBody quantized geometry (KHR_mesh_quantization)', () => {
 	} );
 
 } );
+
+describe( 'StaticBody triangle buffers', () => {
+
+	const positions = new Float32Array( [
+		- 10, 0, - 10,
+		  10, 0, - 10,
+		  10, 0,   10,
+		- 10, 0,   10,
+	] );
+	const indices = new Uint32Array( [ 0, 2, 1, 0, 3, 2 ] );
+
+	it( 'TypedArray の三角形を直接取り込む', () => {
+
+		const bakedPositions = positions.slice();
+		for ( let i = 0; i < bakedPositions.length; i += 3 ) {
+			bakedPositions[ i ]! += 5;
+			bakedPositions[ i + 1 ]! += 2;
+			bakedPositions[ i + 2 ]! += 7;
+		}
+
+		const body = new StaticBody().addTriangles( bakedPositions, indices );
+		const triangles = body.getSphereTriangles( new Sphere( new Vector3( 5, 2, 7 ), 1 ), [] );
+
+		expect( triangles ).toHaveLength( 2 );
+		expect( triangles[ 0 ]!.normal.y ).toBeGreaterThan( 0.99 );
+		expect( triangles[ 0 ]!.a.x ).toBeGreaterThanOrEqual( - 6 );
+
+	} );
+
+} );
