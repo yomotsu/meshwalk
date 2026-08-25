@@ -32,7 +32,7 @@ const _yAxis = new Vector3( 0, 1, 0 );
 const STEP_EPS = 1e-4;
 // 段差登りの発動しきい値。望んだ移動量のうち、これ未満しか進めていなければ
 // 「行く手を阻まれている」とみなす。
-const STEP_BLOCKED_RATIO = 0.25;
+const STEP_BLOCKED_RATIO = 0.3;
 const stepStartPosition = new Vector3();
 const stepProbeFrom = new Vector3();
 const stepProbeTo = new Vector3();
@@ -116,6 +116,9 @@ export class CharacterController extends Body<CharacterControllerEventType> {
 	private _currentJumpPower = 0;
 	private _isStepping = false; // 段差登り中フラグ（壁接触が一時的に消えても登りを継続させるラッチ）
 	private _lastMoveDelta = new Vector3(); // 直前ステップで実際に動けた量（段差登りの発動条件に使う）
+	// 積分に使う速度。velocity は壁ずりの射影後（＝利用側へ見せる実速度）だが、位置を進める
+	// ときは射影前を使い、壁への押し付けを保ったまま押し出しに滑りを任せる。
+	private _integrationVelocity = new Vector3();
 	private _nearTriangles: ComputedTriangle[] = [];
 	// このステップの接触。配列は使い回し（毎ステップの確保を避ける）で、有効なのは
 	// 先頭 _contactCount 件だけ。それより後ろには前のステップの残骸が入っている。
@@ -362,6 +365,7 @@ export class CharacterController extends Body<CharacterControllerEventType> {
 		if ( this._contactCount === 0 && ! this.isJumping ) {
 
 			// 何とも衝突していないので、自由落下
+			this._integrationVelocity.copy( this.velocity );
 			return;
 
 		} else if ( this.isGrounded && ! this.isOnSlope && ! this.isJumping ) {
@@ -386,6 +390,11 @@ export class CharacterController extends Body<CharacterControllerEventType> {
 
 		}
 
+
+		// 位置を進めるのは射影「前」の速度。射影後の速度で進めると壁を押し続けなくなり、
+		// 起伏のある面では接触を取りこぼして「全速で突っ込む／射影されて減速する」を
+		// 交互に繰り返す。押し付けたままにして、滑りは押し出し（_solvePosition）に任せる。
+		this._integrationVelocity.copy( this.velocity );
 
 		// 壁に向かった場合、壁方向の速度を0にする処理
 		// vs walls and sliding on the wall
@@ -447,6 +456,8 @@ export class CharacterController extends Body<CharacterControllerEventType> {
 
 		}
 
+		this._integrationVelocity.y = this.velocity.y;
+
 		// 動床から引き継いだ慣性（drift）: 接地したらクリア、空中では水平に加算し続ける
 		if ( this.isGrounded ) {
 
@@ -456,6 +467,8 @@ export class CharacterController extends Body<CharacterControllerEventType> {
 
 			this.velocity.x += this._externalVelocity.x;
 			this.velocity.z += this._externalVelocity.z;
+			this._integrationVelocity.x += this._externalVelocity.x;
+			this._integrationVelocity.z += this._externalVelocity.z;
 
 		}
 
@@ -667,10 +680,11 @@ export class CharacterController extends Body<CharacterControllerEventType> {
 		// position の座標を進める
 		// 壁との衝突判定はこのこの後のステップで行うのでここではやらない
 		// もし isGrounded 状態なら、強制的に y の値を地面に合わせる
+		const integrationVelocity = this._integrationVelocity;
 		this.position.set(
-			this.position.x + this.velocity.x * deltaTime,
-			this.isGrounded ? this.groundHeight : this.position.y + this.velocity.y * deltaTime,
-			this.position.z + this.velocity.z * deltaTime,
+			this.position.x + integrationVelocity.x * deltaTime,
+			this.isGrounded ? this.groundHeight : this.position.y + integrationVelocity.y * deltaTime,
+			this.position.z + integrationVelocity.z * deltaTime,
 		);
 
 	}
@@ -1082,6 +1096,7 @@ export class CharacterController extends Body<CharacterControllerEventType> {
 		this._fallElapsed = 0;
 		this._isStepping = false;
 		this._lastMoveDelta.set( 0, 0, 0 ); // 転送前の移動量を段差判定へ持ち越さない
+		this._integrationVelocity.set( 0, 0, 0 );
 		this.isRunning = this._moveVelocity.lengthSq() > 1e-8;
 
 	}
