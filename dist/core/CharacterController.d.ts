@@ -37,6 +37,8 @@ export declare class CharacterController extends Body<CharacterControllerEventTy
     groundBody: Body | null;
     private _currentJumpPower;
     private _isStepping;
+    private _lastMoveDelta;
+    private _integrationVelocity;
     private _nearTriangles;
     private _contactInfo;
     private _contactCount;
@@ -82,8 +84,8 @@ export declare class CharacterController extends Body<CharacterControllerEventTy
     rotateFacing(deltaAngle: number): void;
     update(deltaTime: number): void;
     _updateVelocity(): void;
-    _checkGround(): void;
-    _stepLookAhead(): void;
+    _checkGround(deltaTime: number): void;
+    _stepLookAhead(deltaTime: number): void;
     _updatePosition(deltaTime: number): void;
     _collisionDetection(): void;
     _solvePosition(): void;

@@ -88,7 +88,7 @@ class Body extends EventDispatcher$1 {
     dispose() { }
 }
 
-const vec3$4 = new Vector3();
+const vec3$3 = new Vector3();
 class ComputedTriangle extends Triangle {
     constructor(a, b, c) {
         super(a, b, c);
@@ -112,7 +112,7 @@ class ComputedTriangle extends Triangle {
     // 	this.boundingSphere = undefined;
     // }
     extend(amount) {
-        const incenter = getIncenter(this, vec3$4);
+        const incenter = getIncenter(this, vec3$3);
         const a = incenter.distanceTo(this.a);
         const b = incenter.distanceTo(this.b);
         const c = incenter.distanceTo(this.c);
@@ -202,7 +202,7 @@ function makeTriangleBoundingSphere(triangle, normal, bs) {
     return bs;
 }
 
-const vec3$3 = new Vector3();
+const vec3$2 = new Vector3();
 // https://3dkingdoms.com/weekly/weekly.php?a=3
 function intersectsLineBox(line, box, hit) {
     if (line.end.x < box.min.x && line.start.x < box.min.x)
@@ -222,7 +222,7 @@ function intersectsLineBox(line, box, hit) {
         line.start.z > box.min.z && line.start.z < box.max.z) {
         return true;
     }
-    const _hit = vec3$3;
+    const _hit = vec3$2;
     if ((getIntersection(line.start.x - box.min.x, line.end.x - box.min.x, line.start, line.end, _hit) && inBox(_hit, box, 1)) ||
         (getIntersection(line.start.y - box.min.y, line.end.y - box.min.y, line.start, line.end, _hit) && inBox(_hit, box, 2)) ||
         (getIntersection(line.start.z - box.min.z, line.end.z - box.min.z, line.start, line.end, _hit) && inBox(_hit, box, 3)) ||
@@ -239,9 +239,9 @@ function getIntersection(dst1, dst2, p1, p2, hit) {
     if (dst1 == dst2)
         return false;
     if (hit) {
-        vec3$3.subVectors(p2, p1);
-        vec3$3.multiplyScalar(-dst1 / (dst2 - dst1));
-        hit.addVectors(p1, vec3$3);
+        vec3$2.subVectors(p2, p1);
+        vec3$2.multiplyScalar(-dst1 / (dst2 - dst1));
+        hit.addVectors(p1, vec3$2);
     }
     return true;
 }
@@ -255,7 +255,7 @@ function inBox(hit, box, axis) {
     return false;
 }
 
-const vec3$2 = new Vector3();
+const vec3$1 = new Vector3();
 // // based on Real-Time Collision Detection Section 5.3.4
 // // p: <THREE.Vector3>, // line3.start
 // // q: <THREE.Vector3>, // line3.end
@@ -328,7 +328,7 @@ function intersectsLineTriangle(p, q, a, b, c, hit) {
     let v = ac$1.dot(e);
     if (v < 0 || v > d)
         return false;
-    let w = vec3$2.copy(ab$1).dot(e) * -1;
+    let w = vec3$1.copy(ab$1).dot(e) * -1;
     if (w < 0 || v + w > d)
         return false;
     const ood = 1 / d;
@@ -343,7 +343,7 @@ function intersectsLineTriangle(p, q, a, b, c, hit) {
     return true;
 }
 
-const _v1$1 = new Vector3();
+const _v1 = new Vector3();
 const _v2$1 = new Vector3();
 // get*Triangles の重複排除用のマーク。三角形は複数のサブツリーに属するため、
 // 1回のクエリで同じ三角形が何度も見つかる。
@@ -397,7 +397,7 @@ class Octree {
             for (let y = 0; y < 2; y++) {
                 for (let z = 0; z < 2; z++) {
                     const box = new Box3();
-                    const v = _v1$1.set(x, y, z);
+                    const v = _v1.set(x, y, z);
                     box.min.copy(this.box.min).add(v.multiply(halfSize));
                     box.max.copy(box.min).add(halfSize);
                     subTrees.push(new Octree(box));
@@ -617,7 +617,7 @@ class Octree {
         let triangle = null;
         this.getLineTriangles(line, triangles);
         for (let i = 0; i < triangles.length; i++) {
-            const result = _v1$1;
+            const result = _v1;
             const isIntersected = intersectsLineTriangle(line.start, line.end, triangles[i].a, triangles[i].b, triangles[i].c, result);
             if (isIntersected) {
                 const newDistanceSquared = line.start.distanceToSquared(result);
@@ -643,7 +643,7 @@ class Octree {
         const farSquared = far === Infinity ? Infinity : far * far;
         this.getRayTriangles(ray, triangles, far);
         for (let i = 0; i < triangles.length; i++) {
-            const result = ray.intersectTriangle(triangles[i].a, triangles[i].b, triangles[i].c, true, _v1$1);
+            const result = ray.intersectTriangle(triangles[i].a, triangles[i].b, triangles[i].c, true, _v1);
             if (result) {
                 const newDistanceSquared = result.sub(ray.origin).lengthSq();
                 if (newDistanceSquared > farSquared)
@@ -1268,21 +1268,17 @@ function intersectsSphereTriangle(sphere, a, b, c, normal, out) {
 }
 
 const EPSILON$1 = 1e-10;
-const vec3$1 = new Vector3();
-const vec3_0 = new Vector3();
-const vec3_1 = new Vector3();
 const sphere$1 = new Sphere();
-// based on https://github.com/mrdoob/three.js/blob/master/examples/jsm/math/Octree.js
-//
 // https://wickedengine.net/2020/04/26/capsule-collision-detection/
-// we select the closest point on the capsule line to the triangle,
-// place a sphere on that point and then perform the sphere – triangle test.
-// also
-// 5.1.10
-const _v1 = new Vector3();
+// カプセルの中心線上に「三角形へ最も近づく点」を求め、そこに半径ぶんの球を置いて
+// 球 vs 三角形へ帰着させる。フェイス内・辺・頂点のどこで当たっても
+// 接触点・法線・貫通量が一貫して求まる。
+// also "Real-Time Collision Detection" (Christer Ericson) 5.1.10
 const _plane = new Plane();
-const point1 = new Vector3();
-const point2 = new Vector3();
+const _capsuleDirection = new Vector3();
+const _linePlanePoint = new Vector3();
+const _referencePoint = new Vector3();
+const _startToReference = new Vector3();
 function intersectsCapsuleTriangle(capsule, triangle, out) {
     // 線分長が 0 の退化カプセルは球として扱う（start === end のときの NaN を回避）
     if (capsule.start.distanceToSquared(capsule.end) <= EPSILON$1) {
@@ -1290,74 +1286,37 @@ function intersectsCapsuleTriangle(capsule, triangle, out) {
         sphere$1.radius = capsule.radius;
         return intersectsSphereTriangle(sphere$1, triangle.a, triangle.b, triangle.c, triangle.normal, out);
     }
-    // based on three.js examples/jsm/math/Octree.js triangleCapsuleIntersect
-    // 中心線の両端のフェイス平面からの符号付き距離（半径ぶん差し引く）
+    // 中心線の両端のフェイス平面からの符号付き距離
     triangle.getPlane(_plane);
-    const d1 = _plane.distanceToPoint(capsule.start) - capsule.radius;
-    const d2 = _plane.distanceToPoint(capsule.end) - capsule.radius;
+    const distanceStart = _plane.distanceToPoint(capsule.start);
+    const distanceEnd = _plane.distanceToPoint(capsule.end);
     if (
     // 両端ともフェイスの表側（+法線側）で半径より遠い → 接触なし
-    (d1 > 0 && d2 > 0) ||
-        // 両端とも裏側（-法線側）を半径以上通り過ぎている → 接触なし
+    (distanceStart > capsule.radius && distanceEnd > capsule.radius) ||
+        // 両端とも裏側（-法線側）にある → 接触なし
         // （床面と同じ高さの下向き面などで、上に居るキャラを真下へ押し出す誤検出を防ぐ）
-        (d1 < -capsule.radius && d2 < -capsule.radius)) {
+        (distanceStart < 0 && distanceEnd < 0)) {
         return false;
     }
-    // フェイス内部との接触:
-    // 中心線上でフェイス平面に最も近づく点がフェイスの内側にあれば、面で接している。
-    // （縦カプセル vs 縦壁のように中心線が面と平行でも正しく検出できる）
-    const delta = Math.abs(d1 / (Math.abs(d1) + Math.abs(d2)));
-    const intersectPoint = _v1.copy(capsule.start).lerp(capsule.end, delta);
-    if (triangle.containsPoint(intersectPoint)) {
-        out.set(intersectPoint, _plane.normal, // 押し出し方向 = フェイス法線
-        Math.abs(Math.min(d1, d2)));
-        return true;
-    }
-    // 辺との接触: 中心線と三角形の各辺の最近点間距離が半径以下なら、辺で接している。
-    // もっとも深い（距離が最小の）辺を採用する。3辺は展開して書く（一時配列を作らない）。
-    const radiusSquared = capsule.radius * capsule.radius;
-    let minDistanceSquared = Infinity;
-    minDistanceSquared = testEdge(capsule, triangle.a, triangle.b, radiusSquared, minDistanceSquared, out);
-    minDistanceSquared = testEdge(capsule, triangle.b, triangle.c, radiusSquared, minDistanceSquared, out);
-    minDistanceSquared = testEdge(capsule, triangle.c, triangle.a, radiusSquared, minDistanceSquared, out);
-    return minDistanceSquared !== Infinity;
-}
-// カプセルの中心線と辺 (edgeStart, edgeEnd) の最近点間距離が半径以下で、
-// かつこれまでの最小より近ければ out を更新する。採用したら「その距離^2」を、しなければ渡された値を返す。
-function testEdge(capsule, edgeStart, edgeEnd, radiusSquared, minDistanceSquared, out) {
-    nearestPointsOnLineSegments(capsule.start, capsule.end, edgeStart, edgeEnd, point1, point2);
-    const distanceSquared = point1.distanceToSquared(point2);
-    if (distanceSquared >= radiusSquared || distanceSquared >= minDistanceSquared)
-        return minDistanceSquared;
-    const distance = Math.sqrt(distanceSquared);
-    out.set(point1, _v1.subVectors(point1, point2).divideScalar(distance || 1), // 辺 → 中心線 の単位ベクトル
-    capsule.radius - distance);
-    return distanceSquared;
-}
-// https://stackoverflow.com/a/67102941/1512272
-function nearestPointsOnLineSegments(a0, a1, b0, b1, out0, out1) {
-    const r = vec3$1.subVectors(b0, a0);
-    const u = vec3_0.subVectors(a1, a0);
-    const v = vec3_1.subVectors(b1, b0);
-    const ru = r.dot(u);
-    const rv = r.dot(v);
-    const uu = u.dot(u);
-    const uv = u.dot(v);
-    const vv = v.dot(v);
-    const det = uu * vv - uv * uv;
-    let s, t;
-    if (det < EPSILON$1 * uu * vv) {
-        s = MathUtils.clamp(ru / uu, 0, 1);
-        t = 0;
-    }
-    else {
-        s = MathUtils.clamp((ru * vv - rv * uv) / det, 0, 1);
-        t = MathUtils.clamp((ru * uv - rv * uu) / det, 0, 1);
-    }
-    const S = MathUtils.clamp((t * uv + ru) / uu, 0, 1);
-    const T = MathUtils.clamp((s * uv - rv) / vv, 0, 1);
-    out0.addVectors(a0, u.multiplyScalar(S));
-    out1.addVectors(b0, v.multiplyScalar(T));
+    // 参照点を求める: 中心線とフェイス平面の交点（線分外なら端へクランプ）を
+    // 三角形上へ寄せた点。これが「三角形のどのあたりに当たっているか」を表す。
+    _capsuleDirection.subVectors(capsule.end, capsule.start);
+    const denominator = _plane.normal.dot(_capsuleDirection);
+    // 平面上の点の位置 t は distanceStart + t * denominator === 0 で決まる。
+    // 中心線がフェイスと平行（denominator ≈ 0）なら、平面に近い方の端点を使う。
+    const t = Math.abs(denominator) <= EPSILON$1
+        ? (Math.abs(distanceStart) <= Math.abs(distanceEnd) ? 0 : 1)
+        : MathUtils.clamp(-distanceStart / denominator, 0, 1);
+    _linePlanePoint.copy(capsule.start).addScaledVector(_capsuleDirection, t);
+    triangle.closestPointToPoint(_linePlanePoint, _referencePoint);
+    // 参照点に最も近い中心線上の点へ球を置いて、球 vs 三角形へ帰着させる。
+    // 貫通量は「その球の中心と三角形上の最近点の距離」から求まるので、
+    // 傾いたフェイスに対して中心線の遠い端の距離を拾ってしまうことがない。
+    const lengthSquared = _capsuleDirection.lengthSq();
+    const s = MathUtils.clamp(_startToReference.subVectors(_referencePoint, capsule.start).dot(_capsuleDirection) / lengthSquared, 0, 1);
+    sphere$1.center.copy(capsule.start).addScaledVector(_capsuleDirection, s);
+    sphere$1.radius = capsule.radius;
+    return intersectsSphereTriangle(sphere$1, triangle.a, triangle.b, triangle.c, triangle.normal, out);
 }
 
 const vec3 = new Vector3();
@@ -1392,6 +1351,10 @@ const groundContactPoint = new Vector3();
 const translate = new Vector3();
 const _yAxis = new Vector3(0, 1, 0);
 const STEP_EPS = 1e-4;
+// 段差登りの発動しきい値。望んだ移動量のうち、これ未満しか進めていなければ
+// 「行く手を阻まれている」とみなす。
+const STEP_BLOCKED_RATIO = 0.3;
+const stepStartPosition = new Vector3();
 const stepProbeFrom = new Vector3();
 const stepProbeTo = new Vector3();
 const stepProbePoint = new Vector3();
@@ -1440,6 +1403,10 @@ class CharacterController extends Body {
         this.groundBody = null; // 接地している床の所有ボディ（動床なら KinematicBody）。無ければ null
         this._currentJumpPower = 0;
         this._isStepping = false; // 段差登り中フラグ（壁接触が一時的に消えても登りを継続させるラッチ）
+        this._lastMoveDelta = new Vector3(); // 直前ステップで実際に動けた量（段差登りの発動条件に使う）
+        // 積分に使う速度。velocity は壁ずりの射影後（＝利用側へ見せる実速度）だが、位置を進める
+        // ときは射影前を使い、壁への押し付けを保ったまま押し出しに滑りを任せる。
+        this._integrationVelocity = new Vector3();
         this._nearTriangles = [];
         // このステップの接触。配列は使い回し（毎ステップの確保を避ける）で、有効なのは
         // 先頭 _contactCount 件だけ。それより後ろには前のステップの残骸が入っている。
@@ -1593,19 +1560,22 @@ class CharacterController extends Body {
             this._updateClimb(deltaTime);
             return;
         }
+        // このステップで実際にどれだけ動けたかを測る（段差登りの発動条件に使う）
+        stepStartPosition.copy(this.position);
         // 状態をリセットしておく
         this.isGrounded = false;
         this.isOnSlope = false;
         this.groundHeight = -Infinity;
         this.groundNormal.set(0, 1, 0);
         this.groundBody = null;
-        this._checkGround();
+        this._checkGround(deltaTime);
         this._updateJumping(deltaTime);
         this._updatePosition(deltaTime);
         this._collisionDetection();
         this._solvePosition();
         this._updateVelocity();
         this._events(deltaTime);
+        this._lastMoveDelta.subVectors(this.position, stepStartPosition);
     }
     _updateVelocity() {
         let isHittingCeiling = false;
@@ -1613,6 +1583,7 @@ class CharacterController extends Body {
         // 急勾配や自由落下など、自動で付与される速度の処理
         if (this._contactCount === 0 && !this.isJumping) {
             // 何とも衝突していないので、自由落下
+            this._integrationVelocity.copy(this.velocity);
             return;
         }
         else if (this.isGrounded && !this.isOnSlope && !this.isJumping) {
@@ -1629,6 +1600,10 @@ class CharacterController extends Body {
             // ジャンプの処理
             this.velocity.y = this._currentJumpPower * -FALL_VELOCITY;
         }
+        // 位置を進めるのは射影「前」の速度。射影後の速度で進めると壁を押し続けなくなり、
+        // 起伏のある面では接触を取りこぼして「全速で突っ込む／射影されて減速する」を
+        // 交互に繰り返す。押し付けたままにして、滑りは押し出し（_solvePosition）に任せる。
+        this._integrationVelocity.copy(this.velocity);
         // 壁に向かった場合、壁方向の速度を0にする処理
         // vs walls and sliding on the wall
         direction2D.set(this.velocity.x, this.velocity.z);
@@ -1666,6 +1641,7 @@ class CharacterController extends Body {
             this.velocity.y = Math.min(0, this.velocity.y);
             this.isJumping = false;
         }
+        this._integrationVelocity.y = this.velocity.y;
         // 動床から引き継いだ慣性（drift）: 接地したらクリア、空中では水平に加算し続ける
         if (this.isGrounded) {
             this._externalVelocity.set(0, 0, 0);
@@ -1673,9 +1649,11 @@ class CharacterController extends Body {
         else {
             this.velocity.x += this._externalVelocity.x;
             this.velocity.z += this._externalVelocity.z;
+            this._integrationVelocity.x += this._externalVelocity.x;
+            this._integrationVelocity.z += this._externalVelocity.z;
         }
     }
-    _checkGround() {
+    _checkGround(deltaTime) {
         // "頭上からほぼ無限に下方向までの線 (segment)" vs "フェイス (triangle)" の
         // 交差判定を行う
         // もし、フェイスとの交差点が「頭上」から「下 groundCheckDepth」までの間だったら
@@ -1736,7 +1714,7 @@ class CharacterController extends Body {
             return;
         }
         // 低い段差を groundHeight に反映（接地スナップで滑らかに登る）
-        this._stepLookAhead();
+        this._stepLookAhead(deltaTime);
         this.isGrounded = (bottom <= this.groundHeight && this.groundHeight <= top);
         this.isOnSlope = (this.groundNormal.y <= this._slopeLimitCos);
         if (this.isGrounded) {
@@ -1746,14 +1724,19 @@ class CharacterController extends Body {
         }
     }
     // 低い段差 (<= stepOffset) を自動で登る（Unity CharacterController.stepOffset 相当）。
-    // 進行方向を塞ぐ壁があるとき、前縁の少し先・上（stepOffset 以内）に歩ける面があれば、
-    // それを groundHeight として採用する。接地スナップ（_updatePosition）が y を段差へ
-    // 滑らかに持ち上げ、その高さでは段差の垂直面がクリアされるので前進できる。
+    // 進行方向を塞ぐ壁に阻まれて進めないとき、前縁の少し先・上（stepOffset 以内）に
+    // 歩ける面があれば、それを groundHeight として採用する。接地スナップ
+    // （_updatePosition）が y を段差へ滑らかに持ち上げ、その高さでは段差の垂直面が
+    // クリアされるので前進できる。
     //
     // ラッチ (_isStepping): 持ち上げると壁接触が一瞬消えてゲートが外れてしまうため、
     // 「一度登り始めたら、前方に段差が無くなる（＝上面に乗り切る）まで登りを継続」する。
-    // 連続斜面では壁接触が起きないので発動しない（斜面で浮かせない）。
-    _stepLookAhead() {
+    //
+    // 発動条件に「実際に進めていないこと」を要求するのが重要。採用する高さは前縁
+    // （radius 先）の地面なので、斜面で発動すると「まだ到達していない高さ」へ持ち上がり、
+    // 次のステップで解除されて落ちる、を繰り返して上下に振動する。壁接触の有無だけでは
+    // 判別できない（実地形では歩ける斜面の中に急なファセットが混ざる）。
+    _stepLookAhead(deltaTime) {
         if (this.stepOffset <= 0 || this.isLanding)
             return;
         // 望む入力方向を使う（velocity は壁ずりで壁方向成分が 0 にされるため段差判定に使えない）
@@ -1776,8 +1759,17 @@ class CharacterController extends Body {
                 break;
             } // 進行方向に対向する面
         }
-        // 壁に当たったら登り開始。登り中は壁が一瞬消えても継続（ラッチ）
-        if (!wallAhead && !this._isStepping)
+        // 直前ステップで、望んだ方向へどれだけ進めたか。段差登りは「低い障害物に
+        // 行く手を阻まれた」ときだけの機能なので、進めているなら発動させない。
+        // （実地形では歩ける斜面の中に急なファセットが混ざって wallAhead が立つ。
+        //   壁接触の有無だけを条件にすると、斜面を歩くたびに radius 先の高さへ
+        //   持ち上げられて上下に振動する）
+        const speed = Math.sqrt(hSq);
+        const desiredDistance = speed * deltaTime;
+        const movedDistance = (this._lastMoveDelta.x * vx + this._lastMoveDelta.z * vz) / speed;
+        const isBlocked = movedDistance < desiredDistance * STEP_BLOCKED_RATIO;
+        // 壁に阻まれたら登り開始。登り中は壁が一瞬消えても継続（ラッチ）
+        if (!(wallAhead && isBlocked) && !this._isStepping)
             return;
         const foot = this.position.y;
         // カプセル前縁（進行方向へ radius）の真下で、足元〜stepOffset の歩ける面の最高点を探す
@@ -1830,7 +1822,8 @@ class CharacterController extends Body {
         // position の座標を進める
         // 壁との衝突判定はこのこの後のステップで行うのでここではやらない
         // もし isGrounded 状態なら、強制的に y の値を地面に合わせる
-        this.position.set(this.position.x + this.velocity.x * deltaTime, this.isGrounded ? this.groundHeight : this.position.y + this.velocity.y * deltaTime, this.position.z + this.velocity.z * deltaTime);
+        const integrationVelocity = this._integrationVelocity;
+        this.position.set(this.position.x + integrationVelocity.x * deltaTime, this.isGrounded ? this.groundHeight : this.position.y + integrationVelocity.y * deltaTime, this.position.z + integrationVelocity.z * deltaTime);
     }
     _collisionDetection() {
         // プレイヤーのカプセルを現在の position から作る
@@ -2133,6 +2126,9 @@ class CharacterController extends Body {
         this.isLanding = false;
         this._landingTimeRemaining = 0;
         this._fallElapsed = 0;
+        this._isStepping = false;
+        this._lastMoveDelta.set(0, 0, 0); // 転送前の移動量を段差判定へ持ち越さない
+        this._integrationVelocity.set(0, 0, 0);
         this.isRunning = this._moveVelocity.lengthSq() > 1e-8;
     }
     dispose() {
