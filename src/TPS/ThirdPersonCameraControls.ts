@@ -9,8 +9,6 @@ import {
 	Box3,
 	Spherical,
 	Raycaster,
-
-	Ray,
 	Object3D,
 	PerspectiveCamera,
 } from 'three';
@@ -33,12 +31,7 @@ const subsetOfTHREE = {
 
 CameraControls.install( { THREE: subsetOfTHREE } );
 
-const _ORIGIN = new Vector3( 0, 0, 0 );
 const _v3A = new Vector3();
-const _v3B = new Vector3();
-const _v3C = new Vector3();
-const _ray = new Ray();
-const _rotationMatrix = new Matrix4();
 
 export class ThirdPersonCameraControls extends CameraControls {
 
@@ -48,6 +41,15 @@ export class ThirdPersonCameraControls extends CameraControls {
 	// 床の yaw に合わせて回す（肩越し視点が床に対して一定に保たれる）。既定 on。
 	// character を渡していない場合は無効（no-op）。
 	syncFrontAngleToPlatform = true;
+
+	// カメラを壁から離しておく距離。Unreal の SpringArm.ProbeSize / Unity Cinemachine の
+	// Deoccluder.CameraRadius に相当する。判定はこの半径の球を追従点からカメラ方向へ
+	// 掃いて行う。
+	//
+	// 近クリップ面がこの球からはみ出すとカメラの中に壁が映り込むので、下限は
+	//   collisionRadius >= camera.near * tan( fov / 2 ) * sqrt( 1 + aspect^2 )
+	// （near 0.1 / fov 40 / 16:9 なら 0.074）。near や fov を大きくするときは合わせて上げること。
+	collisionRadius = 0.1;
 
 	constructor( camera: PerspectiveCamera, trackObject: Object3D, world: World, domElement: HTMLElement, character: CharacterController | null = null ) {
 
@@ -111,31 +113,19 @@ export class ThirdPersonCameraControls extends CameraControls {
 
 		if ( ! this.world ) return distance;
 
-		// 本家 camera-controls の _collisionTest が raycaster.far に入れているのと同じ上限。
-		// これより遠い衝突は結果に影響しないので、Octree の探索を打ち切ってよい。
-		const far = this._spherical.radius + 1;
+		// 追従点からカメラ方向へ、collisionRadius の球を掃く（Unreal の SpringArm と同じ形）。
+		// 近クリップ面の4隅から平行なレイを4本飛ばす方式は、隅の間を細い柱がすり抜ける。
+		const direction = _v3A.setFromSpherical( this._spherical ).divideScalar( this._spherical.radius );
+		const maxDistance = this._spherical.radius;
+		const radius = this.collisionRadius;
 
 		for ( let i = 0, l = this.world.colliders.length; i < l; i ++ ) {
 
-			const staticBody = this.world.colliders[ i ];
-			const direction = _v3A.setFromSpherical( this._spherical ).divideScalar( this._spherical.radius );
-			_rotationMatrix.lookAt( _ORIGIN, direction, this._camera.up );
+			const hit = this.world.colliders[ i ].sphereCast( this._target, direction, maxDistance, radius );
 
-			for ( let i = 0; i < 4; i ++ ) {
+			if ( hit && hit.distance < distance ) {
 
-				const nearPlaneCorner = _v3B.copy( this._nearPlaneCorners[ i ] );
-				nearPlaneCorner.applyMatrix4( _rotationMatrix );
-
-				const origin = _v3C.addVectors( this._target, nearPlaneCorner );
-				_ray.set( origin, direction );
-
-				const intersect = staticBody.rayIntersect( _ray, far );
-
-				if ( intersect && intersect.distance < distance ) {
-
-					distance = intersect.distance;
-
-				}
+				distance = hit.distance;
 
 			}
 
