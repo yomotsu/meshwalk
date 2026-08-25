@@ -19,6 +19,8 @@ const _localResult: ComputedTriangle[] = [];
 const _rootInverse = new Matrix4();
 const _previousInverse = new Matrix4();
 const _localRay = new Ray();
+const _localSphereCastOrigin = new Vector3();
+const _localSphereCastDirection = new Vector3();
 const _deltaQuaternion = new Quaternion();
 const _axis = new Vector3();
 const _surfaceDelta = new Matrix4();
@@ -224,6 +226,26 @@ export class KinematicBody extends Body {
 		if ( ! result ) return result;
 
 		if ( result.position ) result.position.applyMatrix4( this._matrix );
+		return result;
+
+	}
+
+	/**
+	 * ワールド座標の球を掃いて交差判定する（StaticBody と同じ signature）。
+	 * レイ版と同じく、ボディローカルへ移して Octree に問い合わせ、接触点をワールドへ戻す。
+	 * 剛体変換（並進＋回転）なので距離も半径も不変。
+	 */
+	sphereCast( origin: Vector3, direction: Vector3, maxDistance: number, radius: number ) {
+
+		this._updateMatrix();
+
+		_localSphereCastOrigin.copy( origin ).applyMatrix4( this._matrixInverse );
+		_localSphereCastDirection.copy( direction ).transformDirection( this._matrixInverse );
+
+		const result = this._octree.sphereCast( _localSphereCastOrigin, _localSphereCastDirection, maxDistance, radius );
+		if ( ! result ) return result;
+
+		result.position.applyMatrix4( this._matrix );
 		return result;
 
 	}

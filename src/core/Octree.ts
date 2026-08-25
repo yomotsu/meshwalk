@@ -10,6 +10,7 @@ import {
 import { ComputedTriangle } from '../math/triangle';
 import { intersectsLineBox } from "../math/intersectsLineBox";
 import { intersectsLineTriangle } from "../math/intersectsLineTriangle";
+import { sweepSphereTriangle } from "../math/sweepSphereTriangle";
 
 const _v1 = new Vector3();
 const _v2 = new Vector3();
@@ -38,6 +39,68 @@ function intersectsSphereBox( sphere: Sphere, box: Box3 ): boolean {
 	const dz = center.z < min.z ? min.z - center.z : center.z > max.z ? center.z - max.z : 0;
 
 	return dx * dx + dy * dy + dz * dz <= sphere.radius * sphere.radius;
+
+}
+
+// 掃かれた球（カプセル）とボックスが交差しうるかの前段フィルタ。
+// ボックスを radius ぶん膨らませて中心線のスラブ判定を行う。角の近くでは実際には
+// 当たらない場合も通すが、broad-phase なので superset で構わない（偽陰性はない）。
+function intersectsSweptSphereBox( origin: Vector3, direction: Vector3, maxDistance: number, radius: number, box: Box3 ): boolean {
+
+	const invDirectionX = 1 / direction.x;
+	const invDirectionY = 1 / direction.y;
+	const invDirectionZ = 1 / direction.z;
+
+	let tMin, tMax, tyMin, tyMax, tzMin, tzMax;
+
+	if ( invDirectionX >= 0 ) {
+
+		tMin = ( box.min.x - radius - origin.x ) * invDirectionX;
+		tMax = ( box.max.x + radius - origin.x ) * invDirectionX;
+
+	} else {
+
+		tMin = ( box.max.x + radius - origin.x ) * invDirectionX;
+		tMax = ( box.min.x - radius - origin.x ) * invDirectionX;
+
+	}
+
+	if ( invDirectionY >= 0 ) {
+
+		tyMin = ( box.min.y - radius - origin.y ) * invDirectionY;
+		tyMax = ( box.max.y + radius - origin.y ) * invDirectionY;
+
+	} else {
+
+		tyMin = ( box.max.y + radius - origin.y ) * invDirectionY;
+		tyMax = ( box.min.y - radius - origin.y ) * invDirectionY;
+
+	}
+
+	if ( tMin > tyMax || tyMin > tMax ) return false;
+
+	// 方向成分が 0 のとき 0 * Infinity = NaN になるので、three と同じく NaN を潰す
+	if ( tyMin > tMin || tMin !== tMin ) tMin = tyMin;
+	if ( tyMax < tMax || tMax !== tMax ) tMax = tyMax;
+
+	if ( invDirectionZ >= 0 ) {
+
+		tzMin = ( box.min.z - radius - origin.z ) * invDirectionZ;
+		tzMax = ( box.max.z + radius - origin.z ) * invDirectionZ;
+
+	} else {
+
+		tzMin = ( box.max.z + radius - origin.z ) * invDirectionZ;
+		tzMax = ( box.min.z - radius - origin.z ) * invDirectionZ;
+
+	}
+
+	if ( tMin > tzMax || tzMin > tMax ) return false;
+
+	if ( tzMin > tMin || tMin !== tMin ) tMin = tzMin;
+	if ( tzMax < tMax || tMax !== tMax ) tMax = tzMax;
+
+	return tMax >= 0 && tMin <= maxDistance;
 
 }
 
@@ -416,7 +479,8 @@ export class Octree {
 
 	}
 
-	getCapsuleTriangles( capsule: Sphere, result: ComputedTriangle[], isRoot = true ) {
+	// 掃かれた球が通る領域の近傍三角形を集める（sphereCast の broad-phase）
+	getSweptSphereTriangles( origin: Vector3, direction: Vector3, maxDistance: number, radius: number, result: ComputedTriangle[], isRoot = true ) {
 
 		if ( isRoot ) _queryId ++;
 
@@ -424,7 +488,7 @@ export class Octree {
 
 			const subTree = this.subTrees[ i ];
 
-			if ( ! capsule.intersectsBox( subTree.box ) ) continue;
+			if ( ! intersectsSweptSphereBox( origin, direction, maxDistance, radius, subTree.box ) ) continue;
 
 			if ( subTree.triangles.length > 0 ) {
 
@@ -440,11 +504,50 @@ export class Octree {
 
 			} else {
 
-				subTree.getCapsuleTriangles( capsule, result, false );
+				subTree.getSweptSphereTriangles( origin, direction, maxDistance, radius, result, false );
 
 			}
 
 		}
+
+		return result;
+
+	}
+
+	/**
+	 * 半径 radius の球を origin から direction（単位ベクトル）へ maxDistance まで掃き、
+	 * 最初に当たる三角形とその距離を返す。当たらなければ false。
+	 * レイ版（rayIntersect）と同じく背面は無視し、開始時点で既に接触している面も無視する。
+	 */
+	sphereCast( origin: Vector3, direction: Vector3, maxDistance: number, radius: number ) {
+
+		const triangles = _intersectTriangles;
+		triangles.length = 0;
+
+		this.getSweptSphereTriangles( origin, direction, maxDistance, radius, triangles );
+
+		let nearestDistance = Infinity;
+		let nearestTriangle: ComputedTriangle | undefined;
+
+		for ( let i = 0, l = triangles.length; i < l; i ++ ) {
+
+			const triangle = triangles[ i ];
+			const distance = sweepSphereTriangle( origin, direction, maxDistance, radius, triangle );
+
+			if ( distance < 0 || distance >= nearestDistance ) continue;
+
+			nearestDistance = distance;
+			nearestTriangle = triangle;
+
+		}
+
+		if ( ! nearestTriangle ) return false;
+
+		// 接触点（三角形上の最近点）。もっとも近いものが確定してから 1 回だけ求める
+		_bestPoint.copy( origin ).addScaledVector( direction, nearestDistance );
+		nearestTriangle.closestPointToPoint( _bestPoint, _bestPoint );
+
+		return { distance: nearestDistance, triangle: nearestTriangle, position: _bestPoint.clone() };
 
 	}
 
