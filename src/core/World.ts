@@ -18,6 +18,27 @@ const MAX_CATCH_UP_FRAMES = 5;
 // 包むために半径へ足す余裕の下限（m）。速度から算出した余裕がこれ未満ならこの値を使う。
 const STATIC_QUERY_PADDING_MIN = 0.1;
 
+// キャラが1ステップ中に「触りうる」最遠点までの、カプセル中心（足元 + height/2）からの距離。
+// broad-phase の球がこれを覆っていないと、_queryStaticTriangles の絞り込みで必要な
+// 三角形を落としてしまう。内訳:
+//   - カプセル本体      : height / 2（両端のキャップまで含めてちょうどこの距離に収まる）
+//   - 接地レイの許容帯   : height / 2 + groundCheckDepth
+//   - 段差プローブ      : sqrt( radius^2 + (height/2)^2 )（前縁 radius 先・足元の高さ）
+//   - 頭上プローブ      : height / 2 + stepOffset
+// 既定値（radius 0.5 / height 2 / groundCheckDepth 0.3 / stepOffset 0.3）では
+// 接地レイの 1.3 が最大なので、従来の height/2 + groundCheckDepth と一致する。
+function getQueryReach( character: CharacterController ): number {
+
+	const half = character.height / 2;
+
+	return Math.max(
+		half + character.groundCheckDepth,
+		Math.sqrt( character.radius * character.radius + half * half ),
+		half + character.stepOffset,
+	);
+
+}
+
 export class World {
 
 	private _staticBodies: StaticBody[] = [];
@@ -179,7 +200,7 @@ export class World {
 		const padding = Math.max( ( character.velocity.length() + platformSpeed ) * deltaTime, STATIC_QUERY_PADDING_MIN );
 
 		center.set( 0, character.height / 2, 0 ).add( character.position );
-		const radius = character.height / 2 + character.groundCheckDepth + padding;
+		const radius = getQueryReach( character ) + padding;
 
 		_staticQuerySphere.center.copy( center );
 		_staticQuerySphere.radius = radius;
@@ -191,6 +212,34 @@ export class World {
 			this._staticBodies[ i ].getSphereTriangles( _staticQuerySphere, triangles );
 
 		}
+
+		// Octree は「球に交差する葉ノード」の三角形をまるごと返すので、実際には球から離れた
+		// ものが多く混ざる。ここで一度だけ実交差で絞り込む。substep（既定 4 回）ごとに走る
+		// 接地判定・段差プローブ・カプセル判定はどれもこの配列を頭から舐めるので、
+		// フレームに 1 回のこの絞り込みがそのまま全部に効く（実測 224 → 27 本）。
+		//
+		// 落としてよい根拠: step() は「そのステップで必要な sphere がこの球に収まっているか」を
+		// 確認し、外れていたら引き直す。収まっているなら、必要な三角形は必ずこの球にも交差する。
+		let count = 0;
+
+		for ( let i = 0, l = triangles.length; i < l; i ++ ) {
+
+			const triangle = triangles[ i ];
+			if ( ! triangle.boundingSphere ) triangle.computeBoundingSphere();
+
+			const boundingSphere = triangle.boundingSphere!;
+			const dx = boundingSphere.center.x - center.x;
+			const dy = boundingSphere.center.y - center.y;
+			const dz = boundingSphere.center.z - center.z;
+			const radiusSum = radius + boundingSphere.radius;
+
+			if ( dx * dx + dy * dy + dz * dz > radiusSum * radiusSum ) continue;
+
+			triangles[ count ++ ] = triangle;
+
+		}
+
+		triangles.length = count;
 
 		this._staticTriangleCounts[ index ] = triangles.length;
 		this._staticQueryRadii[ index ] = radius;
@@ -235,7 +284,7 @@ export class World {
 			// キャラクターのカプセル全体を囲む sphere で broad-phase して、
 			// 近傍の三角形だけを character に渡して判定する
 			sphere.center.set( 0, character.height / 2, 0 ).add( character.position );
-			sphere.radius = character.height / 2 + character.groundCheckDepth;
+			sphere.radius = getQueryReach( character );
 
 			// 静的ぶんはフレーム先頭で引いたものを使い回す。このステップで必要な sphere が
 			// キャッシュの sphere に収まっていなければ（ジャンプ開始・速い運搬・テレポートなど）
