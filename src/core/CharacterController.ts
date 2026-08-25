@@ -30,6 +30,10 @@ const groundContactPoint = new Vector3();
 const translate = new Vector3();
 const _yAxis = new Vector3( 0, 1, 0 );
 const STEP_EPS = 1e-4;
+// 段差登りの発動しきい値。望んだ移動量のうち、これ未満しか進めていなければ
+// 「行く手を阻まれている」とみなす。
+const STEP_BLOCKED_RATIO = 0.25;
+const stepStartPosition = new Vector3();
 const stepProbeFrom = new Vector3();
 const stepProbeTo = new Vector3();
 const stepProbePoint = new Vector3();
@@ -111,6 +115,7 @@ export class CharacterController extends Body<CharacterControllerEventType> {
 
 	private _currentJumpPower = 0;
 	private _isStepping = false; // 段差登り中フラグ（壁接触が一時的に消えても登りを継続させるラッチ）
+	private _lastMoveDelta = new Vector3(); // 直前ステップで実際に動けた量（段差登りの発動条件に使う）
 	private _nearTriangles: ComputedTriangle[] = [];
 	// このステップの接触。配列は使い回し（毎ステップの確保を避ける）で、有効なのは
 	// 先頭 _contactCount 件だけ。それより後ろには前のステップの残骸が入っている。
@@ -321,6 +326,9 @@ export class CharacterController extends Body<CharacterControllerEventType> {
 
 		}
 
+		// このステップで実際にどれだけ動けたかを測る（段差登りの発動条件に使う）
+		stepStartPosition.copy( this.position );
+
 		// 状態をリセットしておく
 		this.isGrounded = false;
 		this.isOnSlope  = false;
@@ -328,13 +336,15 @@ export class CharacterController extends Body<CharacterControllerEventType> {
 		this.groundNormal.set( 0, 1, 0 );
 		this.groundBody = null;
 
-		this._checkGround();
+		this._checkGround( deltaTime );
 		this._updateJumping( deltaTime );
 		this._updatePosition( deltaTime );
 		this._collisionDetection();
 		this._solvePosition();
 		this._updateVelocity();
 		this._events( deltaTime );
+
+		this._lastMoveDelta.subVectors( this.position, stepStartPosition );
 
 	}
 
@@ -451,7 +461,7 @@ export class CharacterController extends Body<CharacterControllerEventType> {
 
 	}
 
-	_checkGround() {
+	_checkGround( deltaTime: number ) {
 
 		// "頭上からほぼ無限に下方向までの線 (segment)" vs "フェイス (triangle)" の
 		// 交差判定を行う
@@ -544,7 +554,7 @@ export class CharacterController extends Body<CharacterControllerEventType> {
 		}
 
 		// 低い段差を groundHeight に反映（接地スナップで滑らかに登る）
-		this._stepLookAhead();
+		this._stepLookAhead( deltaTime );
 
 		this.isGrounded = ( bottom <= this.groundHeight && this.groundHeight <= top );
 		this.isOnSlope  = ( this.groundNormal.y <= this._slopeLimitCos );
@@ -560,14 +570,19 @@ export class CharacterController extends Body<CharacterControllerEventType> {
 	}
 
 	// 低い段差 (<= stepOffset) を自動で登る（Unity CharacterController.stepOffset 相当）。
-	// 進行方向を塞ぐ壁があるとき、前縁の少し先・上（stepOffset 以内）に歩ける面があれば、
-	// それを groundHeight として採用する。接地スナップ（_updatePosition）が y を段差へ
-	// 滑らかに持ち上げ、その高さでは段差の垂直面がクリアされるので前進できる。
+	// 進行方向を塞ぐ壁に阻まれて進めないとき、前縁の少し先・上（stepOffset 以内）に
+	// 歩ける面があれば、それを groundHeight として採用する。接地スナップ
+	// （_updatePosition）が y を段差へ滑らかに持ち上げ、その高さでは段差の垂直面が
+	// クリアされるので前進できる。
 	//
 	// ラッチ (_isStepping): 持ち上げると壁接触が一瞬消えてゲートが外れてしまうため、
 	// 「一度登り始めたら、前方に段差が無くなる（＝上面に乗り切る）まで登りを継続」する。
-	// 連続斜面では壁接触が起きないので発動しない（斜面で浮かせない）。
-	_stepLookAhead() {
+	//
+	// 発動条件に「実際に進めていないこと」を要求するのが重要。採用する高さは前縁
+	// （radius 先）の地面なので、斜面で発動すると「まだ到達していない高さ」へ持ち上がり、
+	// 次のステップで解除されて落ちる、を繰り返して上下に振動する。壁接触の有無だけでは
+	// 判別できない（実地形では歩ける斜面の中に急なファセットが混ざる）。
+	_stepLookAhead( deltaTime: number ) {
 
 		if ( this.stepOffset <= 0 || this.isLanding ) return;
 
@@ -589,8 +604,18 @@ export class CharacterController extends Body<CharacterControllerEventType> {
 
 		}
 
-		// 壁に当たったら登り開始。登り中は壁が一瞬消えても継続（ラッチ）
-		if ( ! wallAhead && ! this._isStepping ) return;
+		// 直前ステップで、望んだ方向へどれだけ進めたか。段差登りは「低い障害物に
+		// 行く手を阻まれた」ときだけの機能なので、進めているなら発動させない。
+		// （実地形では歩ける斜面の中に急なファセットが混ざって wallAhead が立つ。
+		//   壁接触の有無だけを条件にすると、斜面を歩くたびに radius 先の高さへ
+		//   持ち上げられて上下に振動する）
+		const speed = Math.sqrt( hSq );
+		const desiredDistance = speed * deltaTime;
+		const movedDistance = ( this._lastMoveDelta.x * vx + this._lastMoveDelta.z * vz ) / speed;
+		const isBlocked = movedDistance < desiredDistance * STEP_BLOCKED_RATIO;
+
+		// 壁に阻まれたら登り開始。登り中は壁が一瞬消えても継続（ラッチ）
+		if ( ! ( wallAhead && isBlocked ) && ! this._isStepping ) return;
 
 		const foot = this.position.y;
 
@@ -1055,6 +1080,8 @@ export class CharacterController extends Body<CharacterControllerEventType> {
 		this.isLanding = false;
 		this._landingTimeRemaining = 0;
 		this._fallElapsed = 0;
+		this._isStepping = false;
+		this._lastMoveDelta.set( 0, 0, 0 ); // 転送前の移動量を段差判定へ持ち越さない
 		this.isRunning = this._moveVelocity.lengthSq() > 1e-8;
 
 	}
