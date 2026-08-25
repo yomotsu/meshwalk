@@ -21,10 +21,10 @@ three.js 用の TPS キャラクターコントローラ・ライブラリ（yom
 - デモは CRLF のものが混在（demo7 は LF）。node で書き換える時は**元の改行コードを保持**する。
 - `Date.now()`/`Math.random()`/`new Date()` はワークフロー用スクリプト内では使えない（別文脈）。通常コードは可。
 
-## 現状（2026-08-07）
-- ブランチ **`master`**。Phase 0–4 ＋ API 整形 ＋ 動く床（`KinematicBody`）＋ **梯子（`ClimbableBody`）** ＋ **パフォーマンス最適化 9 コミット** は master 反映済み。**ローカルで origin より先行（未 push）**。`git log`/`git status -sb` で確認。
-- テスト46件・全デモ（`1`–`10` ＋ recast の `20`/`21`）ロードエラーなし・tsc/lint/build 緑。
-- **`dist` はこの最適化シリーズの分が未コミット**（src のみコミットする運用にした＝差分が大きくなるため）。デモは `dist/meshwalk.module.js` を読むのでローカルではビルド済み。どこかでまとめてコミットするか、`dist` を追跡から外すかは**未決**。コミット時は `git add -A` ではなくパス指定で入れる。
+## 現状（2026-08-25）
+- ブランチ **`master`**。Phase 0–4 ＋ API 整形 ＋ 動く床（`KinematicBody`）＋ **梯子（`ClimbableBody`）** ＋ **パフォーマンス最適化 9 コミット** ＋ **壁摺りのガタつき修正 3 コミット** は master 反映済み。**ローカルで origin より先行（未 push）**。`git log`/`git status -sb` で確認。
+- テスト49件・全デモ（`1`–`10` ＋ recast の `20`/`21`）ロードエラーなし・tsc/lint/build 緑。
+- **`dist` は最適化シリーズ＋ガタつき修正の分が未コミット**（src のみコミットする運用にした＝差分が大きくなるため）。デモは `dist/meshwalk.module.js` を読むのでローカルではビルド済み。どこかでまとめてコミットするか、`dist` を追跡から外すかは**未決**。コミット時は `git add -A` ではなくパス指定で入れる。
 - デモ番号: コア機能は `1`–`10`（`10_ladder.html`）。recast 系は将来の差し込み用に `20`/`21` へ繰り下げ済み（`10`–`19` は空き）。
 
 ### 実装済み（要点）
@@ -45,6 +45,14 @@ three.js 用の TPS キャラクターコントローラ・ライブラリ（yom
 - `KeyboardControls.inputVector`（Vector2, x=右/y=前, 正規化, 無入力=0）。デモは `applyAxisAngle(Y, camera.frontAngle)` で回して `move()` へ。
 - 改名: `KeyInputControl`→`KeyboardControls`、`TPSCameraControls`→`ThirdPersonCameraControls`、`AnimationController.motion`→`actions`。
 - `dispose()` 全クラス。型付き `EventDispatcher<TEventType>`（既定 string）。入力 `keyCode`→`event.code`。
+
+### 壁摺りのガタつき修正（2026-08-25・詳細は `DESIGN.md §12`）
+任意メッシュ（`examples/5_terrain.html`）でのみ出ていた。**独立した 3 原因**で、箱の壁では露呈しない性質だった。
+- `intersectsCapsuleTriangle`: 面接触で「接触点は中心線が平面を横切る位置／貫通量は中心線の**遠い端**」と食い違っていた。傾いたフェイスで接触の見逃し → 次ステップで 0.43m の押し出し。垂直な壁は `d1 === d2` なので露呈しない。→ 「参照点 → 中心線上の最近点 → `intersectsSphereTriangle`」へ置き換え（`testEdge` 等は削除）。
+- `_stepLookAhead`: 発動条件が壁接触だけだったため**連続斜面で誤発動**（3フレーム周期・振幅 ±0.3m の上下振動）。実地形では歩ける斜面に急なファセットが混ざるので「連続斜面では壁接触が起きない」という前提が成立しない。→ 「直前ステップで実際に進めていないこと」（`STEP_BLOCKED_RATIO = 0.3`）を追加。
+- `_updatePosition`: 壁ずり**射影後**の速度で位置を進めていたため壁を押し続けず、起伏のある面で接触が点滅（760 substep 中 211 回）。→ 射影**前**の `_integrationVelocity` で積分し、滑りは押し出しに任せる。`velocity` は射影後のまま（利用側へ見せる実速度）。
+- **計測時の注意**: プロトタイプのフックで `orig.call(this)` と書いて引数を転送し忘れると `deltaTime` が `undefined` になり、段差登りが常時 OFF になって「効いた」ように見える。必ず `orig.apply(this, args)`。
+- 回帰の見方: 段差マトリクス（高さ×進入角の所要フレーム数）／貫通マトリクス（速度×進入角）／substep 粒度のジッター（フレーム粒度だと 4 substep で均されて見えない）。`terrain.glb` は `GLTFLoader.parse()` で node から直接読める。
 
 ### パフォーマンス最適化（2026-08-07・詳細は `DESIGN.md §11`）
 `fixedUpdate` **約0.30 → 約0.046 ms/frame**（床198×198＋箱81個・近傍238三角形で歩行、5000フレーム平均）。
