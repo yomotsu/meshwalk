@@ -95,6 +95,8 @@ The static environment collider: a triangle mesh that never moves, baked into an
 | `addFromObject( object3D )` | Same, additive. |
 | `addFromGeometry( geometry, matrix? )` | Take a `BufferGeometry` directly, optionally transformed. |
 | `addTriangles( positions, indices? )` | Take already baked world-space flat xyz positions and optional triangle indices directly. |
+| `rayIntersect( ray, far? )` | Cast a ray. Returns `{ distance, triangle, position }` or `false`. Back faces are ignored. |
+| `sphereCast( origin, direction, maxDistance, radius )` | Sweep a sphere. Returns `{ distance, triangle, position }` or `false`. Back faces and faces already touching at the start are ignored. |
 | `dispose()` | Drop the baked triangles. |
 
 Geometry is snapshotted at the time it is added, so moving the source `Object3D` afterwards does
@@ -114,6 +116,7 @@ is baked once in local space; the body is moved by writing its velocities.
 | `velocity` | World space translation, m/s. |
 | `angularVelocity` | Rotation around the body origin, rad/s: direction is the axis, length is the speed (yaw is `( 0, ω, 0 )`). |
 | `surfaceVelocity` | Surface flow, m/s: the platform stays still and only carries whoever stands on it (a conveyor belt). |
+| `rayIntersect( ray, far? )` / `sphereCast( origin, direction, maxDistance, radius )` | Same queries as `StaticBody`, taking the platform's current transform into account. |
 | `dispose()` | Drop the baked triangles. |
 
 Motion policy stays on your side: read `position` each frame and flip `velocity` when you want the
@@ -201,10 +204,19 @@ A [camera-controls](https://github.com/yomotsu/camera-controls) subclass that fo
 `trackObject` and keeps the level geometry registered in `world` out of the way, so the whole
 camera-controls API is available on it.
 
+Collision is resolved by sweeping a sphere of `collisionRadius` from the follow point toward the
+camera. Keep it at or above the near plane's circumscribed circle, otherwise walls show up inside
+the near plane:
+
+```
+collisionRadius >= camera.near * Math.tan( fov / 2 ) * Math.sqrt( 1 + aspect ** 2 )
+```
+
 | member | description |
 |---|---|
 | `frontAngle` | The current azimuth angle. Rotate your input by this to get camera relative movement. |
 | `syncFrontAngleToPlatform` | When `true` (default) and a `character` was passed, the azimuth follows the yaw of the rotating platform the character rides, keeping the over the shoulder view fixed relative to the platform. |
+| `collisionRadius` | How far to keep the camera off the level geometry, default `0.1`. Equivalent to Unreal's `SpringArm.ProbeSize` or Cinemachine's `Deoccluder.CameraRadius`: a sphere of this radius is swept from the follow point toward the camera. |
 
 ### `AnimationController( mesh, animationClips )`
 

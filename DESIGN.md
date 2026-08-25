@@ -14,10 +14,11 @@ Rapier / cannon-es）および three.js の命名慣習に寄せるための設�
 | 区分 | 項目 |
 |---|---|
 | **実装済み** | `Body`/`StaticBody`/`CharacterController` 化・`World.add(body)` 一本化。`StaticBody.fromObject`/`addFromObject`/`addFromGeometry`・`matrixWorld` バグ修正。`Octree` 内部化。`move(vec)` 入力。`slopeLimit`（度）。レンダー分離（`position`/`quaternion` 公開・利用側で同期）。`world.update(dt)` 固定ステップ・アキュムレータ。ジャンプの脱 `performance.now`（deltaTime 化・決定論）。`dispose()` 全クラス。型付き `EventDispatcher`。入力 `keyCode`→`event.code`。改名 `KeyInputControl`→`KeyboardControls` / `TPSCameraControls`→`ThirdPersonCameraControls` / `AnimationController.motion`→`actions`。options コンストラクタ。`teleport(Vector3)`。`KeyboardControls.inputVector`（Vector2）。**`stepOffset`（段差自動登り・既定 0.3）＋ `groundCheckDepth` 既定 0.3（登り降り対称）**。**動く床 `KinematicBody`**（`deltaMatrix` 運搬・回転運搬・離脱慣性・`surfaceVelocity`／ベルトコンベア。デモ 9）。**梯子 `ClimbableBody`**（登り状態。§10。デモ `10_ladder.html`）。 |
-| **実装済み（性能）** | **パフォーマンス最適化 9 コミット**（§11）。`Octree` の重複排除を `_queryId` マーク化、静的 broad-phase をフレーム単位＋有効範囲キャッシュ、動く床の bounding sphere を剛体変換、縦レイの xz prefilter、接触・バッファのプール化、カメラのレイに `far`。`fixedUpdate` 約 0.30 → 約 0.046 ms/frame。 |
+| **実装済み（性能）** | **パフォーマンス最適化 9 コミット**（§11）＋**プレフィルタ最適化 3 コミット**（§13）。`Octree` の重複排除を `_queryId` マーク化、静的 broad-phase をフレーム単位＋有効範囲キャッシュ、動く床の bounding sphere を剛体変換、縦レイの xz prefilter、接触・バッファのプール化、`intersectsCapsuleSphere` のスカラー化、broad-phase 結果のフレーム単位の絞り込み、`Sphere.intersectsBox` の自前化。`fixedUpdate` 0.1377 → 0.0554 ms/frame（密なレベル）。 |
 | **実装済み（衝突の質）** | **壁摺りのガタつき修正 3 コミット**（§12）。`intersectsCapsuleTriangle` を 「参照点 → 中心線上の最近点 → 球 vs 三角形」へ置き換え（接触点と貫通量の食い違いを解消）、段差登りの発動条件に 「実際に進めていないこと」を追加（連続斜面での誤発動＝上下振動を解消）、位置の積分を壁ずり射影**前**の速度へ（壁を押し続けて接触の点滅を解消）。任意メッシュ（`terrain.glb`）でのみ出ていた症状。 |
+| **実装済み（カメラ）** | **カメラ衝突をスフィアスイープへ**（§14）。近クリップ面 4 隅からの平行レイ 4 本 → 追従点から `collisionRadius`（既定 0.1）の球を 1 回掃く方式（Unreal の SpringArm 相当）。隅の間隔より細い柱をすり抜ける問題が消え、負荷も 0.125 → 0.046 ms/frame。`StaticBody.sphereCast` / `KinematicBody.sphereCast` を公開 API として追加。 |
 | **ドロップ** | **物理モデル刷新（重力の「場」＋インパルスジャンプ＋`gravityScale`）**。§3 参照。現行のジャンプ／落下仕様を維持する判断。 |
-| **保留（未着手）** | 壁面フリークライム（`ClimbableBody` の `mode:'free'`＝Phase B。§10）。`AnimationController.turn()` の `Date.now`/rAF → deltaTime 化。瞬間イベント `landed`/`jumped`（現状は `startIdling/Walking/Jumping/Sliding/Falling` を維持）。壁歩き／惑星重力（L2）。README の API 節更新。 |
+| **保留（未着手）** | 壁面フリークライム（`ClimbableBody` の `mode:'free'`＝Phase B。§10）。`AnimationController.turn()` の `Date.now`/rAF → deltaTime 化。瞬間イベント `landed`/`jumped`（現状は `startIdling/Walking/Jumping/Sliding/Falling` を維持）。壁歩き／惑星重力（L2）。 |
 
 ---
 
@@ -506,3 +507,180 @@ meshwalk の Octree 版オーバーライドはこの上限が落ちていた。
   挙動で、`_stepLookAhead` が単一のプローブ点しか見ないことに由来する。
 - `_stepLookAhead` は依然として「`radius` 先の高さ」へスナップするので、本物の段差でも到達前に
   最大 `stepOffset` ぶん先行して持ち上がる。滑らかにするなら持ち上げをレート制限する必要がある。
+
+---
+
+## 13. プレフィルタ最適化（as-built・2026-08-25）
+
+§11 の後、あらためて `fixedUpdate` をプロファイルして分かったこと。**近傍 224 三角形に対して
+実際の接触は 1.14 件**しかない。つまりコストのほぼ全部が「候補を集める」「候補を弾く」側にある。
+
+計測環境: 床 200×200（1m セル・80,000 三角形）＋ 3m 箱 144 個。近傍 224 三角形。
+**`fixedUpdate` 0.1377 → 0.0554 ms/frame（-60%）**。3 変更とも 3000 フレームの軌跡がビット一致。
+
+| | inclusive（最適化前） | 呼ばれる回数 |
+|---|---|---|
+| `_collisionDetection` | 41% | 4 回/frame |
+| `_queryStaticTriangles` | 36% | 1 回/frame |
+| `_checkGround` | 18% | 4 回/frame |
+
+### 13.1 `intersectsCapsuleSphere` のスカラー化
+
+近傍三角形すべてに対して substep ごとに呼ばれるプレフィルタで、密なレベルでは約 900 回/frame。
+旧実装は 1 呼び出しごとに `Line3` を経由し、`copy`×2 ＋ `subVectors`×2 ＋ `dot`×2 ＋ `clamp` ＋
+`add` ＋ `multiplyScalar` が走っていた。**カプセルの線分はループ中ずっと同じなのに毎回組み立て
+直している**。`Vector3` / `Line3` を経由しないスカラー計算へ。0.1377 → 0.1007 ms/frame。
+
+### 13.2 broad-phase 結果をフレーム単位で実交差に絞る（`World._queryStaticTriangles`）
+
+`Octree.getSphereTriangles` は「球に交差する**葉ノード**」の三角形をまるごと返す。実測では
+**1 クエリあたり 663 回のノード判定で 265 本を集めるが、球に実際に交差するのは 27 本（12%）**。
+そこを substep（既定 4 回）ごとに、接地判定・段差プローブ・カプセル判定の 3 箇所がそれぞれ
+頭から舐めていた。フレーム先頭で 1 回だけ実交差で絞れば、そのすべてに効く。
+
+**落としてよい根拠は §11.2 の仕組みがそのまま使える**: `step()` は「そのステップで必要な sphere が
+キャッシュの球に収まっているか」を確認し、外れていたら引き直す。収まっているなら、必要な三角形は
+必ずキャッシュの球にも交差する。速度に依存しない条件で、高速移動時は引き直しが走る。
+
+あわせて球の半径を `getQueryReach()` へ切り出し、**キャラが 1 ステップ中に触りうる最遠点を
+明示的に覆う**ようにした。
+
+| 判定 | 中心（足元 + height/2）からの必要距離 |
+|---|---|
+| カプセル本体 | `height / 2`（両端のキャップまで含めてちょうどこの距離に収まる） |
+| 接地レイの許容帯 | `height / 2 + groundCheckDepth` ← 従来の半径 |
+| 段差プローブ | `sqrt( radius² + (height/2)² )` |
+| 頭上プローブ | `height / 2 + stepOffset` |
+
+従来の半径では `stepOffset > groundCheckDepth` や `radius` の大きいキャラでプローブを覆いきらない。
+**今までは葉ノード単位の余分な取り込みが偶然それを隠していただけ**で、絞り込みを入れるとその余裕が
+消える。既定値（radius 0.5 / height 2 / groundCheckDepth 0.3 / stepOffset 0.3）では接地レイの 1.3 が
+最大なので従来と同じ値になり、挙動は変わらない。0.1007 → 0.0638 ms/frame。
+
+### 13.3 `Sphere.intersectsBox` の自前化（`Octree`）
+
+`getSphereTriangles` はノードを降りるたびに全サブツリーへ判定を行い、1 クエリあたり 663 回になる。
+three の実装は `Box3.clampPoint`（`Vector3` の `copy` ＋ `clamp`×6）を経由するのでスカラーで書き直す。
+0.0638 → 0.0554 ms/frame。
+
+**先に単体で試したときは実測差ゼロで一度棄却した**。13.2 で他が軽くなった結果 broad-phase が
+`fixedUpdate` の 67% を占めるようになり、効くようになった。**最適化の順序で効果が変わる例**。
+
+### 13.4 残アイデア（`fixedUpdate`）
+
+最適化後の内訳は `_queryStaticTriangles` 63% / `_collisionDetection` 25% / `_checkGround` 7%。
+octree の走査が支配的になった。
+
+- **葉のしきい値（`split()` の `len > 8`）の調整**: 8 → 32 でノード判定 663 → 320 回だが、収集本数が
+  265 → 538 本に増えて相殺され、正味 **-10%** どまり。**返る三角形の集合と順序が変わる**ので
+  「軌跡ビット一致」では検証できない（`_solvePosition` が接触を配列順に累積するため）。
+- **二段キャッシュ**: octree クエリを毎フレーム引き直しているのが 63% の正体。「大きめの球で稀に引く →
+  毎フレーム狭い球で絞る」の二段にすれば octree 走査そのものを多くのフレームで飛ばせる。理屈上は最大の
+  一手だがキャッシュ層が 1 段増える。
+- `getSphereTriangles` の `push` → `arr[ n++ ]`（§11.5 の V8 の知見）。265 本/frame。
+- `_collisionDetection` の 25% のうち 16% は `intersectsCapsuleTriangle` 本体（27 本 → プレフィルタ通過
+  約 13 本 × 4 substep ≒ 50 回/frame）で、これは本来やるべき仕事。**もう脂肪が少ない**。
+
+---
+
+## 14. カメラの衝突判定（as-built・2026-08-25）
+
+### 14.1 きっかけ
+
+§11・§13 で `fixedUpdate` が 0.30 → 0.017 ms/frame まで下がった結果、**カメラの衝突判定のほうが
+物理より 5〜9 倍重い**という逆転が起きた。§11.6 の「平坦なレベルでは効果なし」という評価は、
+物理が重かった当時の相対評価だった。
+
+| シーン | 物理 `fixedUpdate` | カメラのレイ 4 本 |
+|---|---|---|
+| 高さ 3m の箱（平坦） | 0.017 ms/frame | 0.093〜0.128 ms/frame |
+| 高さ 20m の柱 | 0.015 ms/frame | 0.083〜0.134 ms/frame |
+
+### 14.2 4 本レイという方式そのものを見直す
+
+camera-controls の `_collisionTest()` は近クリップ面の 4 隅から平行なレイを 4 本飛ばす。矩形を掃いた
+体積を隅で近似する方法で、過剰に引き寄せない利点がある。**なお `_collisionTest` は `protected` で、
+公式サンプル `collision-custom.html` が octree で上書きする例を示している＝これは想定された拡張点**
+（当初「private に手を突っ込んでいて脆い」と評価したが誤り。継ぎ目の追加は不要だった）。
+
+主要エンジンは**単一のスフィア／カプセルのスイープ**を使う。
+
+| | 判定方法 | 半径 |
+|---|---|---|
+| Unreal `USpringArmComponent` | スフィアスイープ 1 本 | `ProbeSize` 固定・既定 12cm |
+| Unity Cinemachine `Deoccluder` | レイ 1 本 ＋ 半径ぶんのマージン | `CameraRadius` 固定 |
+| camera-controls | 平行レイ 4 本 | なし（近クリップ面の隅が実質の半径） |
+
+4 本レイの弱点は**隅の間隔より細い物体をすり抜ける**こと。near 0.1 / fov 40 / 16:9 では隅の間隔が
+12.9cm なので、それより細い柱・手すり・格子でカメラが壁の中に入る。
+
+| 柱の幅 | レイ 4 本 | スフィア（r=0.1） |
+|---|---|---|
+| 2cm / 5cm / 10cm | **すり抜け** | 4.800 |
+| 13cm 以上 | 4.900 | 4.800 |
+
+### 14.3 実装
+
+`StaticBody.sphereCast( origin, direction, maxDistance, radius )` を `rayIntersect` と対になる公開 API
+として追加（`KinematicBody` にも同 signature。**`world.colliders` は動く床を含み、カメラは従来から
+動く床とも判定している**ため必須）。
+
+- `src/math/sweepSphereTriangle.ts`: 掃かれた球 vs 三角形。面・辺・頂点の 3 領域を解く
+  （Fauerby "Improved Collision detection and Response" ／ Ericson 5.5）。
+- `Octree.getSweptSphereTriangles()`: broad-phase。ボックスを `radius` ぶん膨らませて中心線のスラブ判定。
+  角の近くで superset になるが偽陰性はない。未使用かつ引数の型が `Sphere` になっていた
+  `getCapsuleTriangles` を置き換えた。
+
+レイ版に合わせて**背面は無視**する。あわせて**開始時点で既に接触している面も無視**する。カメラの
+追従点が一瞬ジオメトリへ潜っただけで距離 0 を返すと、カメラがターゲットへ張り付いてしまうため
+（Unreal の `bStartPenetrating` に相当する状況。Unreal 自身はアームを畳むが、ここでは畳まない選択）。
+
+### 14.4 負荷は下がる（直感に反して候補が減る）
+
+| シーン / 距離 | | 候補三角形 | 時間 |
+|---|---|---|---|
+| 高さ 3m の箱・5m | レイ 4 本 | 2287 本 | 0.125 ms |
+| | **スイープ 1 本** | **1161 本** | **0.046 ms** |
+| 高さ 20m の柱・30m | レイ 4 本 | 1481 本 | 0.135 ms |
+| | **スイープ 1 本** | **545 本** | **0.050 ms** |
+
+**候補三角形の数がスイープのほうが少ない**（1/2〜1/3）のが効いている。4 本のレイはそれぞれ独立に
+octree を走査するので、隣り合う 4 本がほぼ同じ葉ノードを重複して辿り、同じ三角形を 4 回集める
+（`_queryId` の重複排除はクエリ単位）。掃かれた球は 1 回の走査で同じ体積を覆うので、この 4 重の
+無駄が消える。
+
+なお利得の一部は形状ではなく実装差（新しいノード判定がスカラー、レイ側は three の
+`Ray.intersectsBox` ＋ `distanceSquaredToBox` 経由）。「スフィアスイープだから速い」ではなく
+**「1 回走査への集約＋ノード判定のスカラー化」の合算**。
+
+### 14.5 半径とクリップ面
+
+`collisionRadius` は公開プロパティ・既定 **0.1**（Cinemachine の `CameraRadius` と同値、Unreal の
+`ProbeSize` 12cm とも近い）。近クリップ面がこの球からはみ出すと壁が映り込むので、下限は
+
+```
+collisionRadius >= camera.near * tan( fov / 2 ) * sqrt( 1 + aspect² )
+```
+
+（near 0.1 / fov 40 / 16:9 で 0.074）。Cinemachine のドキュメントが *"Increase it if you are seeing
+inside obstacles due to a large FOV"* と言っているのと同じ話で、**自動算出はしない**（エンジンに
+合わせる方針、かつ暗黙の魔法を避ける）。
+
+あわせてデモのカメラを `( 40, aspect, 1, 1000 )` → `( 40, aspect, 0.1, 1000 )` へ。`near 1` は
+three.js としてもかなり大きい。`far 1000` は Unity Camera の既定と同じなので据え置き。`fov 40`
+（水平 66°）も据え置き（Unity / Unreal の既定は垂直 60 / 水平 90 だが汎用の値で、三人称アクションの
+実勢は水平 55〜75°）。
+
+**深度精度**（24bit）: near 0.1 / far 1000 で 100m で 6mm、200m で 24mm。デモの規模では z-fighting に
+至らない。オープンワールド規模（far 10km）では near を 0.1 → 1 と 10 倍にしても 5km で 1.5m にしか
+ならず、**near をいじる方向に解はない**。reversed-Z（three.js の `WebGLRenderer.reversedDepthBuffer`）
+や対数深度で対応する話になり、meshwalk の管轄外。
+
+### 14.6 破棄した試み: `Octree.rayIntersect` の近い順走査（G2）
+
+§11.7 の G2（近い順に辿って最初のヒットで打ち切り）を実装しかけたが、20000 本のランダムなレイで
+base 8437 ヒットに対し新実装 1952 ヒットと大量の取りこぼしが出た（単純なケースは一致）。原因を
+詰める前に、そもそも 4 本レイをやめる方針へ切り替えたため破棄した。
+
+カメラが `rayIntersect` を使わなくなったので、**G2 の優先度は再び下がった**。`rayIntersect` は
+公開 API として残っており、利用側が使うなら依然として「集める → 全部厳密判定」の 2 段のままである。

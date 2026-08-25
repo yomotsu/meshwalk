@@ -22,9 +22,9 @@ three.js 用の TPS キャラクターコントローラ・ライブラリ（yom
 - `Date.now()`/`Math.random()`/`new Date()` はワークフロー用スクリプト内では使えない（別文脈）。通常コードは可。
 
 ## 現状（2026-08-25）
-- ブランチ **`master`**。Phase 0–4 ＋ API 整形 ＋ 動く床（`KinematicBody`）＋ **梯子（`ClimbableBody`）** ＋ **パフォーマンス最適化 9 コミット** ＋ **壁摺りのガタつき修正 3 コミット** は master 反映済み。**ローカルで origin より先行（未 push）**。`git log`/`git status -sb` で確認。
-- テスト49件・全デモ（`1`–`10` ＋ recast の `20`/`21`）ロードエラーなし・tsc/lint/build 緑。
-- **`dist` は最適化シリーズ＋ガタつき修正の分が未コミット**（src のみコミットする運用にした＝差分が大きくなるため）。デモは `dist/meshwalk.module.js` を読むのでローカルではビルド済み。どこかでまとめてコミットするか、`dist` を追跡から外すかは**未決**。コミット時は `git add -A` ではなくパス指定で入れる。
+- ブランチ **`master`**。Phase 0–4 ＋ API 整形 ＋ 動く床（`KinematicBody`）＋ **梯子（`ClimbableBody`）** ＋ **パフォーマンス最適化 9 コミット** ＋ **壁摺りのガタつき修正 3 コミット** ＋ **プレフィルタ最適化 3 コミット** ＋ **カメラ衝突のスフィアスイープ化 3 コミット** は master 反映済み。**ローカルで origin より先行（未 push）**。`git log`/`git status -sb` で確認。
+- テスト64件（`collision.test.ts` 49 ＋ `sphereCast.test.ts` 15）・全デモ（`1`–`10` ＋ recast の `20`/`21`）ロードエラーなし・tsc/lint/build 緑。
+- **`dist` は 2026-08-07 以降の分がずっと未コミット**（src のみコミットする運用にした＝差分が大きくなるため）。デモは `dist/meshwalk.module.js` を読むのでローカルではビルド済み。どこかでまとめてコミットするか、`dist` を追跡から外すかは**未決**。コミット時は `git add -A` ではなくパス指定で入れる。
 - デモ番号: コア機能は `1`–`10`（`10_ladder.html`）。recast 系は将来の差し込み用に `20`/`21` へ繰り下げ済み（`10`–`19` は空き）。
 
 ### 実装済み（要点）
@@ -54,6 +54,25 @@ three.js 用の TPS キャラクターコントローラ・ライブラリ（yom
 - **計測時の注意**: プロトタイプのフックで `orig.call(this)` と書いて引数を転送し忘れると `deltaTime` が `undefined` になり、段差登りが常時 OFF になって「効いた」ように見える。必ず `orig.apply(this, args)`。
 - 回帰の見方: 段差マトリクス（高さ×進入角の所要フレーム数）／貫通マトリクス（速度×進入角）／substep 粒度のジッター（フレーム粒度だと 4 substep で均されて見えない）。`terrain.glb` は `GLTFLoader.parse()` で node から直接読める。
 
+### カメラ衝突のスフィアスイープ化（2026-08-25・詳細は `DESIGN.md §14`）
+物理が軽くなった結果、**カメラの衝突判定が物理より 5〜9 倍重い**という逆転が起きたのがきっかけ。
+- camera-controls の `_collisionTest` は近クリップ面 4 隅からの平行レイ 4 本。**隅の間隔（near 0.1 / fov 40 / 16:9 で 12.9cm）より細い柱をすり抜ける**。→ Unreal の SpringArm と同じ**スフィアスイープ 1 本**へ。
+- `_collisionTest` は `protected` で、公式サンプル `collision-custom.html` が octree で上書きする例を示している＝**想定された拡張点**。camera-controls 側に継ぎ目を足す必要はなかった（当初「private で脆い」と評価したのは誤り）。
+- `StaticBody.sphereCast( origin, direction, maxDistance, radius )` を `rayIntersect` と対で追加。**`KinematicBody` にも必須**（`world.colliders` は動く床を含み、カメラは従来から動く床とも判定している）。
+- `sweepSphereTriangle`（面・辺・頂点の 3 領域）。背面と**開始時オーバーラップは無視**（カメラがターゲットへ張り付くのを防ぐ）。
+- `collisionRadius` 既定 0.1（Cinemachine の `CameraRadius` と同値）。下限は `near * tan(fov/2) * sqrt(1+aspect²)`。**自動算出はしない**。
+- デモのカメラを `( 40, aspect, 1, 1000 )` → `( 40, aspect, 0.1, 1000 )`。`far` と `fov` は据え置き（Unity 既定 / 三人称の実勢）。
+- 負荷は 0.125 → 0.046 ms/frame。**候補三角形がスイープのほうが少ない**（4本のレイは同じ葉ノードを重複して辿るため）。
+- **破棄**: `Octree.rayIntersect` の近い順走査（§11.7 の G2）。実装しかけたが取りこぼしが出た。カメラが `rayIntersect` を使わなくなったので優先度も下がった。
+
+### プレフィルタ最適化（2026-08-25・詳細は `DESIGN.md §13`）
+`fixedUpdate` **0.1377 → 0.0554 ms/frame**（密なレベル）。3 変更とも軌跡ビット一致。
+**近傍 224 三角形に対して実際の接触は 1.14 件**＝コストのほぼ全部が候補集め／候補弾き、という発見が出発点。
+- `intersectsCapsuleSphere` を `Line3` 経由からスカラーへ（約900回/frame・カプセルの線分は毎回同じなのに組み立て直していた）。
+- **broad-phase の結果をフレーム先頭で実交差に絞る**。octree は葉ノード単位で返すので 265 本のうち球に交差するのは 27 本。落としてよい根拠は §11.2 のキャッシュ有効判定がそのまま使える。あわせて球の半径を `getQueryReach()` へ切り出し、段差・頭上プローブまで覆う条件を明示（従来は葉の余分な取り込みが偶然隠していた）。
+- `Sphere.intersectsBox` の自前化。**単体では実測差ゼロで一度棄却したが、他が軽くなって broad-phase が 67% を占めるようになったら効いた**＝最適化は順序で効果が変わる。
+- 残り: octree 走査が 63%。葉のしきい値 8→32 は -10%（ただし順序が変わり軌跡比較が使えない）、二段キャッシュが理屈上は最大の一手。
+
 ### パフォーマンス最適化（2026-08-07・詳細は `DESIGN.md §11`）
 `fixedUpdate` **約0.30 → 約0.046 ms/frame**（床198×198＋箱81個・近傍238三角形で歩行、5000フレーム平均）。
 各変更は「ゴールデンテスト緑」＋「同一シナリオの最終位置トレースがビット一致するか」で検証済み。
@@ -75,7 +94,6 @@ three.js 用の TPS キャラクターコントローラ・ライブラリ（yom
 - **壁面フリークライム（Phase B）**: `ClimbableBody` の `mode:'free'` を実装（領域内の壁三角形に貼り付き、`_contactInfo` 法線で正対、2D 上下＋横移動、上端マントル・下端接地・ジャンプ離脱）。up は Y のまま＝L2 とは別物。
 - `AnimationController.turn()` の脱 `Date.now`/rAF（deltaTime 化）。
 - 瞬間イベント `landed`/`jumped`（現状 `start*` イベント維持）。梯子は `startClimbing`/`endClimbing` を既に持つ。
-- README の API 節を現行 API に更新（デモ一覧は更新済み・DESIGN.md は as-built）。
 - 壁歩き／惑星重力（L2＝コントローラを up ベクトル非依存に再設計）。
 - **G2: octree のレイ走査を「近い順＋最初のヒットで打ち切り」に**（現在は「集める→全部厳密判定」の2段）。高さのあるレベルでカメラの衝突判定が 150 µs/frame かかる問題の本質的な解。現デモ規模（16 µs/frame）では不要。`DESIGN.md §11.7`。
 
