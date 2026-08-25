@@ -25,6 +25,22 @@ let _queryId = 0;
 const _intersectTriangles: ComputedTriangle[] = [];
 const _bestPoint = new Vector3();
 
+// Sphere.intersectsBox 相当。ノードを降りるたびに全サブツリーに対して呼ばれるので、
+// Box3.clampPoint（Vector3 の copy + clamp×6）を経由せずスカラーで書く。
+function intersectsSphereBox( sphere: Sphere, box: Box3 ): boolean {
+
+	const center = sphere.center;
+	const min = box.min;
+	const max = box.max;
+
+	const dx = center.x < min.x ? min.x - center.x : center.x > max.x ? center.x - max.x : 0;
+	const dy = center.y < min.y ? min.y - center.y : center.y > max.y ? center.y - max.y : 0;
+	const dz = center.z < min.z ? min.z - center.z : center.z > max.z ? center.z - max.z : 0;
+
+	return dx * dx + dy * dy + dz * dz <= sphere.radius * sphere.radius;
+
+}
+
 /**
  * Transferable representation of a built static octree.
  *
@@ -374,7 +390,7 @@ export class Octree {
 
 			const subTree = this.subTrees[ i ];
 
-			if ( ! sphere.intersectsBox( subTree.box ) ) continue;
+			if ( ! intersectsSphereBox( sphere, subTree.box ) ) continue;
 
 			if ( subTree.triangles.length > 0 ) {
 
