@@ -389,6 +389,31 @@ describe( 'CharacterController capsule collision', () => {
 
 	} );
 
+	it( 'launch() の下降は groundCheckDepth の高さで吸い付かず、地面に触れるまで宙にいる', () => {
+
+		const { world, player } = makeScene();
+		player.teleport( new Vector3( 10, 0, 10 ) );
+		for ( let i = 0; i < 60; i ++ ) { player.move( STOP ); world.fixedUpdate(); }
+		const restY = player.position.y;
+
+		player.launch( 6 );
+		for ( let i = 0; i < 4; i ++ ) { player.move( STOP ); world.fixedUpdate(); }
+		player.setLaunchSpeed( - 1 );
+		let lowestAirborne = Infinity;
+		for ( let i = 0; i < 60 && player.isLaunched; i ++ ) {
+
+			player.move( STOP );
+			world.fixedUpdate();
+			if ( player.isLaunched ) lowestAirborne = Math.min( lowestAirborne, player.position.y - restY );
+
+		}
+		expect( player.isLaunched ).toBe( false );
+		expect( player.isGrounded ).toBe( true );
+		// groundCheckDepth（0.3m）の高さではまだ宙にいて、2cm ほどまで降りてから接地する。
+		expect( lowestAirborne ).toBeLessThan( 0.05 );
+
+	} );
+
 	it( 'launch() は急斜面からも宙へ出て、斜面に降りると滑りに戻る', () => {
 
 		const world = new World();

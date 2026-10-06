@@ -11,6 +11,8 @@ import { type ClimbableBody } from './ClimbableBody';
 const FALL_VELOCITY = - 20; // 自由落下、崖滑り時の下向きの速度。単位は m/s。
 const JUMP_DURATION_SEC = 1; // ジャンプ弧の全長（秒）。
 const LANDING_MIN_FALL_DURATION_SEC = 0.1; // 段差補正などの瞬間的な非接地を着地衝撃として扱わない。
+// launch() 中の接地の深さ（m）。groundCheckDepth（既定 0.3m）のままだと、外から決めた弧が地面の 0.3m 上で吸い付いて終わる。
+const LAUNCH_GROUND_CHECK_DEPTH = 0.02;
 const CLIMB_REMOUNT_COOLDOWN_SEC = 0.25; // 天面へマントル後、再取り付きを抑止する時間。縁で W 押しっぱなしのチラつき防止。
 const MANTLE_DURATION_SEC = 0.2; // 上端から天面へ乗り移る（マントル）の所要時間。瞬間移動でカメラがカクつくのを防ぐ。
 const CLIMB_ALIGN_SPEED_MPS = 6; // グラブ時に取り付き軸へ寄せる水平速度。1フレームの移動量を制限し、位置スナップを滑らかにする。
@@ -562,7 +564,8 @@ export class CharacterController extends Body<CharacterControllerEventType> {
 		// その他、床の属性を追加で取得する場合はここで
 
 		const top    = groundingHead.y;
-		const bottom = this.position.y - this.groundCheckDepth;
+		const checkDepth = this._launchSpeed !== null ? LAUNCH_GROUND_CHECK_DEPTH : this.groundCheckDepth;
+		const bottom = this.position.y - checkDepth;
 
 		// ジャンプ中、かつ上方向に移動中だったら、強制接地しない
 		if ( this.isJumping && 0 < this._currentJumpPower ) {
@@ -585,7 +588,7 @@ export class CharacterController extends Body<CharacterControllerEventType> {
 		// 触れたら launch を解いて、滑りに任せる。
 		if ( this._launchSpeed !== null && this.isOnSlope ) {
 
-			const touchHeight = this.position.y + this.radius - this.radius / this.groundNormal.y - this.groundCheckDepth;
+			const touchHeight = this.position.y + this.radius - this.radius / this.groundNormal.y - checkDepth;
 			if ( touchHeight <= this.groundHeight ) {
 
 				this.isJumping = false;
