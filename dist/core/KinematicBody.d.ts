@@ -69,6 +69,16 @@ export declare class KinematicBody extends Body {
         triangle: ComputedTriangle | undefined;
         position: Vector3;
     } | undefined;
+    /**
+     * ワールド座標の球を掃いて交差判定する（StaticBody と同じ signature）。
+     * レイ版と同じく、ボディローカルへ移して Octree に問い合わせ、接触点をワールドへ戻す。
+     * 剛体変換（並進＋回転）なので距離も半径も不変。
+     */
+    sphereCast(origin: Vector3, direction: Vector3, maxDistance: number, radius: number): false | {
+        distance: number;
+        triangle: ComputedTriangle;
+        position: Vector3;
+    };
     dispose(): void;
     private _acquireWorldTriangle;
     private _updateMatrix;

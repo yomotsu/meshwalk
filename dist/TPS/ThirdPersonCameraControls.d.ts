@@ -6,6 +6,7 @@ export declare class ThirdPersonCameraControls extends CameraControls {
     world: World;
     character: CharacterController | null;
     syncFrontAngleToPlatform: boolean;
+    collisionRadius: number;
     constructor(camera: PerspectiveCamera, trackObject: Object3D, world: World, domElement: HTMLElement, character?: CharacterController | null);
     get frontAngle(): number;
     _collisionTest(): number;

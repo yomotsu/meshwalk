@@ -4,7 +4,7 @@
  * (c) 2017 @yomotsu
  * Released under the MIT License.
  */
-import { Vector3, Triangle, Sphere, Box3, Mesh, Matrix4, Ray, Quaternion, BoxGeometry, Plane, MathUtils, Line3, Vector2, AnimationMixer, Raycaster, Spherical, Vector4, Object3D } from 'three';
+import { Vector3, Triangle, Sphere, Box3, Mesh, Matrix4, Ray, Quaternion, BoxGeometry, Plane, MathUtils, Vector2, AnimationMixer, Raycaster, Spherical, Vector4, Object3D } from 'three';
 
 /**
  * イベント発行・購読の基底クラス。
@@ -88,7 +88,7 @@ class Body extends EventDispatcher$1 {
     dispose() { }
 }
 
-const vec3$3 = new Vector3();
+const vec3$2 = new Vector3();
 class ComputedTriangle extends Triangle {
     constructor(a, b, c) {
         super(a, b, c);
@@ -112,7 +112,7 @@ class ComputedTriangle extends Triangle {
     // 	this.boundingSphere = undefined;
     // }
     extend(amount) {
-        const incenter = getIncenter(this, vec3$3);
+        const incenter = getIncenter(this, vec3$2);
         const a = incenter.distanceTo(this.a);
         const b = incenter.distanceTo(this.b);
         const c = incenter.distanceTo(this.c);
@@ -202,7 +202,7 @@ function makeTriangleBoundingSphere(triangle, normal, bs) {
     return bs;
 }
 
-const vec3$2 = new Vector3();
+const vec3$1 = new Vector3();
 // https://3dkingdoms.com/weekly/weekly.php?a=3
 function intersectsLineBox(line, box, hit) {
     if (line.end.x < box.min.x && line.start.x < box.min.x)
@@ -222,7 +222,7 @@ function intersectsLineBox(line, box, hit) {
         line.start.z > box.min.z && line.start.z < box.max.z) {
         return true;
     }
-    const _hit = vec3$2;
+    const _hit = vec3$1;
     if ((getIntersection(line.start.x - box.min.x, line.end.x - box.min.x, line.start, line.end, _hit) && inBox(_hit, box, 1)) ||
         (getIntersection(line.start.y - box.min.y, line.end.y - box.min.y, line.start, line.end, _hit) && inBox(_hit, box, 2)) ||
         (getIntersection(line.start.z - box.min.z, line.end.z - box.min.z, line.start, line.end, _hit) && inBox(_hit, box, 3)) ||
@@ -239,9 +239,9 @@ function getIntersection(dst1, dst2, p1, p2, hit) {
     if (dst1 == dst2)
         return false;
     if (hit) {
-        vec3$2.subVectors(p2, p1);
-        vec3$2.multiplyScalar(-dst1 / (dst2 - dst1));
-        hit.addVectors(p1, vec3$2);
+        vec3$1.subVectors(p2, p1);
+        vec3$1.multiplyScalar(-dst1 / (dst2 - dst1));
+        hit.addVectors(p1, vec3$1);
     }
     return true;
 }
@@ -255,7 +255,7 @@ function inBox(hit, box, axis) {
     return false;
 }
 
-const vec3$1 = new Vector3();
+const vec3 = new Vector3();
 // // based on Real-Time Collision Detection Section 5.3.4
 // // p: <THREE.Vector3>, // line3.start
 // // q: <THREE.Vector3>, // line3.end
@@ -328,7 +328,7 @@ function intersectsLineTriangle(p, q, a, b, c, hit) {
     let v = ac$1.dot(e);
     if (v < 0 || v > d)
         return false;
-    let w = vec3$1.copy(ab$1).dot(e) * -1;
+    let w = vec3.copy(ab$1).dot(e) * -1;
     if (w < 0 || v + w > d)
         return false;
     const ood = 1 / d;
@@ -343,6 +343,91 @@ function intersectsLineTriangle(p, q, a, b, c, hit) {
     return true;
 }
 
+const EPSILON$3 = 1e-10;
+const _planeContactPoint = new Vector3();
+const _baseToVertex = new Vector3();
+const _edge = new Vector3();
+// 掃かれた球 vs 三角形。半径 radius の球を origin から direction（単位ベクトル）へ
+// maxDistance まで動かしたとき、三角形へ最初に接触するまでの距離を返す。接触しなければ -1。
+//
+//  - 背面（法線と同じ向きへ進む面）は無視する。レイ版が backfaceCulling: true なのに合わせる。
+//  - 開始時点で既に接触している場合も無視する。カメラの追従点が一瞬ジオメトリへ潜っただけで
+//    カメラがターゲットへ張り付くのを防ぐ（Unreal の bStartPenetrating と同じ考え方）。
+//
+// 面・辺・頂点の3領域を順に解く。
+// based on "Improved Collision detection and Response" (Kasper Fauerby)
+// および "Real-Time Collision Detection" (Christer Ericson) 5.5.
+function sweepSphereTriangle(origin, direction, maxDistance, radius, triangle) {
+    const normal = triangle.normal;
+    const normalDotDirection = normal.dot(direction);
+    // 面から遠ざかる、または平行 → 面としては当たらない
+    if (normalDotDirection >= -EPSILON$3)
+        return -1;
+    const signedDistance = normal.x * (origin.x - triangle.a.x) +
+        normal.y * (origin.y - triangle.a.y) +
+        normal.z * (origin.z - triangle.a.z);
+    // 開始時点で既に面へ接触している（裏側にいる場合も含む）→ 無視
+    if (signedDistance <= radius)
+        return -1;
+    // 面内での接触: 中心が「平面から radius」まで来る距離
+    const distanceToPlane = (signedDistance - radius) / -normalDotDirection;
+    if (distanceToPlane > maxDistance)
+        return -1;
+    // そのときの接触点が三角形の内側なら、それが答え
+    _planeContactPoint.copy(origin).addScaledVector(direction, distanceToPlane).addScaledVector(normal, -radius);
+    if (triangle.containsPoint(_planeContactPoint))
+        return distanceToPlane;
+    // 面を外れているので、辺と頂点を当たる。もっとも手前を採る。
+    let nearest = maxDistance;
+    let hit = false;
+    const radiusSquared = radius * radius;
+    const vertices = [triangle.a, triangle.b, triangle.c];
+    for (let i = 0; i < 3; i++) {
+        const vertex = vertices[i];
+        const next = vertices[(i + 1) % 3];
+        // 頂点: |origin + direction * s - vertex| = radius を s について解く
+        _baseToVertex.subVectors(origin, vertex);
+        const b = 2 * _baseToVertex.dot(direction);
+        const c = _baseToVertex.lengthSq() - radiusSquared;
+        const discriminant = b * b - 4 * c;
+        if (discriminant >= 0) {
+            const s = (-b - Math.sqrt(discriminant)) / 2;
+            if (0 <= s && s < nearest) {
+                nearest = s;
+                hit = true;
+            }
+        }
+        // 辺: 中心線と辺の距離が radius になる s を解く
+        _edge.subVectors(next, vertex);
+        const edgeLengthSquared = _edge.lengthSq();
+        if (edgeLengthSquared <= EPSILON$3)
+            continue;
+        const edgeDotDirection = _edge.dot(direction);
+        const edgeDotBaseToVertex = _edge.dot(_baseToVertex);
+        const ea = edgeLengthSquared * -1 + edgeDotDirection * edgeDotDirection;
+        const eb = edgeLengthSquared * 2 * _baseToVertex.dot(direction) - 2 * edgeDotDirection * edgeDotBaseToVertex;
+        const ec = edgeLengthSquared * (radiusSquared - _baseToVertex.lengthSq()) + edgeDotBaseToVertex * edgeDotBaseToVertex;
+        if (Math.abs(ea) <= EPSILON$3)
+            continue; // 中心線が辺と平行
+        const edgeDiscriminant = eb * eb - 4 * ea * ec;
+        if (edgeDiscriminant < 0)
+            continue;
+        const root = Math.sqrt(edgeDiscriminant);
+        const s0 = (-eb - root) / (2 * ea);
+        const s1 = (-eb + root) / (2 * ea);
+        const s = Math.min(s0, s1);
+        if (s < 0 || s >= nearest)
+            continue;
+        // 最近点が辺の内側（端点は頂点の判定が拾う）にあるか
+        const onEdge = (edgeDotDirection * s - edgeDotBaseToVertex) / edgeLengthSquared;
+        if (onEdge < 0 || onEdge > 1)
+            continue;
+        nearest = s;
+        hit = true;
+    }
+    return hit ? nearest : -1;
+}
+
 const _v1 = new Vector3();
 const _v2$1 = new Vector3();
 // get*Triangles の重複排除用のマーク。三角形は複数のサブツリーに属するため、
@@ -354,6 +439,64 @@ let _queryId = 0;
 // 再帰・入れ子で使わないので1本で足りる。
 const _intersectTriangles = [];
 const _bestPoint = new Vector3();
+// Sphere.intersectsBox 相当。ノードを降りるたびに全サブツリーに対して呼ばれるので、
+// Box3.clampPoint（Vector3 の copy + clamp×6）を経由せずスカラーで書く。
+function intersectsSphereBox(sphere, box) {
+    const center = sphere.center;
+    const min = box.min;
+    const max = box.max;
+    const dx = center.x < min.x ? min.x - center.x : center.x > max.x ? center.x - max.x : 0;
+    const dy = center.y < min.y ? min.y - center.y : center.y > max.y ? center.y - max.y : 0;
+    const dz = center.z < min.z ? min.z - center.z : center.z > max.z ? center.z - max.z : 0;
+    return dx * dx + dy * dy + dz * dz <= sphere.radius * sphere.radius;
+}
+// 掃かれた球（カプセル）とボックスが交差しうるかの前段フィルタ。
+// ボックスを radius ぶん膨らませて中心線のスラブ判定を行う。角の近くでは実際には
+// 当たらない場合も通すが、broad-phase なので superset で構わない（偽陰性はない）。
+function intersectsSweptSphereBox(origin, direction, maxDistance, radius, box) {
+    const invDirectionX = 1 / direction.x;
+    const invDirectionY = 1 / direction.y;
+    const invDirectionZ = 1 / direction.z;
+    let tMin, tMax, tyMin, tyMax, tzMin, tzMax;
+    if (invDirectionX >= 0) {
+        tMin = (box.min.x - radius - origin.x) * invDirectionX;
+        tMax = (box.max.x + radius - origin.x) * invDirectionX;
+    }
+    else {
+        tMin = (box.max.x + radius - origin.x) * invDirectionX;
+        tMax = (box.min.x - radius - origin.x) * invDirectionX;
+    }
+    if (invDirectionY >= 0) {
+        tyMin = (box.min.y - radius - origin.y) * invDirectionY;
+        tyMax = (box.max.y + radius - origin.y) * invDirectionY;
+    }
+    else {
+        tyMin = (box.max.y + radius - origin.y) * invDirectionY;
+        tyMax = (box.min.y - radius - origin.y) * invDirectionY;
+    }
+    if (tMin > tyMax || tyMin > tMax)
+        return false;
+    // 方向成分が 0 のとき 0 * Infinity = NaN になるので、three と同じく NaN を潰す
+    if (tyMin > tMin || tMin !== tMin)
+        tMin = tyMin;
+    if (tyMax < tMax || tMax !== tMax)
+        tMax = tyMax;
+    if (invDirectionZ >= 0) {
+        tzMin = (box.min.z - radius - origin.z) * invDirectionZ;
+        tzMax = (box.max.z + radius - origin.z) * invDirectionZ;
+    }
+    else {
+        tzMin = (box.max.z + radius - origin.z) * invDirectionZ;
+        tzMax = (box.min.z - radius - origin.z) * invDirectionZ;
+    }
+    if (tMin > tzMax || tzMin > tMax)
+        return false;
+    if (tzMin > tMin || tMin !== tMin)
+        tMin = tzMin;
+    if (tzMax < tMax || tMax !== tMax)
+        tMax = tzMax;
+    return tMax >= 0 && tMin <= maxDistance;
+}
 // 点から box までの最短距離の2乗（box の内側なら 0）。far による枝刈り用（sqrt を避ける）。
 function distanceSquaredToBox(box, point) {
     const dx = Math.max(box.min.x - point.x, 0, point.x - box.max.x);
@@ -572,7 +715,7 @@ class Octree {
             _queryId++;
         for (let i = 0; i < this.subTrees.length; i++) {
             const subTree = this.subTrees[i];
-            if (!sphere.intersectsBox(subTree.box))
+            if (!intersectsSphereBox(sphere, subTree.box))
                 continue;
             if (subTree.triangles.length > 0) {
                 for (let j = 0; j < subTree.triangles.length; j++) {
@@ -589,12 +732,13 @@ class Octree {
         }
         return result;
     }
-    getCapsuleTriangles(capsule, result, isRoot = true) {
+    // 掃かれた球が通る領域の近傍三角形を集める（sphereCast の broad-phase）
+    getSweptSphereTriangles(origin, direction, maxDistance, radius, result, isRoot = true) {
         if (isRoot)
             _queryId++;
         for (let i = 0; i < this.subTrees.length; i++) {
             const subTree = this.subTrees[i];
-            if (!capsule.intersectsBox(subTree.box))
+            if (!intersectsSweptSphereBox(origin, direction, maxDistance, radius, subTree.box))
                 continue;
             if (subTree.triangles.length > 0) {
                 for (let j = 0; j < subTree.triangles.length; j++) {
@@ -606,9 +750,36 @@ class Octree {
                 }
             }
             else {
-                subTree.getCapsuleTriangles(capsule, result, false);
+                subTree.getSweptSphereTriangles(origin, direction, maxDistance, radius, result, false);
             }
         }
+        return result;
+    }
+    /**
+     * 半径 radius の球を origin から direction（単位ベクトル）へ maxDistance まで掃き、
+     * 最初に当たる三角形とその距離を返す。当たらなければ false。
+     * レイ版（rayIntersect）と同じく背面は無視し、開始時点で既に接触している面も無視する。
+     */
+    sphereCast(origin, direction, maxDistance, radius) {
+        const triangles = _intersectTriangles;
+        triangles.length = 0;
+        this.getSweptSphereTriangles(origin, direction, maxDistance, radius, triangles);
+        let nearestDistance = Infinity;
+        let nearestTriangle;
+        for (let i = 0, l = triangles.length; i < l; i++) {
+            const triangle = triangles[i];
+            const distance = sweepSphereTriangle(origin, direction, maxDistance, radius, triangle);
+            if (distance < 0 || distance >= nearestDistance)
+                continue;
+            nearestDistance = distance;
+            nearestTriangle = triangle;
+        }
+        if (!nearestTriangle)
+            return false;
+        // 接触点（三角形上の最近点）。もっとも近いものが確定してから 1 回だけ求める
+        _bestPoint.copy(origin).addScaledVector(direction, nearestDistance);
+        nearestTriangle.closestPointToPoint(_bestPoint, _bestPoint);
+        return { distance: nearestDistance, triangle: nearestTriangle, position: _bestPoint.clone() };
     }
     lineIntersect(line) {
         const triangles = _intersectTriangles;
@@ -729,6 +900,14 @@ class StaticBody extends Body {
     rayIntersect(ray, far = Infinity) {
         return this._octree.rayIntersect(ray, far);
     }
+    /**
+     * 半径 radius の球を origin から direction（単位ベクトル）へ maxDistance まで掃き、
+     * 最初に当たる三角形とその距離を返す。当たらなければ false。
+     * レイ版（rayIntersect）と同じく背面は無視し、開始時点で既に接触している面も無視する。
+     */
+    sphereCast(origin, direction, maxDistance, radius) {
+        return this._octree.sphereCast(origin, direction, maxDistance, radius);
+    }
     dispose() {
         this._octree.triangles.length = 0;
         this._octree.subTrees.length = 0;
@@ -807,6 +986,8 @@ const _localResult = [];
 const _rootInverse = new Matrix4();
 const _previousInverse = new Matrix4();
 const _localRay = new Ray();
+const _localSphereCastOrigin = new Vector3();
+const _localSphereCastDirection = new Vector3();
 const _deltaQuaternion = new Quaternion();
 const _axis = new Vector3();
 const _surfaceDelta = new Matrix4();
@@ -960,6 +1141,21 @@ class KinematicBody extends Body {
             return result;
         if (result.position)
             result.position.applyMatrix4(this._matrix);
+        return result;
+    }
+    /**
+     * ワールド座標の球を掃いて交差判定する（StaticBody と同じ signature）。
+     * レイ版と同じく、ボディローカルへ移して Octree に問い合わせ、接触点をワールドへ戻す。
+     * 剛体変換（並進＋回転）なので距離も半径も不変。
+     */
+    sphereCast(origin, direction, maxDistance, radius) {
+        this._updateMatrix();
+        _localSphereCastOrigin.copy(origin).applyMatrix4(this._matrixInverse);
+        _localSphereCastDirection.copy(direction).transformDirection(this._matrixInverse);
+        const result = this._octree.sphereCast(_localSphereCastOrigin, _localSphereCastDirection, maxDistance, radius);
+        if (!result)
+            return result;
+        result.position.applyMatrix4(this._matrix);
         return result;
     }
     dispose() {
@@ -1319,20 +1515,39 @@ function intersectsCapsuleTriangle(capsule, triangle, out) {
     return intersectsSphereTriangle(sphere$1, triangle.a, triangle.b, triangle.c, triangle.normal, out);
 }
 
-const vec3 = new Vector3();
-const line = new Line3();
 // https://arrowinmyknee.com/2021/03/15/some-math-about-capsule-collision/
+// 中心線上で sphere の中心に最も近い点との距離が半径の和以下なら交差。
+// 近傍三角形すべてに対して毎ステップ呼ばれるプレフィルタなので、Vector3 / Line3 を
+// 経由せずスカラーで書く（Line3.closestPointToPoint 版は 1 呼び出しあたり
+// copy 2 + subVectors 2 + dot 2 + clamp + add + multiplyScalar が走っていた）。
 function intersectsCapsuleSphere(capsule, sphere) {
-    line.start.copy(capsule.start);
-    line.end.copy(capsule.end);
-    line.closestPointToPoint(sphere.center, true, vec3);
-    const r = capsule.radius + sphere.radius;
-    return vec3.distanceToSquared(sphere.center) <= r * r;
+    const startX = capsule.start.x;
+    const startY = capsule.start.y;
+    const startZ = capsule.start.z;
+    const segmentX = capsule.end.x - startX;
+    const segmentY = capsule.end.y - startY;
+    const segmentZ = capsule.end.z - startZ;
+    const toCenterX = sphere.center.x - startX;
+    const toCenterY = sphere.center.y - startY;
+    const toCenterZ = sphere.center.z - startZ;
+    const lengthSquared = segmentX * segmentX + segmentY * segmentY + segmentZ * segmentZ;
+    let t = 0;
+    if (lengthSquared > 0) {
+        t = (toCenterX * segmentX + toCenterY * segmentY + toCenterZ * segmentZ) / lengthSquared;
+        t = t < 0 ? 0 : t > 1 ? 1 : t;
+    }
+    const offsetX = toCenterX - segmentX * t;
+    const offsetY = toCenterY - segmentY * t;
+    const offsetZ = toCenterZ - segmentZ * t;
+    const radiusSum = capsule.radius + sphere.radius;
+    return offsetX * offsetX + offsetY * offsetY + offsetZ * offsetZ <= radiusSum * radiusSum;
 }
 
 const FALL_VELOCITY = -20; // 自由落下、崖滑り時の下向きの速度。単位は m/s。
 const JUMP_DURATION_SEC = 1; // ジャンプ弧の全長（秒）。
 const LANDING_MIN_FALL_DURATION_SEC = 0.1; // 段差補正などの瞬間的な非接地を着地衝撃として扱わない。
+// launch() 中の接地の深さ（m）。groundCheckDepth（既定 0.3m）のままだと、外から決めた弧が地面の 0.3m 上で吸い付いて終わる。
+const LAUNCH_GROUND_CHECK_DEPTH = 0.02;
 const CLIMB_REMOUNT_COOLDOWN_SEC = 0.25; // 天面へマントル後、再取り付きを抑止する時間。縁で W 押しっぱなしのチラつき防止。
 const MANTLE_DURATION_SEC = 0.2; // 上端から天面へ乗り移る（マントル）の所要時間。瞬間移動でカメラがカクつくのを防ぐ。
 const CLIMB_ALIGN_SPEED_MPS = 6; // グラブ時に取り付き軸へ寄せる水平速度。1フレームの移動量を制限し、位置スナップを滑らかにする。
@@ -1402,6 +1617,10 @@ class CharacterController extends Body {
         this.groundNormal = new Vector3();
         this.groundBody = null; // 接地している床の所有ボディ（動床なら KinematicBody）。無ければ null
         this._currentJumpPower = 0;
+        // launch() 中の上下の速度（m/s、上が正）。launch していなければ null。ジャンプのコサイン弧の代わりに使う。
+        this._launchSpeed = null;
+        // cancelLaunch() の後、次の接地で必ず startLanding を出し、硬直は 0 にする。
+        this._launchCancelled = false;
         this._isStepping = false; // 段差登り中フラグ（壁接触が一時的に消えても登りを継続させるラッチ）
         this._lastMoveDelta = new Vector3(); // 直前ステップで実際に動けた量（段差登りの発動条件に使う）
         // 積分に使う速度。velocity は壁ずりの射影後（＝利用側へ見せる実速度）だが、位置を進める
@@ -1460,11 +1679,14 @@ class CharacterController extends Body {
             const startedLanding = !wasGrounded &&
                 this.isGrounded &&
                 !this.isOnSlope &&
-                (wasJumping || LANDING_MIN_FALL_DURATION_SEC <= this._fallElapsed);
+                (wasJumping || this._launchCancelled || LANDING_MIN_FALL_DURATION_SEC <= this._fallElapsed);
             if (startedLanding) {
+                // cancelLaunch() で打ち切った後の着地は硬直させない。
+                const lockDuration = this._launchCancelled ? 0 : this.landingLockDuration;
+                this._launchCancelled = false;
                 this.isIdling = false;
-                this.isLanding = 0 < this.landingLockDuration;
-                this._landingTimeRemaining = this.landingLockDuration;
+                this.isLanding = 0 < lockDuration;
+                this._landingTimeRemaining = lockDuration;
                 this.isRunning = !this.isLanding && this._moveVelocity.lengthSq() > 1e-8;
                 if (this.isLanding) {
                     this.velocity.x = 0;
@@ -1502,6 +1724,8 @@ class CharacterController extends Body {
             wasJumping = this.isJumping;
             if (this.isGrounded)
                 this._fallElapsed = 0;
+            if (this.isOnSlope)
+                this._launchCancelled = false;
         };
     }
     setNearTriangles(nearTriangles) {
@@ -1705,7 +1929,8 @@ class CharacterController extends Body {
         this.groundNormal.copy(groundContact.ground.normal);
         // その他、床の属性を追加で取得する場合はここで
         const top = groundingHead.y;
-        const bottom = this.position.y - this.groundCheckDepth;
+        const checkDepth = this._launchSpeed !== null ? LAUNCH_GROUND_CHECK_DEPTH : this.groundCheckDepth;
+        const bottom = this.position.y - checkDepth;
         // ジャンプ中、かつ上方向に移動中だったら、強制接地しない
         if (this.isJumping && 0 < this._currentJumpPower) {
             this.isOnSlope = false;
@@ -1717,6 +1942,19 @@ class CharacterController extends Body {
         this._stepLookAhead(deltaTime);
         this.isGrounded = (bottom <= this.groundHeight && this.groundHeight <= top);
         this.isOnSlope = (this.groundNormal.y <= this._slopeLimitCos);
+        // launch 中は、急斜面に触れるまで滑りにしない（ジャンプは宙でも真下が急斜面なら滑る）。
+        // 下の球が斜面に接する高さは、中心の真下の地面から radius / normal.y - radius だけ下がる。
+        // 触れたら launch を解いて、滑りに任せる。
+        if (this._launchSpeed !== null && this.isOnSlope) {
+            const touchHeight = this.position.y + this.radius - this.radius / this.groundNormal.y - checkDepth;
+            if (touchHeight <= this.groundHeight) {
+                this.isJumping = false;
+                this._launchSpeed = null;
+            }
+            else {
+                this.isOnSlope = false;
+            }
+        }
         if (this.isGrounded) {
             this.isJumping = false;
             // 乗っている床の所有ボディを覚える（動床の運搬判定に使う）
@@ -2099,9 +2337,50 @@ class CharacterController extends Body {
         this._currentJumpPower = 1;
         this.isJumping = true;
     }
-    _updateJumping(deltaTime) {
-        if (!this.isJumping)
+    /**
+     * 接地・斜面に関わらず宙へ出す。上下の速度は verticalSpeed（m/s、上が正）で、
+     * ジャンプのコサイン弧の代わりに使う。宙にいる間は setLaunchSpeed() で毎フレーム差し替える。
+     * 水平は move() のまま。着地・滑り・天井はジャンプと同じ道筋で解ける。
+     */
+    launch(verticalSpeed) {
+        this._endClimb();
+        this.isLanding = false;
+        this._landingTimeRemaining = 0;
+        this._launchCancelled = false;
+        this._jumpElapsed = 0;
+        this._launchSpeed = verticalSpeed;
+        this._currentJumpPower = verticalSpeed / -FALL_VELOCITY;
+        this.isJumping = true;
+    }
+    /** launch 中の上下の速度（m/s、上が正）を差し替える。launch 中でなければ何もしない。 */
+    setLaunchSpeed(verticalSpeed) {
+        if (this._launchSpeed === null)
             return;
+        this._launchSpeed = verticalSpeed;
+    }
+    /** launch をやめて普通の落下に戻す。次の接地では startLanding を出すが、硬直させない。 */
+    cancelLaunch() {
+        if (this._launchSpeed === null)
+            return;
+        this._launchSpeed = null;
+        this._currentJumpPower = 0;
+        this.isJumping = false;
+        this._launchCancelled = true;
+    }
+    /** launch() で宙に出ている間 true。 */
+    get isLaunched() {
+        return this._launchSpeed !== null;
+    }
+    _updateJumping(deltaTime) {
+        if (!this.isJumping) {
+            // 接地・天井・梯子でジャンプが解けたら、launch も解く。
+            this._launchSpeed = null;
+            return;
+        }
+        if (this._launchSpeed !== null) {
+            this._currentJumpPower = this._launchSpeed / -FALL_VELOCITY;
+            return;
+        }
         // 経過時間を deltaTime で積算する（実時計 performance.now に依存しない＝決定論的）。
         // コサイン弧の形は従来と同一で、60fps 実行時は旧実装と一致する。
         this._jumpElapsed += deltaTime;
@@ -2126,6 +2405,8 @@ class CharacterController extends Body {
         this.isLanding = false;
         this._landingTimeRemaining = 0;
         this._fallElapsed = 0;
+        this._launchSpeed = null;
+        this._launchCancelled = false;
         this._isStepping = false;
         this._lastMoveDelta.set(0, 0, 0); // 転送前の移動量を段差判定へ持ち越さない
         this._integrationVelocity.set(0, 0, 0);
@@ -2192,6 +2473,19 @@ const MAX_CATCH_UP_FRAMES = 5;
 // 静的ジオメトリの broad-phase をフレーム先頭で1回だけ引くときに、1フレーム分の移動を
 // 包むために半径へ足す余裕の下限（m）。速度から算出した余裕がこれ未満ならこの値を使う。
 const STATIC_QUERY_PADDING_MIN = 0.1;
+// キャラが1ステップ中に「触りうる」最遠点までの、カプセル中心（足元 + height/2）からの距離。
+// broad-phase の球がこれを覆っていないと、_queryStaticTriangles の絞り込みで必要な
+// 三角形を落としてしまう。内訳:
+//   - カプセル本体      : height / 2（両端のキャップまで含めてちょうどこの距離に収まる）
+//   - 接地レイの許容帯   : height / 2 + groundCheckDepth
+//   - 段差プローブ      : sqrt( radius^2 + (height/2)^2 )（前縁 radius 先・足元の高さ）
+//   - 頭上プローブ      : height / 2 + stepOffset
+// 既定値（radius 0.5 / height 2 / groundCheckDepth 0.3 / stepOffset 0.3）では
+// 接地レイの 1.3 が最大なので、従来の height/2 + groundCheckDepth と一致する。
+function getQueryReach(character) {
+    const half = character.height / 2;
+    return Math.max(half + character.groundCheckDepth, Math.sqrt(character.radius * character.radius + half * half), half + character.stepOffset);
+}
 class World {
     constructor({ fps = 60, stepsPerFrame = 4 } = {}) {
         this._staticBodies = [];
@@ -2312,13 +2606,35 @@ class World {
             : 0;
         const padding = Math.max((character.velocity.length() + platformSpeed) * deltaTime, STATIC_QUERY_PADDING_MIN);
         center.set(0, character.height / 2, 0).add(character.position);
-        const radius = character.height / 2 + character.groundCheckDepth + padding;
+        const radius = getQueryReach(character) + padding;
         _staticQuerySphere.center.copy(center);
         _staticQuerySphere.radius = radius;
         triangles.length = 0;
         for (let i = 0, l = this._staticBodies.length; i < l; i++) {
             this._staticBodies[i].getSphereTriangles(_staticQuerySphere, triangles);
         }
+        // Octree は「球に交差する葉ノード」の三角形をまるごと返すので、実際には球から離れた
+        // ものが多く混ざる。ここで一度だけ実交差で絞り込む。substep（既定 4 回）ごとに走る
+        // 接地判定・段差プローブ・カプセル判定はどれもこの配列を頭から舐めるので、
+        // フレームに 1 回のこの絞り込みがそのまま全部に効く（実測 224 → 27 本）。
+        //
+        // 落としてよい根拠: step() は「そのステップで必要な sphere がこの球に収まっているか」を
+        // 確認し、外れていたら引き直す。収まっているなら、必要な三角形は必ずこの球にも交差する。
+        let count = 0;
+        for (let i = 0, l = triangles.length; i < l; i++) {
+            const triangle = triangles[i];
+            if (!triangle.boundingSphere)
+                triangle.computeBoundingSphere();
+            const boundingSphere = triangle.boundingSphere;
+            const dx = boundingSphere.center.x - center.x;
+            const dy = boundingSphere.center.y - center.y;
+            const dz = boundingSphere.center.z - center.z;
+            const radiusSum = radius + boundingSphere.radius;
+            if (dx * dx + dy * dy + dz * dz > radiusSum * radiusSum)
+                continue;
+            triangles[count++] = triangle;
+        }
+        triangles.length = count;
         this._staticTriangleCounts[index] = triangles.length;
         this._staticQueryRadii[index] = radius;
     }
@@ -2347,7 +2663,7 @@ class World {
             // キャラクターのカプセル全体を囲む sphere で broad-phase して、
             // 近傍の三角形だけを character に渡して判定する
             sphere.center.set(0, character.height / 2, 0).add(character.position);
-            sphere.radius = character.height / 2 + character.groundCheckDepth;
+            sphere.radius = getQueryReach(character);
             // 静的ぶんはフレーム先頭で引いたものを使い回す。このステップで必要な sphere が
             // キャッシュの sphere に収まっていなければ（ジャンプ開始・速い運搬・テレポートなど）
             // 引き直す。収まっていれば必要な葉ノードは必ず含まれている。
@@ -2887,13 +3203,13 @@ const VERSION = '3.1.2'; // will be replaced with `version` in package.json duri
 const TOUCH_DOLLY_FACTOR = 1 / 8;
 const isMac = /Mac/.test(globalThis?.navigator?.platform);
 let THREE;
-let _ORIGIN$1;
+let _ORIGIN;
 let _AXIS_Y;
 let _AXIS_Z;
 let _v2;
 let _v3A$1;
-let _v3B$1;
-let _v3C$1;
+let _v3B;
+let _v3C;
 let _cameraDirection;
 let _xColumn;
 let _yColumn;
@@ -2907,7 +3223,7 @@ let _box3B;
 let _sphere;
 let _quaternionA;
 let _quaternionB;
-let _rotationMatrix$1;
+let _rotationMatrix;
 let _raycaster;
 class CameraControls extends EventDispatcher {
     /**
@@ -2952,13 +3268,13 @@ class CameraControls extends EventDispatcher {
      */
     static install(libs) {
         THREE = libs.THREE;
-        _ORIGIN$1 = Object.freeze(new THREE.Vector3(0, 0, 0));
+        _ORIGIN = Object.freeze(new THREE.Vector3(0, 0, 0));
         _AXIS_Y = Object.freeze(new THREE.Vector3(0, 1, 0));
         _AXIS_Z = Object.freeze(new THREE.Vector3(0, 0, 1));
         _v2 = new THREE.Vector2();
         _v3A$1 = new THREE.Vector3();
-        _v3B$1 = new THREE.Vector3();
-        _v3C$1 = new THREE.Vector3();
+        _v3B = new THREE.Vector3();
+        _v3C = new THREE.Vector3();
         _cameraDirection = new THREE.Vector3();
         _xColumn = new THREE.Vector3();
         _yColumn = new THREE.Vector3();
@@ -2972,7 +3288,7 @@ class CameraControls extends EventDispatcher {
         _sphere = new THREE.Sphere();
         _quaternionA = new THREE.Quaternion();
         _quaternionB = new THREE.Quaternion();
-        _rotationMatrix$1 = new THREE.Matrix4();
+        _rotationMatrix = new THREE.Matrix4();
         _raycaster = new THREE.Raycaster();
     }
     /**
@@ -4178,7 +4494,7 @@ class CameraControls extends EventDispatcher {
         _xColumn.multiplyScalar(x);
         _yColumn.multiplyScalar(-y);
         const offset = _v3A$1.copy(_xColumn).add(_yColumn);
-        const to = _v3B$1.copy(this._targetEnd).add(offset);
+        const to = _v3B.copy(this._targetEnd).add(offset);
         return this.moveTo(to.x, to.y, to.z, enableTransition);
     }
     /**
@@ -4191,7 +4507,7 @@ class CameraControls extends EventDispatcher {
         _v3A$1.setFromMatrixColumn(this._camera.matrix, 0);
         _v3A$1.crossVectors(this._camera.up, _v3A$1);
         _v3A$1.multiplyScalar(distance);
-        const to = _v3B$1.copy(this._targetEnd).add(_v3A$1);
+        const to = _v3B.copy(this._targetEnd).add(_v3A$1);
         return this.moveTo(to.x, to.y, to.z, enableTransition);
     }
     /**
@@ -4277,29 +4593,29 @@ class CameraControls extends EventDispatcher {
         // make oriented bounding box
         const bb = _box3B.makeEmpty();
         // left bottom back corner
-        _v3B$1.copy(aabb.min).applyQuaternion(rotation);
-        bb.expandByPoint(_v3B$1);
+        _v3B.copy(aabb.min).applyQuaternion(rotation);
+        bb.expandByPoint(_v3B);
         // right bottom back corner
-        _v3B$1.copy(aabb.min).setX(aabb.max.x).applyQuaternion(rotation);
-        bb.expandByPoint(_v3B$1);
+        _v3B.copy(aabb.min).setX(aabb.max.x).applyQuaternion(rotation);
+        bb.expandByPoint(_v3B);
         // left top back corner
-        _v3B$1.copy(aabb.min).setY(aabb.max.y).applyQuaternion(rotation);
-        bb.expandByPoint(_v3B$1);
+        _v3B.copy(aabb.min).setY(aabb.max.y).applyQuaternion(rotation);
+        bb.expandByPoint(_v3B);
         // right top back corner
-        _v3B$1.copy(aabb.max).setZ(aabb.min.z).applyQuaternion(rotation);
-        bb.expandByPoint(_v3B$1);
+        _v3B.copy(aabb.max).setZ(aabb.min.z).applyQuaternion(rotation);
+        bb.expandByPoint(_v3B);
         // left bottom front corner
-        _v3B$1.copy(aabb.min).setZ(aabb.max.z).applyQuaternion(rotation);
-        bb.expandByPoint(_v3B$1);
+        _v3B.copy(aabb.min).setZ(aabb.max.z).applyQuaternion(rotation);
+        bb.expandByPoint(_v3B);
         // right bottom front corner
-        _v3B$1.copy(aabb.max).setY(aabb.min.y).applyQuaternion(rotation);
-        bb.expandByPoint(_v3B$1);
+        _v3B.copy(aabb.max).setY(aabb.min.y).applyQuaternion(rotation);
+        bb.expandByPoint(_v3B);
         // left top front corner
-        _v3B$1.copy(aabb.max).setX(aabb.min.x).applyQuaternion(rotation);
-        bb.expandByPoint(_v3B$1);
+        _v3B.copy(aabb.max).setX(aabb.min.x).applyQuaternion(rotation);
+        bb.expandByPoint(_v3B);
         // right top front corner
-        _v3B$1.copy(aabb.max).applyQuaternion(rotation);
-        bb.expandByPoint(_v3B$1);
+        _v3B.copy(aabb.max).applyQuaternion(rotation);
+        bb.expandByPoint(_v3B);
         // add padding
         bb.min.x -= paddingLeft;
         bb.min.y -= paddingBottom;
@@ -4311,7 +4627,7 @@ class CameraControls extends EventDispatcher {
         }
         rotation.premultiply(this._yAxisUpSpace);
         const bbSize = bb.getSize(_v3A$1);
-        const center = bb.getCenter(_v3B$1).applyQuaternion(rotation);
+        const center = bb.getCenter(_v3B).applyQuaternion(rotation);
         if (isPerspectiveCamera(this._camera)) {
             const distance = this.getDistanceToFitBox(bbSize.x, bbSize.y, bbSize.z, cover);
             promises.push(this.moveTo(center.x, center.y, center.z, enableTransition));
@@ -4373,7 +4689,7 @@ class CameraControls extends EventDispatcher {
         this._isUserControllingTruck = false;
         this._lastDollyDirection = DOLLY_DIRECTION.NONE;
         this._changedDolly = 0;
-        const target = _v3B$1.set(targetX, targetY, targetZ);
+        const target = _v3B.set(targetX, targetY, targetZ);
         const position = _v3A$1.set(positionX, positionY, positionZ);
         this._targetEnd.copy(target);
         this._sphericalEnd.setFromVector3(position.sub(target).applyQuaternion(this._yAxisUpSpace));
@@ -4410,15 +4726,15 @@ class CameraControls extends EventDispatcher {
             _sphericalA.set(...stateA.spherical);
         }
         else {
-            const positionA = _v3B$1.set(...stateA.position);
+            const positionA = _v3B.set(...stateA.position);
             _sphericalA.setFromVector3(positionA.sub(targetA).applyQuaternion(this._yAxisUpSpace));
         }
-        const targetB = _v3C$1.set(...stateB.target);
+        const targetB = _v3C.set(...stateB.target);
         if ('spherical' in stateB) {
             _sphericalB.set(...stateB.spherical);
         }
         else {
-            const positionB = _v3B$1.set(...stateB.position);
+            const positionB = _v3B.set(...stateB.position);
             _sphericalB.setFromVector3(positionB.sub(targetB).applyQuaternion(this._yAxisUpSpace));
         }
         this._targetEnd.copy(targetA.lerp(targetB, t)); // tricky
@@ -4721,7 +5037,7 @@ class CameraControls extends EventDispatcher {
         const cameraDirection = _v3A$1.subVectors(this._target, this._camera.position).normalize();
         // So first find the vector off to the side, orthogonal to both this.object.up and
         // the "view" vector.
-        const side = _v3B$1.crossVectors(cameraDirection, this._camera.up);
+        const side = _v3B.crossVectors(cameraDirection, this._camera.up);
         // Then find the vector orthogonal to both this "side" vector and the "view" vector.
         // This vector will be the new "up" vector.
         this._camera.up.crossVectors(side, cameraDirection).normalize();
@@ -4811,11 +5127,11 @@ class CameraControls extends EventDispatcher {
                 const planeX = _v3A$1.copy(cameraDirection).cross(camera.up).normalize();
                 if (planeX.lengthSq() === 0)
                     planeX.x = 1.0;
-                const planeY = _v3B$1.crossVectors(planeX, cameraDirection);
+                const planeY = _v3B.crossVectors(planeX, cameraDirection);
                 const worldToScreen = this._sphericalEnd.radius * Math.tan(camera.getEffectiveFOV() * DEG2RAD * 0.5);
                 const prevRadius = this._sphericalEnd.radius - dollyControlAmount;
                 const lerpRatio = (prevRadius - this._sphericalEnd.radius) / this._sphericalEnd.radius;
-                const cursor = _v3C$1.copy(this._targetEnd)
+                const cursor = _v3C.copy(this._targetEnd)
                     .add(planeX.multiplyScalar(this._dollyControlCoord.x * worldToScreen * camera.aspect))
                     .add(planeY.multiplyScalar(this._dollyControlCoord.y * worldToScreen));
                 const newTargetEnd = _v3A$1.copy(this._targetEnd).lerp(cursor, lerpRatio);
@@ -4824,12 +5140,12 @@ class CameraControls extends EventDispatcher {
                 if (this.infinityDolly && (isMin || isMax)) {
                     this._sphericalEnd.radius -= dollyControlAmount;
                     this._spherical.radius -= dollyControlAmount;
-                    const dollyAmount = _v3B$1.copy(cameraDirection).multiplyScalar(-dollyControlAmount);
+                    const dollyAmount = _v3B.copy(cameraDirection).multiplyScalar(-dollyControlAmount);
                     newTargetEnd.add(dollyAmount);
                 }
                 // target position may be moved beyond boundary.
                 this._boundary.clampPoint(newTargetEnd, newTargetEnd);
-                const targetEndDiff = _v3B$1.subVectors(newTargetEnd, this._targetEnd);
+                const targetEndDiff = _v3B.subVectors(newTargetEnd, this._targetEnd);
                 this._targetEnd.copy(newTargetEnd);
                 this._target.add(targetEndDiff);
                 this._changedDolly -= dollyControlAmount;
@@ -4840,8 +5156,8 @@ class CameraControls extends EventDispatcher {
                 const dollyControlAmount = this._zoom - this._lastZoom;
                 const camera = this._camera;
                 const worldCursorPosition = _v3A$1.set(this._dollyControlCoord.x, this._dollyControlCoord.y, (camera.near + camera.far) / (camera.near - camera.far)).unproject(camera);
-                const quaternion = _v3B$1.set(0, 0, -1).applyQuaternion(camera.quaternion);
-                const cursor = _v3C$1.copy(worldCursorPosition).add(quaternion.multiplyScalar(-worldCursorPosition.dot(camera.up)));
+                const quaternion = _v3B.set(0, 0, -1).applyQuaternion(camera.quaternion);
+                const cursor = _v3C.copy(worldCursorPosition).add(quaternion.multiplyScalar(-worldCursorPosition.dot(camera.up)));
                 const prevZoom = this._zoom - dollyControlAmount;
                 const lerpRatio = -(prevZoom - this._zoom) / this._zoom;
                 // find the "distance" (aka plane constant in three.js) of Plane
@@ -4856,7 +5172,7 @@ class CameraControls extends EventDispatcher {
                 newTargetEnd.sub(pullBack);
                 // target position may be moved beyond boundary.
                 this._boundary.clampPoint(newTargetEnd, newTargetEnd);
-                const targetEndDiff = _v3B$1.subVectors(newTargetEnd, this._targetEnd);
+                const targetEndDiff = _v3B.subVectors(newTargetEnd, this._targetEnd);
                 this._targetEnd.copy(newTargetEnd);
                 this._target.add(targetEndDiff);
                 // this._target.copy( this._targetEnd );
@@ -5052,8 +5368,8 @@ class CameraControls extends EventDispatcher {
             return position;
         }
         // See: https://twitter.com/FMS_Cat/status/1106508958640988161
-        const newTarget = _v3B$1.copy(offset).add(position); // target
-        const clampedTarget = this._boundary.clampPoint(newTarget, _v3C$1); // clamped target
+        const newTarget = _v3B.copy(offset).add(position); // target
+        const clampedTarget = this._boundary.clampPoint(newTarget, _v3C); // clamped target
         const deltaClampedTarget = clampedTarget.sub(newTarget); // newTarget -> clampedTarget
         const deltaClampedTargetLength2 = deltaClampedTarget.lengthSq(); // squared length of deltaClampedTarget
         if (deltaClampedTargetLength2 === 0.0) { // when the position doesn't have to be clamped
@@ -5068,7 +5384,7 @@ class CameraControls extends EventDispatcher {
         else {
             const offsetFactor = 1.0 + friction * deltaClampedTargetLength2 / offset.dot(deltaClampedTarget);
             return position
-                .add(_v3B$1.copy(offset).multiplyScalar(offsetFactor))
+                .add(_v3B.copy(offset).multiplyScalar(offsetFactor))
                 .add(deltaClampedTarget.multiplyScalar(1.0 - friction));
         }
     }
@@ -5175,11 +5491,11 @@ class CameraControls extends EventDispatcher {
         if (notSupportedInOrthographicCamera(this._camera, '_collisionTest'))
             return distance;
         const rayDirection = this._getTargetDirection(_cameraDirection);
-        _rotationMatrix$1.lookAt(_ORIGIN$1, rayDirection, this._camera.up);
+        _rotationMatrix.lookAt(_ORIGIN, rayDirection, this._camera.up);
         for (let i = 0; i < 4; i++) {
-            const nearPlaneCorner = _v3B$1.copy(this._nearPlaneCorners[i]);
-            nearPlaneCorner.applyMatrix4(_rotationMatrix$1);
-            const origin = _v3C$1.addVectors(this._target, nearPlaneCorner);
+            const nearPlaneCorner = _v3B.copy(this._nearPlaneCorners[i]);
+            nearPlaneCorner.applyMatrix4(_rotationMatrix);
+            const origin = _v3C.addVectors(this._target, nearPlaneCorner);
             _raycaster.set(origin, rayDirection);
             _raycaster.far = this._spherical.radius + 1;
             const intersects = _raycaster.intersectObjects(this.colliderMeshes);
@@ -5305,12 +5621,7 @@ const subsetOfTHREE = {
     Raycaster: Raycaster,
 };
 CameraControls.install({ THREE: subsetOfTHREE });
-const _ORIGIN = new Vector3(0, 0, 0);
 const _v3A = new Vector3();
-const _v3B = new Vector3();
-const _v3C = new Vector3();
-const _ray = new Ray();
-const _rotationMatrix = new Matrix4();
 class ThirdPersonCameraControls extends CameraControls {
     constructor(camera, trackObject, world, domElement, character = null) {
         super(camera, domElement);
@@ -5318,6 +5629,14 @@ class ThirdPersonCameraControls extends CameraControls {
         // 床の yaw に合わせて回す（肩越し視点が床に対して一定に保たれる）。既定 on。
         // character を渡していない場合は無効（no-op）。
         this.syncFrontAngleToPlatform = true;
+        // カメラを壁から離しておく距離。Unreal の SpringArm.ProbeSize / Unity Cinemachine の
+        // Deoccluder.CameraRadius に相当する。判定はこの半径の球を追従点からカメラ方向へ
+        // 掃いて行う。
+        //
+        // 近クリップ面がこの球からはみ出すとカメラの中に壁が映り込むので、下限は
+        //   collisionRadius >= camera.near * tan( fov / 2 ) * sqrt( 1 + aspect^2 )
+        // （near 0.1 / fov 40 / 16:9 なら 0.074）。near や fov を大きくするときは合わせて上げること。
+        this.collisionRadius = 0.1;
         this.minDistance = 1;
         this.maxDistance = 30;
         this.azimuthRotateSpeed = 0.3; // negative value to invert rotation direction
@@ -5358,22 +5677,15 @@ class ThirdPersonCameraControls extends CameraControls {
         let distance = Infinity;
         if (!this.world)
             return distance;
-        // 本家 camera-controls の _collisionTest が raycaster.far に入れているのと同じ上限。
-        // これより遠い衝突は結果に影響しないので、Octree の探索を打ち切ってよい。
-        const far = this._spherical.radius + 1;
+        // 追従点からカメラ方向へ、collisionRadius の球を掃く（Unreal の SpringArm と同じ形）。
+        // 近クリップ面の4隅から平行なレイを4本飛ばす方式は、隅の間を細い柱がすり抜ける。
+        const direction = _v3A.setFromSpherical(this._spherical).divideScalar(this._spherical.radius);
+        const maxDistance = this._spherical.radius;
+        const radius = this.collisionRadius;
         for (let i = 0, l = this.world.colliders.length; i < l; i++) {
-            const staticBody = this.world.colliders[i];
-            const direction = _v3A.setFromSpherical(this._spherical).divideScalar(this._spherical.radius);
-            _rotationMatrix.lookAt(_ORIGIN, direction, this._camera.up);
-            for (let i = 0; i < 4; i++) {
-                const nearPlaneCorner = _v3B.copy(this._nearPlaneCorners[i]);
-                nearPlaneCorner.applyMatrix4(_rotationMatrix);
-                const origin = _v3C.addVectors(this._target, nearPlaneCorner);
-                _ray.set(origin, direction);
-                const intersect = staticBody.rayIntersect(_ray, far);
-                if (intersect && intersect.distance < distance) {
-                    distance = intersect.distance;
-                }
+            const hit = this.world.colliders[i].sphereCast(this._target, direction, maxDistance, radius);
+            if (hit && hit.distance < distance) {
+                distance = hit.distance;
             }
         }
         return distance;

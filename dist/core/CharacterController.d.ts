@@ -36,6 +36,8 @@ export declare class CharacterController extends Body<CharacterControllerEventTy
     groundNormal: Vector3;
     groundBody: Body | null;
     private _currentJumpPower;
+    private _launchSpeed;
+    private _launchCancelled;
     private _isStepping;
     private _lastMoveDelta;
     private _integrationVelocity;
@@ -99,6 +101,18 @@ export declare class CharacterController extends Body<CharacterControllerEventTy
     private _updateMantle;
     private _endClimb;
     jump(): void;
+    /**
+     * 接地・斜面に関わらず宙へ出す。上下の速度は verticalSpeed（m/s、上が正）で、
+     * ジャンプのコサイン弧の代わりに使う。宙にいる間は setLaunchSpeed() で毎フレーム差し替える。
+     * 水平は move() のまま。着地・滑り・天井はジャンプと同じ道筋で解ける。
+     */
+    launch(verticalSpeed: number): void;
+    /** launch 中の上下の速度（m/s、上が正）を差し替える。launch 中でなければ何もしない。 */
+    setLaunchSpeed(verticalSpeed: number): void;
+    /** launch をやめて普通の落下に戻す。次の接地では startLanding を出すが、硬直させない。 */
+    cancelLaunch(): void;
+    /** launch() で宙に出ている間 true。 */
+    get isLaunched(): boolean;
     _updateJumping(deltaTime: number): void;
     private _updateLanding;
     teleport(position: Vector3): void;

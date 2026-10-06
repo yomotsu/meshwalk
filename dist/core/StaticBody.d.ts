@@ -41,6 +41,16 @@ export declare class StaticBody extends Body {
         triangle: ComputedTriangle | undefined;
         position: Vector3;
     } | undefined;
+    /**
+     * 半径 radius の球を origin から direction（単位ベクトル）へ maxDistance まで掃き、
+     * 最初に当たる三角形とその距離を返す。当たらなければ false。
+     * レイ版（rayIntersect）と同じく背面は無視し、開始時点で既に接触している面も無視する。
+     */
+    sphereCast(origin: Vector3, direction: Vector3, maxDistance: number, radius: number): false | {
+        distance: number;
+        triangle: ComputedTriangle;
+        position: Vector3;
+    };
     dispose(): void;
     private _addGeometry;
     private _addTriangles;
