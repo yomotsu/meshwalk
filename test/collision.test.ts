@@ -361,6 +361,110 @@ describe( 'CharacterController capsule collision', () => {
 
 	} );
 
+	it( 'launch() は指定した上下の速度で宙へ出て、平地に降りると startLanding を出す', () => {
+
+		const { world, player } = makeScene();
+		player.teleport( new Vector3( 10, 0, 10 ) );
+		for ( let i = 0; i < 60; i ++ ) { player.move( STOP ); world.fixedUpdate(); }
+		const restY = player.position.y;
+		let landingCount = 0;
+		player.addEventListener( 'startLanding', () => landingCount ++ );
+
+		player.launch( 3 );
+		expect( player.isJumping ).toBe( true );
+		expect( player.isLaunched ).toBe( true );
+		player.move( STOP );
+		world.fixedUpdate();
+		expect( player.isGrounded ).toBe( false );
+		// 位置は 1 つ前の substep の速度で進むので、launch 直後の 1 substep（1/4 フレーム）は動かない（jump() と同じ）。
+		expect( player.position.y - restY ).toBeCloseTo( 3 / 60 * 3 / 4, 3 );
+
+		// 毎フレーム上下の速度を差し替えられる。
+		player.setLaunchSpeed( - 3 );
+		for ( let i = 0; i < 60 && landingCount === 0; i ++ ) { player.move( STOP ); world.fixedUpdate(); }
+		expect( landingCount ).toBe( 1 );
+		expect( player.isGrounded ).toBe( true );
+		expect( player.isLaunched ).toBe( false );
+		expect( player.position.y ).toBeCloseTo( restY, 2 );
+
+	} );
+
+	it( 'launch() は急斜面からも宙へ出て、斜面に降りると滑りに戻る', () => {
+
+		const world = new World();
+		const ramp = new Mesh( new PlaneGeometry( 200, 200 ), new MeshBasicMaterial() );
+		ramp.rotation.x = - 30 * MathUtils.DEG2RAD;
+		ramp.updateMatrixWorld( true );
+		const level = new StaticBody();
+		level.addFromObject( ramp );
+		world.add( level );
+		const player = new CharacterController( { radius: PLAYER_RADIUS, height: PLAYER_HEIGHT } );
+		world.add( player );
+		player.teleport( new Vector3( 0, 3, 0 ) );
+		for ( let i = 0; i < 30; i ++ ) { player.move( STOP ); world.fixedUpdate(); }
+		expect( player.isOnSlope ).toBe( true );
+
+		let slidingCount = 0;
+		let landingCount = 0;
+		player.addEventListener( 'startSliding', () => slidingCount ++ );
+		player.addEventListener( 'startLanding', () => landingCount ++ );
+		player.launch( 5 );
+		// 斜面の上では meshwalk が水平速度を滑り（+z）で上書きする。宙に出ていれば、渡した向き（+x、斜面を横切る向き）へ進む。
+		const startX = player.position.x;
+		for ( let i = 0; i < 6; i ++ ) { player.move( new Vector3( 5, 0, 0 ) ); world.fixedUpdate(); }
+		expect( player.isOnSlope ).toBe( false );
+		expect( player.position.x - startX ).toBeGreaterThan( 0.4 );
+
+		player.setLaunchSpeed( - 10 );
+		for ( let i = 0; i < 60 && slidingCount === 0; i ++ ) { player.move( STOP ); world.fixedUpdate(); }
+		expect( slidingCount ).toBe( 1 );
+		// 真下が急斜面なら宙でも isOnSlope が立って startSliding が出る（jump() と同じ）。launch が解けるのは接地してから。
+		for ( let i = 0; i < 30; i ++ ) { player.move( STOP ); world.fixedUpdate(); }
+		expect( landingCount ).toBe( 0 );
+		expect( player.isLaunched ).toBe( false );
+
+	} );
+
+	it( 'cancelLaunch() の後の着地は startLanding を出すが、硬直しない', () => {
+
+		const { world, player } = makeScene();
+		player.landingLockDuration = 0.2;
+		player.teleport( new Vector3( 10, 0, 10 ) );
+		for ( let i = 0; i < 60; i ++ ) { player.move( STOP ); world.fixedUpdate(); }
+		let landingCount = 0;
+		player.addEventListener( 'startLanding', () => landingCount ++ );
+
+		player.launch( 6 );
+		for ( let i = 0; i < 3; i ++ ) { player.move( STOP ); world.fixedUpdate(); }
+		player.cancelLaunch();
+		expect( player.isJumping ).toBe( false );
+		expect( player.isLaunched ).toBe( false );
+		// 0.3m ほどの高さから落ちる。普通の落下なら 0.1s 未満で startLanding は出ないが、cancelLaunch の後は出す。
+		for ( let i = 0; i < 30 && landingCount === 0; i ++ ) { player.move( STOP ); world.fixedUpdate(); }
+		expect( landingCount ).toBe( 1 );
+		expect( player.isLanding ).toBe( false );
+
+		// 次の普通の落下では、また硬直する。
+		player.teleport( new Vector3( 10, 5, 10 ) );
+		for ( let i = 0; i < 120 && landingCount === 1; i ++ ) { player.move( STOP ); world.fixedUpdate(); }
+		expect( landingCount ).toBe( 2 );
+		expect( player.isLanding ).toBe( true );
+
+	} );
+
+	it( 'launch() で壁に向かうと、水平の実速度が落ちる', () => {
+
+		// 箱（5 × 5 × 10、中心が原点）の +x の面へ向かう。
+		const { world, player } = makeScene();
+		player.teleport( new Vector3( 4, 0, 0 ) );
+		for ( let i = 0; i < 60; i ++ ) { player.move( STOP ); world.fixedUpdate(); }
+		player.launch( 2 );
+		for ( let i = 0; i < 10; i ++ ) { player.move( new Vector3( - 6, 0, 0 ) ); player.setLaunchSpeed( 2 ); world.fixedUpdate(); }
+		expect( Math.abs( player.velocity.x ) ).toBeLessThan( 3 );
+		expect( player.position.x ).toBeGreaterThan( 2.5 + PLAYER_RADIUS - 0.05 );
+
+	} );
+
 	it( '自由落下からの着地で startLanding を発火し、指定時間は移動とジャンプを抑止する', () => {
 
 		const { world, player } = makeScene();

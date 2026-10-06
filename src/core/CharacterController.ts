@@ -114,6 +114,10 @@ export class CharacterController extends Body<CharacterControllerEventType> {
 	groundBody: Body | null = null; // 接地している床の所有ボディ（動床なら KinematicBody）。無ければ null
 
 	private _currentJumpPower = 0;
+	// launch() 中の上下の速度（m/s、上が正）。launch していなければ null。ジャンプのコサイン弧の代わりに使う。
+	private _launchSpeed: number | null = null;
+	// cancelLaunch() の後、次の接地で必ず startLanding を出し、硬直は 0 にする。
+	private _launchCancelled = false;
 	private _isStepping = false; // 段差登り中フラグ（壁接触が一時的に消えても登りを継続させるラッチ）
 	private _lastMoveDelta = new Vector3(); // 直前ステップで実際に動けた量（段差登りの発動条件に使う）
 	// 積分に使う速度。velocity は壁ずりの射影後（＝利用側へ見せる実速度）だが、位置を進める
@@ -188,13 +192,16 @@ export class CharacterController extends Body<CharacterControllerEventType> {
 				! wasGrounded &&
 				this.isGrounded &&
 				! this.isOnSlope &&
-				( wasJumping || LANDING_MIN_FALL_DURATION_SEC <= this._fallElapsed );
+				( wasJumping || this._launchCancelled || LANDING_MIN_FALL_DURATION_SEC <= this._fallElapsed );
 
 			if ( startedLanding ) {
 
+				// cancelLaunch() で打ち切った後の着地は硬直させない。
+				const lockDuration = this._launchCancelled ? 0 : this.landingLockDuration;
+				this._launchCancelled = false;
 				this.isIdling = false;
-				this.isLanding = 0 < this.landingLockDuration;
-				this._landingTimeRemaining = this.landingLockDuration;
+				this.isLanding = 0 < lockDuration;
+				this._landingTimeRemaining = lockDuration;
 				this.isRunning = ! this.isLanding && this._moveVelocity.lengthSq() > 1e-8;
 				if ( this.isLanding ) {
 
@@ -243,6 +250,7 @@ export class CharacterController extends Body<CharacterControllerEventType> {
 			wasRunning  = startedLanding ? false : this.isRunning;
 			wasJumping  = this.isJumping;
 			if ( this.isGrounded ) this._fallElapsed = 0;
+			if ( this.isOnSlope ) this._launchCancelled = false;
 
 		};
 
@@ -571,6 +579,25 @@ export class CharacterController extends Body<CharacterControllerEventType> {
 
 		this.isGrounded = ( bottom <= this.groundHeight && this.groundHeight <= top );
 		this.isOnSlope  = ( this.groundNormal.y <= this._slopeLimitCos );
+
+		// launch 中は、急斜面に触れるまで滑りにしない（ジャンプは宙でも真下が急斜面なら滑る）。
+		// 下の球が斜面に接する高さは、中心の真下の地面から radius / normal.y - radius だけ下がる。
+		// 触れたら launch を解いて、滑りに任せる。
+		if ( this._launchSpeed !== null && this.isOnSlope ) {
+
+			const touchHeight = this.position.y + this.radius - this.radius / this.groundNormal.y - this.groundCheckDepth;
+			if ( touchHeight <= this.groundHeight ) {
+
+				this.isJumping = false;
+				this._launchSpeed = null;
+
+			} else {
+
+				this.isOnSlope = false;
+
+			}
+
+		}
 
 		if ( this.isGrounded ) {
 
@@ -1061,9 +1088,66 @@ export class CharacterController extends Body<CharacterControllerEventType> {
 
 	}
 
+	/**
+	 * 接地・斜面に関わらず宙へ出す。上下の速度は verticalSpeed（m/s、上が正）で、
+	 * ジャンプのコサイン弧の代わりに使う。宙にいる間は setLaunchSpeed() で毎フレーム差し替える。
+	 * 水平は move() のまま。着地・滑り・天井はジャンプと同じ道筋で解ける。
+	 */
+	launch( verticalSpeed: number ) {
+
+		this._endClimb();
+		this.isLanding = false;
+		this._landingTimeRemaining = 0;
+		this._launchCancelled = false;
+		this._jumpElapsed = 0;
+		this._launchSpeed = verticalSpeed;
+		this._currentJumpPower = verticalSpeed / - FALL_VELOCITY;
+		this.isJumping = true;
+
+	}
+
+	/** launch 中の上下の速度（m/s、上が正）を差し替える。launch 中でなければ何もしない。 */
+	setLaunchSpeed( verticalSpeed: number ) {
+
+		if ( this._launchSpeed === null ) return;
+		this._launchSpeed = verticalSpeed;
+
+	}
+
+	/** launch をやめて普通の落下に戻す。次の接地では startLanding を出すが、硬直させない。 */
+	cancelLaunch() {
+
+		if ( this._launchSpeed === null ) return;
+		this._launchSpeed = null;
+		this._currentJumpPower = 0;
+		this.isJumping = false;
+		this._launchCancelled = true;
+
+	}
+
+	/** launch() で宙に出ている間 true。 */
+	get isLaunched(): boolean {
+
+		return this._launchSpeed !== null;
+
+	}
+
 	_updateJumping( deltaTime: number ) {
 
-		if ( ! this.isJumping ) return;
+		if ( ! this.isJumping ) {
+
+			// 接地・天井・梯子でジャンプが解けたら、launch も解く。
+			this._launchSpeed = null;
+			return;
+
+		}
+
+		if ( this._launchSpeed !== null ) {
+
+			this._currentJumpPower = this._launchSpeed / - FALL_VELOCITY;
+			return;
+
+		}
 
 		// 経過時間を deltaTime で積算する（実時計 performance.now に依存しない＝決定論的）。
 		// コサイン弧の形は従来と同一で、60fps 実行時は旧実装と一致する。
@@ -1094,6 +1178,8 @@ export class CharacterController extends Body<CharacterControllerEventType> {
 		this.isLanding = false;
 		this._landingTimeRemaining = 0;
 		this._fallElapsed = 0;
+		this._launchSpeed = null;
+		this._launchCancelled = false;
 		this._isStepping = false;
 		this._lastMoveDelta.set( 0, 0, 0 ); // 転送前の移動量を段差判定へ持ち越さない
 		this._integrationVelocity.set( 0, 0, 0 );

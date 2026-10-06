@@ -140,11 +140,14 @@ edge).
 |---|---|
 | `move( vector3 )` | Desired horizontal velocity in world space, m/s. The `y` component is ignored (gravity, jumping and ground snapping own the vertical axis). It persists until the next call, so pass a zero vector to stop. |
 | `jump()` | Start a jump. Ignored while landing, already jumping, airborne or sliding. While climbing it pops off the surface instead. |
+| `launch( verticalSpeed )` | Leave the ground with the vertical speed you give (m/s, up is positive), even from a steep slope. Horizontal motion still comes from `move()`. Landing ends it like a jump; a steep slope ends it only on contact and hands over to sliding. |
+| `setLaunchSpeed( verticalSpeed )` | Replace the vertical speed while launched. Call it every frame to follow your own arc. |
+| `cancelLaunch()` | Stop the launch and fall normally. The next landing fires `startLanding` without the landing lock. |
 | `climb( vector2 )` | Climbing input while attached to a `ClimbableBody`: `x` is sideways, `y` is up. Camera independent, so forward always means up. |
 | `teleport( vector3 )` | Move instantly, clearing the landing lock and any climbing state. |
 | `position`, `quaternion` | The result of the simulation. Copy them onto your mesh after `world.update()`. |
 | `velocity` | The final velocity the engine produced this step. This is an output, not an input -- use `move()` to drive the character. |
-| `isGrounded`, `isOnSlope`, `isIdling`, `isRunning`, `isJumping`, `isLanding`, `isClimbing` | State flags. |
+| `isGrounded`, `isOnSlope`, `isIdling`, `isRunning`, `isJumping`, `isLanding`, `isClimbing`, `isLaunched` | State flags. |
 | `groundHeight`, `groundNormal`, `groundBody` | The floor under the character. `groundBody` is the owning body, so it is a `KinematicBody` while riding a moving platform. |
 | `slopeLimit`, `stepOffset`, `groundCheckDepth`, `landingLockDuration`, `jumpDuration` | The options above, writable at runtime. |
 | `carryRotation` | When `true` (default), a rider turns with the yaw of a rotating platform. |
