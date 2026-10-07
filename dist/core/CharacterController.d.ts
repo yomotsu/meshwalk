@@ -38,6 +38,7 @@ export declare class CharacterController extends Body<CharacterControllerEventTy
     private _currentJumpPower;
     private _launchSpeed;
     private _launchCancelled;
+    private _floatHeight;
     private _isStepping;
     private _lastMoveDelta;
     private _integrationVelocity;
@@ -111,8 +112,20 @@ export declare class CharacterController extends Body<CharacterControllerEventTy
     setLaunchSpeed(verticalSpeed: number): void;
     /** launch をやめて普通の落下に戻す。次の接地では startLanding を出すが、硬直させない。 */
     cancelLaunch(): void;
+    /**
+     * 重力と接地を切り、足元（position.y）を height に保つ（泳ぎなど）。null で重力に戻す。
+     * 水平は move() のまま。壁とは当たり、食い込んだ分だけ押し出す。
+     * 真下の歩ける地面が height より高ければ、その上に乗る（groundHeight / groundNormal に入る）。
+     * 急斜面は地面とみなさないので、その上では滑らず、真下の急斜面にも止められない。
+     * 浮いている間は isGrounded / isOnSlope / isJumping は false で、イベントは出さない。
+     * 高さを滑らかに変えたいときは、毎フレーム少しずつ違う height を渡す。
+     */
+    float(height: number | null): void;
+    /** float() で浮いている間 true。 */
+    get isFloating(): boolean;
     /** launch() で宙に出ている間 true。 */
     get isLaunched(): boolean;
+    private _updateFloat;
     _updateJumping(deltaTime: number): void;
     private _updateLanding;
     teleport(position: Vector3): void;

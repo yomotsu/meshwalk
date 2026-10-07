@@ -1621,6 +1621,8 @@ class CharacterController extends Body {
         this._launchSpeed = null;
         // cancelLaunch() の後、次の接地で必ず startLanding を出し、硬直は 0 にする。
         this._launchCancelled = false;
+        // float() で保つ足元の高さ（m）。浮いていなければ null。
+        this._floatHeight = null;
         this._isStepping = false; // 段差登り中フラグ（壁接触が一時的に消えても登りを継続させるラッチ）
         this._lastMoveDelta = new Vector3(); // 直前ステップで実際に動けた量（段差登りの発動条件に使う）
         // 積分に使う速度。velocity は壁ずりの射影後（＝利用側へ見せる実速度）だが、位置を進める
@@ -1773,6 +1775,11 @@ class CharacterController extends Body {
         this._updateLanding(deltaTime);
         if (this._climbMountCooldown > 0)
             this._climbMountCooldown = Math.max(0, this._climbMountCooldown - deltaTime);
+        // 浮いている間は専用ループ（重力・接地・ジャンプ・イベントをバイパスする）
+        if (this._floatHeight !== null) {
+            this._updateFloat(deltaTime);
+            return;
+        }
         // 登り中は専用ループ（重力・接地・ジャンプをバイパスし、面に沿って動かす）
         if (this.isClimbing) {
             this._updateClimb(deltaTime);
@@ -2373,9 +2380,88 @@ class CharacterController extends Body {
         this.isJumping = false;
         this._launchCancelled = true;
     }
+    /**
+     * 重力と接地を切り、足元（position.y）を height に保つ（泳ぎなど）。null で重力に戻す。
+     * 水平は move() のまま。壁とは当たり、食い込んだ分だけ押し出す。
+     * 真下の歩ける地面が height より高ければ、その上に乗る（groundHeight / groundNormal に入る）。
+     * 急斜面は地面とみなさないので、その上では滑らず、真下の急斜面にも止められない。
+     * 浮いている間は isGrounded / isOnSlope / isJumping は false で、イベントは出さない。
+     * 高さを滑らかに変えたいときは、毎フレーム少しずつ違う height を渡す。
+     */
+    float(height) {
+        if (height !== null && this._floatHeight === null) {
+            this._endClimb();
+            this.isGrounded = false;
+            this.isOnSlope = false;
+            this.isJumping = false;
+            this.isLanding = false;
+            this._landingTimeRemaining = 0;
+            this._launchSpeed = null;
+            this._launchCancelled = false;
+            this._currentJumpPower = 0;
+            this._isStepping = false;
+            this.isRunning = this._moveVelocity.lengthSq() > 1e-8;
+        }
+        // 浮いていた時間を落下の時間に数えない（抜けた直後の小さな落下で硬直させない）。
+        if (height === null)
+            this._fallElapsed = 0;
+        this._floatHeight = height;
+    }
+    /** float() で浮いている間 true。 */
+    get isFloating() {
+        return this._floatHeight !== null;
+    }
     /** launch() で宙に出ている間 true。 */
     get isLaunched() {
         return this._launchSpeed !== null;
+    }
+    _updateFloat(deltaTime) {
+        stepStartPosition.copy(this.position);
+        this.isGrounded = false;
+        this.isOnSlope = false;
+        this.groundHeight = -Infinity;
+        this.groundNormal.set(0, 1, 0);
+        this.groundBody = null;
+        this._externalVelocity.set(0, 0, 0);
+        this.position.set(this.position.x + this._moveVelocity.x * deltaTime, this._floatHeight, this.position.z + this._moveVelocity.z * deltaTime);
+        // 頭から足元までの間で、真下の歩ける面の最高点。あればその上に乗る。
+        // 歩ける面を押し出しに任せると、斜面の法線で後ろへ押し戻されて上れない（_solvePosition と同じ理由）。
+        groundingHead.set(this.position.x, this.position.y + this.height, this.position.z);
+        groundingTo.set(this.position.x, this.position.y, this.position.z);
+        const triangles = this._nearTriangles;
+        for (let i = 0, l = triangles.length; i < l; i++) {
+            const triangle = triangles[i];
+            if (triangle.normal.y <= this._slopeLimitCos)
+                continue;
+            if (isFarFromVerticalLine(triangle, this.position.x, this.position.z))
+                continue;
+            if (!intersectsLineTriangle(groundingHead, groundingTo, triangle.a, triangle.b, triangle.c, groundContactPointTmp))
+                continue;
+            if (groundContactPointTmp.y <= this.groundHeight)
+                continue;
+            this.groundHeight = groundContactPointTmp.y;
+            this.groundNormal.copy(triangle.normal);
+        }
+        if (this.position.y < this.groundHeight)
+            this.position.y = this.groundHeight;
+        // 歩ける面は上で扱ったので、壁・急斜面・天井からだけ押し出す。
+        this._collisionDetection();
+        translate.set(0, 0, 0);
+        for (let i = 0, l = this._contactCount; i < l; i++) {
+            const contact = this._contactInfo[i];
+            if (this._slopeLimitCos < contact.triangle.normal.y)
+                continue;
+            const remaining = contact.depth - translate.dot(contact.normal);
+            if (0 < remaining)
+                translate.addScaledVector(contact.normal, remaining);
+        }
+        this.position.add(translate);
+        this._updateQuaternion();
+        // 利用側へ見せる速度は、押し出しの後に実際に動いた量。
+        this._lastMoveDelta.subVectors(this.position, stepStartPosition);
+        if (0 < deltaTime)
+            this.velocity.copy(this._lastMoveDelta).divideScalar(deltaTime);
+        this._integrationVelocity.set(this.velocity.x, 0, this.velocity.z);
     }
     _updateJumping(deltaTime) {
         if (!this.isJumping) {
