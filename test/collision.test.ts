@@ -491,6 +491,97 @@ describe( 'CharacterController capsule collision', () => {
 
 	} );
 
+	it( 'float() は足元を指定した高さに保ち、真下の急斜面に止められずに進む', () => {
+
+		// 55° の斜面（-z が上り。PlaneGeometry を x 軸まわりに -35° 回すと、傾きは 90° - 35°）。
+		// 泳ぎのように、斜面よりずっと上を上りの向きへ進む。
+		const world = new World();
+		const ramp = new Mesh( new PlaneGeometry( 200, 200 ), new MeshBasicMaterial() );
+		ramp.rotation.x = - 35 * MathUtils.DEG2RAD;
+		ramp.updateMatrixWorld( true );
+		const level = new StaticBody();
+		level.addFromObject( ramp );
+		world.add( level );
+		const player = new CharacterController( { radius: PLAYER_RADIUS, height: PLAYER_HEIGHT } );
+		world.add( player );
+		player.teleport( new Vector3( 0, 5, 0 ) );
+
+		const events: string[] = [];
+		for ( const type of [ 'startLanding', 'startFalling', 'startSliding', 'startJumping' ] ) player.addEventListener( type, () => events.push( type ) );
+		player.float( 5 );
+		expect( player.isFloating ).toBe( true );
+		for ( let i = 0; i < 60; i ++ ) { player.move( new Vector3( 0, 0, - 2 ) ); world.fixedUpdate(); }
+		expect( player.position.z ).toBeCloseTo( - 2, 1 );
+		expect( player.position.y ).toBeCloseTo( 5, 6 );
+		expect( player.isGrounded ).toBe( false );
+		expect( player.isOnSlope ).toBe( false );
+		expect( player.isJumping ).toBe( false );
+		expect( player.velocity.z ).toBeCloseTo( - 2, 1 );
+		expect( events ).toEqual( [] );
+
+	} );
+
+	it( 'float( null ) で重力に戻り、落ちて着地する', () => {
+
+		const { world, player } = makeScene();
+		player.teleport( new Vector3( 10, 0, 10 ) );
+		for ( let i = 0; i < 60; i ++ ) { player.move( STOP ); world.fixedUpdate(); }
+		const restY = player.position.y;
+		let landingCount = 0;
+		player.addEventListener( 'startLanding', () => landingCount ++ );
+
+		player.float( restY + 3 );
+		for ( let i = 0; i < 10; i ++ ) { player.move( STOP ); world.fixedUpdate(); }
+		expect( player.position.y ).toBeCloseTo( restY + 3, 6 );
+		player.float( null );
+		expect( player.isFloating ).toBe( false );
+		for ( let i = 0; i < 120 && landingCount === 0; i ++ ) { player.move( STOP ); world.fixedUpdate(); }
+		expect( landingCount ).toBe( 1 );
+		expect( player.isGrounded ).toBe( true );
+		expect( player.position.y ).toBeCloseTo( restY, 2 );
+
+	} );
+
+	it( 'float() の間も壁には当たり、地面より下へは沈まない', () => {
+
+		// 箱（5 × 5 × 10、中心が原点）の +x の面へ向かう。
+		const { world, player } = makeScene();
+		player.teleport( new Vector3( 4, 1, 0 ) );
+		player.float( 1 );
+		for ( let i = 0; i < 60; i ++ ) { player.move( new Vector3( - 3, 0, 0 ) ); world.fixedUpdate(); }
+		expect( player.position.x ).toBeGreaterThan( 2.5 + PLAYER_RADIUS - 0.05 );
+		expect( Math.abs( player.velocity.x ) ).toBeLessThan( 0.1 );
+
+		// 地面より下を指しても、歩ける地面の上に乗る。
+		player.teleport( new Vector3( 10, 0, 10 ) );
+		player.float( - 0.5 );
+		for ( let i = 0; i < 10; i ++ ) { player.move( STOP ); world.fixedUpdate(); }
+		expect( player.position.y ).toBeCloseTo( 0, 6 );
+
+	} );
+
+	it( 'float() の高さより歩ける斜面が高くなると、斜面に乗って進む', () => {
+
+		// 20° の斜面（-z が上り）。岸へ泳ぎ着いて、浅くなる前に湖底が水面近くまで上がってくる形。
+		const world = new World();
+		const ramp = new Mesh( new PlaneGeometry( 200, 200 ), new MeshBasicMaterial() );
+		ramp.rotation.x = - 70 * MathUtils.DEG2RAD;
+		ramp.updateMatrixWorld( true );
+		const level = new StaticBody();
+		level.addFromObject( ramp );
+		world.add( level );
+		const player = new CharacterController( { radius: PLAYER_RADIUS, height: PLAYER_HEIGHT } );
+		world.add( player );
+		player.teleport( new Vector3( 0, 0.5, 0 ) );
+		player.float( 0.5 );
+		for ( let i = 0; i < 120; i ++ ) { player.move( new Vector3( 0, 0, - 2 ) ); world.fixedUpdate(); }
+		expect( player.position.z ).toBeCloseTo( - 4, 1 );
+		expect( player.position.y ).toBeCloseTo( - player.position.z * Math.tan( 20 * MathUtils.DEG2RAD ), 2 );
+		expect( player.groundHeight ).toBeCloseTo( player.position.y, 6 );
+		expect( player.isGrounded ).toBe( false );
+
+	} );
+
 	it( '自由落下からの着地で startLanding を発火し、指定時間は移動とジャンプを抑止する', () => {
 
 		const { world, player } = makeScene();
