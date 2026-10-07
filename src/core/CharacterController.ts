@@ -683,8 +683,15 @@ export class CharacterController extends Body<CharacterControllerEventType> {
 
 		}
 
-		// 現在の地面より高い段差で、かつ stepOffset 以内でなければ登れない（＝壁のまま）
-		const valid = ( stepTop > this.groundHeight + STEP_EPS ) && ( stepTop - foot <= this.stepOffset );
+		// いま立っている面を前縁まで延ばした高さ。上り斜面では前縁の地面が中心より高いだけで、
+		// 段ではない。これを段とみなすと持ち上げた次のステップでラッチが外れて落ち、
+		// 斜面の先の急な面に押し戻される、を繰り返して上下に振動する。
+		const groundNormal = this.groundNormal;
+		const groundPlaneTop = this.groundHeight
+			- ( groundNormal.x * ( px - this.position.x ) + groundNormal.z * ( pz - this.position.z ) ) / groundNormal.y;
+
+		// 現在の地面（とその延長）より高い段差で、かつ stepOffset 以内でなければ登れない（＝壁のまま）
+		const valid = ( stepTop > Math.max( this.groundHeight, groundPlaneTop ) + STEP_EPS ) && ( stepTop - foot <= this.stepOffset );
 		if ( ! valid ) { this._isStepping = false; return; }
 
 		// 頭上チェック: 持ち上げでカプセル頭が天井等に当たるなら登らない

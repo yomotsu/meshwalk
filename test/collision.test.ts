@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
 import {
 	Mesh,
 	Object3D,
@@ -1697,6 +1698,63 @@ describe( 'StaticBody triangle buffers', () => {
 
 		expect( source.getSphereTriangles( sphere, [] ).length ).toBeGreaterThan( 0 );
 		expect( hydrated.getSphereTriangles( sphere, [] ).length ).toBeGreaterThan( 0 );
+
+	} );
+
+} );
+
+describe( 'CharacterController step offset on real terrain', () => {
+
+	// terrain-gen の walkthrough で、急な面と歩ける小さな棚が混ざる崖へ前進し続けた場所の三角形
+	// （キャラの位置を原点にした相対座標）。半径 0.25・高さ 1.6・速さ 9m/s で (-1, 0, -1) へ押す。
+	// 棚へ持ち上げた次の substep でラッチが外れて落ち、壁に押し戻される、を繰り返していた。
+	const fixture = JSON.parse( readFileSync( new URL( './fixtures/terrain-wall-step.json', import.meta.url ), 'utf8' ) ) as {
+		move: [ number, number ];
+		radius: number;
+		height: number;
+		tris: number[][];
+	};
+
+	function makeTerrainWall() {
+
+		const positions = new Float32Array( fixture.tris.flat() );
+		const indices = new Uint32Array( positions.length / 3 ).map( ( _, i ) => i );
+		const world = new World();
+		world.add( new StaticBody().addTriangles( positions, indices ) );
+		const player = new CharacterController( { radius: fixture.radius, height: fixture.height } );
+		world.add( player );
+		return { world, player };
+
+	}
+
+	it( '越えられない壁へ押し続けても上下に振動しない', () => {
+
+		const { world, player } = makeTerrainWall();
+		const move = new Vector3( fixture.move[ 0 ], 0, fixture.move[ 1 ] );
+		const back = move.clone().normalize().multiplyScalar( - 0.5 );
+		player.teleport( new Vector3( back.x, 1, back.z ) );
+		player.velocity.set( 0, 0, 0 );
+		for ( let i = 0; i < 40; i ++ ) { player.move( STOP ); world.fixedUpdate(); }
+
+		const ys: number[] = [];
+		const positions: Vector3[] = [];
+		for ( let i = 0; i < 120; i ++ ) {
+
+			player.move( move );
+			world.fixedUpdate();
+			if ( i >= 60 ) {
+
+				ys.push( player.position.y );
+				positions.push( player.position.clone() );
+
+			}
+
+		}
+
+		let maxFrameStep = 0;
+		for ( let i = 1; i < positions.length; i ++ ) maxFrameStep = Math.max( maxFrameStep, positions[ i ]!.distanceTo( positions[ i - 1 ]! ) );
+		expect( Math.max( ...ys ) - Math.min( ...ys ), '押し続けている間に上下している' ).toBeLessThan( 0.02 );
+		expect( maxFrameStep, '押し続けている間にフレームごとに位置が跳ねている' ).toBeLessThan( 0.02 );
 
 	} );
 
